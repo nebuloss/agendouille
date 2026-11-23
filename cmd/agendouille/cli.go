@@ -63,23 +63,34 @@ func want(positional []string, n int, usage string) error {
 	return nil
 }
 
-// cmdAdmin: agendouille admin passwd [--random].
+// cmdAdmin: agendouille admin passwd [--random] [--if-unset].
 func cmdAdmin(ctx context.Context, e env, args []string) error {
 	set := flag.NewFlagSet("agendouille admin", flag.ContinueOnError)
 	loader := config.NewLoader(set)
 	random := set.Bool("random", false, "make a random password and print it once")
+	ifUnset := set.Bool("if-unset", false, "leave a password that is already set alone (install.sh, on upgrades)")
 	help, pos, err := parseArgs(set, e, args)
 	if help || err != nil {
 		return err
 	}
-	if err := want(pos, 1, "admin passwd [--random]"); err != nil || pos[0] != "passwd" {
-		return errors.Join(err, fmt.Errorf("usage: agendouille admin passwd [--random]"))
+	if err := want(pos, 1, "admin passwd [--random] [--if-unset]"); err != nil || pos[0] != "passwd" {
+		return errors.Join(err, fmt.Errorf("usage: agendouille admin passwd [--random] [--if-unset]"))
 	}
 	cfg, svc, err := openFor(ctx, e, loader)
 	if err != nil {
 		return err
 	}
 	defer svc.store.Close()
+	if *ifUnset {
+		has, err := svc.auth.HasAdminPassword(ctx)
+		if err != nil {
+			return err
+		}
+		if has {
+			fmt.Fprintln(e.stdout, "An admin password is already set; left alone.")
+			return nil
+		}
+	}
 	password := ""
 	if *random {
 		password = auth.RandomPassword()

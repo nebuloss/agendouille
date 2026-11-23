@@ -126,3 +126,10 @@ func serve(w http.ResponseWriter, r *http.Request, byPath map[string]asset, p st
 	h.Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, path.Base(p), time.Time{}, bytes.NewReader(a.body))
 }
+
+// Icon is the andouille, as SVG: the favicon of every surface and the
+// brand in the top bars.
+func Icon() []byte {
+	b, _ := files.ReadFile("static/shared/icon.svg")
+	return b
+}

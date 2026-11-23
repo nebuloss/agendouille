@@ -1,0 +1,27 @@
+# /etc/agendouille.yaml: what agendouille needs before it can open its
+# database. Everything else (the public address and listener, backups,
+# limits, the family's time zone) is a setting, changed in the admin UI and
+# applied at once; `agendouille config` prints both.
+#
+# Every key is also a flag (-admin-listen) and an environment variable
+# (AGENDOUILLE_ADMIN_LISTEN). An unknown key is an error, on purpose.
+
+# Where the database and its backups live. The systemd unit lets the
+# service write only here; change ReadWritePaths with it.
+# data_dir: /var/lib/agendouille
+
+# The admin UI: users, groups, sign-in QR codes, settings, backups. It
+# never shows an event. Meant for the LAN only: the DMZ proxy forwards to
+# the public listener, never to this one.
+#
+# On loopback (the default) reach it through SSH:
+#   ssh -L 8792:127.0.0.1:8792 root@this-machine, then http://127.0.0.1:8792/admin
+# To reach it from the LAN, listen there and say where it is reached;
+# plain http off loopback needs admin_allow_insecure, in so many words:
+#   admin_listen: 0.0.0.0:8792
+#   admin_public_url: http://10.0.60.8:8792
+#   admin_allow_insecure: true
+# admin_listen: 127.0.0.1:8792
+
+# debug, info, warn or error.
+# log_level: info

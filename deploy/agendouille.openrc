@@ -1,0 +1,45 @@
+#!/sbin/openrc-run
+# Variables are read by openrc-run, not by this file.
+# shellcheck shell=sh disable=SC2034
+# agendouille under OpenRC: /etc/init.d/agendouille, then
+# `rc-update add agendouille default`. An Alpine container has no systemd.
+#
+# supervise-daemon, not a plain background process: a restore from the
+# admin UI exits with 75 and must be started again to be applied, and a
+# crash must not leave the family without its calendar.
+
+name="agendouille"
+description="the family calendar: CalDAV, the web app and the admin UI"
+
+supervisor=supervise-daemon
+command="/usr/local/bin/agendouille"
+command_args="serve -config /etc/agendouille.yaml"
+command_user="agendouille:agendouille"
+pidfile="/run/agendouille.pid"
+umask=077
+respawn_delay=2
+respawn_max=0
+
+output_log="/var/log/agendouille.log"
+error_log="/var/log/agendouille.log"
+
+depend() {
+    need net
+    after firewall
+}
+
+start_pre() {
+    checkpath --file --owner agendouille:agendouille --mode 0640 "$output_log"
+
+    # Refuse to start rather than start wrong: `agendouille config` fails
+    # on an unknown key or a value that cannot mean what it says.
+    if ! "$command" config -config /etc/agendouille.yaml >/dev/null 2>&1; then
+        eerror "the configuration in /etc/agendouille.yaml is not usable:"
+        "$command" config -config /etc/agendouille.yaml 2>&1 | head -12
+        return 1
+    fi
+
+    data_dir=$("$command" config -config /etc/agendouille.yaml 2>/dev/null |
+        sed -n 's/^data_dir: *//p')
+    checkpath --directory --owner agendouille:agendouille --mode 0700 "${data_dir:-/var/lib/agendouille}"
+}

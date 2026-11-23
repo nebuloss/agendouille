@@ -63,9 +63,15 @@ M0 and M1 are done. What exists:
   Moi). Tests: `family_e2e_test.go` (M4's "done when"),
   `src/app/**/*.test.ts`. `scripts/shots/run.sh` shoots the app too.
 
-Next is M5, deployment (PLAN section 15). M2's by-hand checks with real
-DAVx5, iOS and Thunderbird are still to do, now with the web app's
-Appareils page to set them up.
+- **M5, deployment:** `deploy/` (install.sh for Debian and Alpine, the
+  hardened unit, OpenRC under supervise-daemon, the container drop-in,
+  nginx and Caddy examples, README with the client checklist),
+  `scripts/devdeploy.sh`, `admin passwd --if-unset`, the andouille icon.
+  Deployed to CT 408 `dmz-agendouille`:
+  `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
+
+M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
+now with the web app's Appareils page to set them up.
 
 ## Conventions come from cafard and claudication
 
@@ -148,7 +154,10 @@ install'`, and copy `package-lock.json` back with `scp`.
   it happened to the admin sign-in).
 - **A restore restarts the server** (`ErrRestart`, exit 75): the service
   must run under `Restart=on-failure` or a supervisor, which `deploy/`
-  sets up (M5).
+  sets up (systemd, and OpenRC's `supervise-daemon`).
+- **The rsync in `remote.sh` deletes `scripts/shots/node_modules`** (the
+  link to puppeteer): `ln -sfn $HOME/shots/node_modules scripts/shots/node_modules`
+  in the same remote command before any `node scripts/shots/*.mjs`.
 - **Screenshots before saying a page works:** `scripts/remote.sh 'bash
   scripts/shots/run.sh'`, then look at them. Happy-dom tests do not catch
   layout. The app pages hold `/api/live` open: wait for `networkidle2`,

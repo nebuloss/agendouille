@@ -95,7 +95,8 @@ p { margin: 0 0 12px; }
 .topbar form { margin: 0; }
 .admin-bar { background: var(--admin-bar); color: var(--on-admin-bar); }
 .admin-bar .btn.text { color: var(--on-admin-bar); }
-.brand { color: inherit; text-decoration: none; font-weight: 600; letter-spacing: .01em; }
+.brand { color: inherit; text-decoration: none; font-weight: 600; letter-spacing: .01em; display: inline-flex; align-items: center; gap: 8px; }
+.brand img { border-radius: 7px; }
 .sidenav { background: var(--surface-container-low); padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
 .sidenav a { color: var(--on-surface); text-decoration: none; padding: 10px 16px; border-radius: var(--shape-full); }
 .sidenav a:hover { background: var(--surface-container-high); }

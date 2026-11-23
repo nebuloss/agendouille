@@ -27,7 +27,8 @@ backups at `http://127.0.0.1:8792/admin`. The family web app shows the
 calendars by agenda, week and month, edits events (one, this and
 following, or all of a series), creates and shares calendars, and sets
 up phones (DAVx5 by QR, iPhone by profile, Thunderbird by hand) and
-read-only `.ics` links. Deployment (M5) is next. See `PLAN.md` for the design,
+read-only `.ics` links. `deploy/install.sh` installs and upgrades it on
+Debian or Alpine (see `deploy/README.md`). See `PLAN.md` for the design,
 `CONTRACTS.md` for the interfaces and `DECISIONS.md` for what was decided
 and why.
 

@@ -64,11 +64,12 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintln(w, "ok "+version)
 }
 
-// noFavicon answers the browsers' favicon request with nothing, rather than
-// a 404 in every console (an icon comes with the web app's manifest, M4).
-func noFavicon(w http.ResponseWriter, _ *http.Request) {
+// favicon answers /favicon.ico with the andouille in SVG, which every
+// current browser takes whatever the path says.
+func favicon(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "max-age=86400")
-	w.WriteHeader(http.StatusNoContent)
+	_, _ = w.Write(assets.Icon())
 }
 
 // services is everything that reads and writes the database.
@@ -110,14 +111,14 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 func muxes(d *deps.Deps) (public, adminMux http.Handler, err error) {
 	pub := http.NewServeMux()
 	pub.HandleFunc("GET /healthz", healthz)
-	pub.HandleFunc("GET /favicon.ico", noFavicon)
+	pub.HandleFunc("GET /favicon.ico", favicon)
 	dav.Register(pub, d)
 	if err := app.Register(pub, d); err != nil {
 		return nil, nil, err
 	}
 	adm := http.NewServeMux()
 	adm.HandleFunc("GET /healthz", healthz)
-	adm.HandleFunc("GET /favicon.ico", noFavicon)
+	adm.HandleFunc("GET /favicon.ico", favicon)
 	if err := admin.Register(adm, d); err != nil {
 		return nil, nil, err
 	}

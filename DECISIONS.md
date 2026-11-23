@@ -3,6 +3,28 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M5 notes
+
+- **The home server is container 408 `dmz-agendouille`** (Alpine,
+  OpenRC, 10.0.60.8) on the Proxmox host 10.0.0.2, which the user made for
+  it and said to deploy to. The admin UI listens on the LAN
+  (`0.0.0.0:8792`, plain http, `admin_allow_insecure`), as claudication's
+  container next to it does; the DMZ proxy (HAProxy 10.0.60.1, then Nginx
+  Proxy Manager 10.0.60.2) forwards only the public listener (:8791).
+- **OpenRC runs it under `supervise-daemon`**, not as a plain background
+  process: a restore exits with 75 and must be started again. Checked on
+  408: a restore from the admin API was back in 3 s.
+- **`admin passwd --if-unset`**: install.sh makes a random password, pipes
+  it in, and shows it only when it was set, so an upgrade never changes it
+  and the server never prints one into a log.
+- **`scripts/devdeploy.sh` runs install.sh** with the binary it built
+  (`AGENDOUILLE_INSTALL_BINARY`), so one command does a first install and
+  every upgrade; cafard's needed install.sh run first by hand.
+- **The icon is an andouille** (the user's request): a tied sausage and a
+  Guémené slice with its rings, `static/shared/icon.svg`, used as the
+  favicon (`/favicon.ico` answers it as SVG), the touch icon and the brand
+  in both top bars.
+
 ## 2026-11-23: M4 notes
 
 - **No in-page QR scanner, so no `jsqr`.** The approval QR holds a plain

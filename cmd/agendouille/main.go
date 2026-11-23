@@ -23,7 +23,7 @@ Commands:
   serve     run the server
   config    print the bootstrap configuration and the settings;
             config set <key> <value>... changes settings
-  admin     admin passwd [--random]: set the admin password
+  admin     admin passwd [--random] [--if-unset]: set the admin password
   user      add, enrol (a one-time sign-in link and QR), list, disable,
             enable, remove
   group     add, list, remove, member add|remove

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,5 +164,35 @@ func withAdminPassword(t *testing.T, cfg *config.Config) {
 	defer svc.store.Close()
 	if err := svc.auth.SetAdminPassword(context.Background(), "test", testAdminPassword); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// install.sh runs `admin passwd --if-unset` on every install: the first
+// sets the password, an upgrade leaves it alone.
+func TestAdminPasswdIfUnset(t *testing.T) {
+	vars := map[string]string{"AGENDOUILLE_DATA_DIR": t.TempDir()}
+	passwd := func(pw string) string {
+		t.Helper()
+		var out strings.Builder
+		err := run(context.Background(), []string{"admin", "passwd", "--if-unset"}, strings.NewReader(pw+"\n"), &out, io.Discard,
+			func(k string) string { return vars[k] })
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	if out := passwd("first password here"); !strings.HasPrefix(out, "Admin password set.") {
+		t.Errorf("first: %q", out)
+	}
+	if out := passwd("second password here"); !strings.HasPrefix(out, "An admin password is already set") {
+		t.Errorf("second: %q", out)
+	}
+}
+
+func TestFaviconIsTheAndouille(t *testing.T) {
+	rec := httptest.NewRecorder()
+	favicon(rec, httptest.NewRequest("GET", "/favicon.ico", nil))
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/svg+xml" || !strings.Contains(rec.Body.String(), "andouille") {
+		t.Errorf("favicon: %d %q", rec.Code, rec.Header().Get("Content-Type"))
 	}
 }

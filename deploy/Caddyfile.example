@@ -1,0 +1,16 @@
+# agendouille behind Caddy in the DMZ: forward ONLY the public listener
+# (CalDAV and the family web app, :8791), never the admin one (:8792).
+# Caddy gets the certificate itself, passes every method and header
+# CalDAV needs, and flushes Server-Sent Events (/api/live) as they come.
+#
+# Then, in agendouille's admin UI (Settings, Network): public_url
+# https://agenda.example.org and trusted_proxies set to Caddy's address.
+
+agenda.example.org {
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy 10.0.60.8:8791 {
+		flush_interval -1
+	}
+}
