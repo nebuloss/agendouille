@@ -33,13 +33,17 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 		"GET /admin/users":        {"users", "Utilisateurs"},
 		"GET /admin/users/{name}": {"user", "Utilisateur"},
 		"GET /admin/groups":       {"groups", "Groupes"},
-		"GET /admin/calendars":    {"calendars", "Calendriers"},
 		"GET /admin/activity":     {"activity", "Activité"},
 		"GET /admin/settings":     {"settings", "Réglages"},
 		"GET /admin/backups":      {"backups", "Sauvegardes"},
 	} {
 		mux.Handle(path, h.page(h.shell(page[0], page[1])))
 	}
+	// Calendars are under their owner now, as on claudication's pages: an
+	// old link lands on the users.
+	mux.Handle("GET /admin/calendars", h.page(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	}))
 	h.registerAPI(mux, guard)
 	return nil
 }
@@ -49,7 +53,7 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 func (h *handlers) shell(page, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		webx.Render(w, h.d.Log, http.StatusOK, "admin/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.Admin,
-			Data: map[string]any{"Page": page, "Title": title, "Name": r.PathValue("name")}})
+			Data: map[string]any{"Page": page, "Title": title, "Name": r.PathValue("name"), "Version": h.d.Version}})
 	}
 }
 

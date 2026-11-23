@@ -76,10 +76,29 @@ func TestM3AdminUI(t *testing.T) {
 	}
 	A := signInAdmin(t, x)
 	// The pages are served (the bundle fills them).
-	for _, p := range []string{"/admin", "/admin/users", "/admin/users/lea", "/admin/groups", "/admin/calendars", "/admin/activity", "/admin/settings", "/admin/backups"} {
+	for _, p := range []string{"/admin", "/admin/users", "/admin/users/lea", "/admin/groups", "/admin/activity", "/admin/settings", "/admin/backups"} {
 		if a := x.do("GET", x.admin+p, nil, cookie(auth.AdminCookie, A.session)); a.status != 200 || !strings.Contains(a.body, "admin-content") {
 			t.Errorf("page %s: %d", p, a.status)
 		}
+	}
+	// The old calendars page lands on the users: calendars are under their owner.
+	if a := x.do("GET", x.admin+"/admin/calendars", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/admin/users" {
+		t.Errorf("/admin/calendars: %d %s", a.status, a.header.Get("Location"))
+	}
+	// The notification centre: the public side being off is an error,
+	// marked read it stays read, and it is forgotten once fixed.
+	nt := A.json("GET", "/notices", nil, 200)
+	if !strings.Contains(asJSON(nt), `"id":"server:no_public_listener"`) || !strings.Contains(asJSON(nt), `"severity":"error"`) {
+		t.Errorf("notices: %v", nt)
+	}
+	nt = A.json("POST", "/notices/read", map[string]any{"ids": []string{"server:no_public_listener", "nonsense"}}, 200)
+	read := map[string]bool{}
+	for _, n := range nt["notices"].([]any) {
+		m := n.(map[string]any)
+		read[m["id"].(string)] = m["read"] == true
+	}
+	if !read["server:no_public_listener"] || read["server:backup_old"] {
+		t.Errorf("marked read: %v", read)
 	}
 	ov := A.json("GET", "/overview", nil, 200)
 	if !strings.Contains(asJSON(ov["warnings"]), "no_public_listener") {
@@ -97,6 +116,14 @@ func TestM3AdminUI(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	x.public = "http://" + addr
+	if nt := A.json("GET", "/notices", nil, 200); strings.Contains(asJSON(nt), "no_public_listener") {
+		t.Errorf("the notice outlived its problem: %v", nt)
+	}
+	var marks int
+	_ = x.svc.store.DB().QueryRow(`SELECT count(*) FROM notice_reads WHERE id = 'server:no_public_listener'`).Scan(&marks)
+	if marks != 0 {
+		t.Error("the read mark outlived its notice")
+	}
 	bad := A.call("PATCH", "/settings", map[string]any{"public_listen": "0.0.0.0:1", "public_url": "http://lan"})
 	if bad.status != http.StatusBadRequest || !strings.Contains(bad.body, "plain http") {
 		t.Errorf("a bad setting: %d %s", bad.status, bad.body)

@@ -3,6 +3,28 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: the admin UI laid out like claudication and cafard
+
+The user: "organize admin ui like claudication and cafard with horizontal
+nav bar, notification center. remove calendar from top level".
+
+- **The frame is theirs:** a top bar (the andouille, "administration", the
+  running version, the bell, sign-out), the trail of every level above the
+  page across the whole width (home, Utilisateurs, Léa: the user's display
+  name once the page has loaded), and the rail of the sections beside the
+  page, a row above it on a phone. The overview is the trail's home, not a
+  rail entry, as there.
+- **Calendars are not a section any more:** they are on their owner's page,
+  with what the old page did (remove a share, give, delete). An old
+  `/admin/calendars` link lands on the users.
+- **The notification centre** (`GET /api/admin/notices`, `POST
+  /api/admin/notices/read`): worked out from the state on every read (the
+  server's warnings, devices that stopped syncing, users who never signed
+  in), each a link to where it is dealt with. A read mark lives in
+  `notice_reads` while its notice lasts and is forgotten when it goes, so
+  the problem coming back is news. The bell polls every minute and after
+  every change the admin makes.
+
 ## 2026-11-23: Tailwind and Material 3, like claudication and cafard
 
 The user: "ui is ugly use typescript with tailwind like claudication and

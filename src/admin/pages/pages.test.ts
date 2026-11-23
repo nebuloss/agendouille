@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Api } from '@/shared/core/Api.ts';
 import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UsersPage } from '@/admin/pages/Users.ts';
-import { CalendarsPage } from '@/admin/pages/More.ts';
+import { GroupsPage } from '@/admin/pages/More.ts';
 import { bytes, ago } from '@/shared/render/format.ts';
 import { isImageDataUrl, svgDataUrl } from '@/shared/core/Dom.ts';
 
@@ -63,10 +63,10 @@ describe('admin pages', () => {
   });
 
   it('an error from the server is shown in place of the page', async () => {
-    const page = new CalendarsPage(document, fakeApi({}));
+    const page = new GroupsPage(document, fakeApi({}));
     page.start();
     await settle();
-    expect(document.querySelector('#admin-content [role="alert"]')?.textContent).toContain('no /calendars');
+    expect(document.querySelector('#admin-content [role="alert"]')?.textContent).toContain('no /groups');
   });
 });
 

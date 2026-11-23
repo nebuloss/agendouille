@@ -70,61 +70,6 @@ export class GroupsPage extends AdminPage {
   }
 }
 
-interface CalendarMeta {
-  ref: string;
-  owner: string;
-  name: string;
-  color: string;
-  timezone: string;
-  events: number;
-  bytes: number;
-  shares: { target: string; access: string }[];
-}
-
-/** Every calendar, without its events (PLAN.md 10, privacy from the admin). */
-export class CalendarsPage extends AdminPage {
-  protected async render(): Promise<Child[]> {
-    const [{ calendars }, { users }] = await Promise.all([
-      this.api.get<{ calendars: CalendarMeta[] }>('/calendars'),
-      this.api.get<{ users: UserLite[] }>('/users'),
-    ]);
-    return [
-      h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements."),
-      table(['Calendrier', 'Propriétaire', 'Événements', 'Taille', 'Partages', ''],
-        calendars.map((c) => [
-          h('span', {}, swatch(c.color), c.name, ' ', h('span', { class: 'font-mono text-xs text-on-surface-variant' }, c.ref)),
-          h('a', { href: `/admin/users/${seg(c.owner)}` }, c.owner),
-          String(c.events),
-          bytes(c.bytes),
-          h('span', {}, ...c.shares.map((s) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, `${s.target} · ${accessLabel(s.access)} `,
-            action('×', () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(s.target)}`), 'Partage retiré.'), 'text')))),
-          h('span', { class: 'flex flex-wrap items-center gap-2' },
-            action('Donner…', () => this.transfer(c, users), 'text'),
-            action('Supprimer…', () => this.remove(c), 'text')),
-        ]), 'Aucun calendrier. Les utilisateurs les créent depuis leur téléphone ou l’application.'),
-    ];
-  }
-
-  private async transfer(c: CalendarMeta, users: UserLite[]): Promise<void> {
-    const select = h('select', {}, ...users.filter((u) => u.name !== c.owner).map((u) => h('option', { value: u.name }, u.display_name)));
-    const keep = h('input', { type: 'checkbox', checked: true });
-    const v = await dialog(this.doc, `Donner ${c.name}`, [field('À', select), h('label', { class: ui.check }, keep, `${c.owner} garde lecture et écriture`)],
-      [{ label: 'Annuler', value: 'no' }, { label: 'Donner', value: 'yes', kind: 'filled' }]);
-    if (v !== 'yes' || select.value === '') return;
-    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: select.value, keep: keep.checked }), 'Calendrier donné.');
-  }
-
-  private async remove(c: CalendarMeta): Promise<void> {
-    const typed = h('input', { autocomplete: 'off' });
-    const v = await dialog(this.doc, `Supprimer ${c.name} ?`, [
-      h('p', {}, `Ses ${c.events} événement(s) disparaissent pour tout le monde. Seule une sauvegarde peut les rendre.`),
-      field(`Tapez « ${c.name} » pour confirmer`, typed),
-    ], [{ label: 'Annuler', value: 'no' }, { label: 'Supprimer', value: 'yes', kind: 'danger' }]);
-    if (v !== 'yes') return;
-    await this.act(() => this.api.delete(`/calendars/${seg(c.ref)}`, { confirm: typed.value }), 'Calendrier supprimé.');
-  }
-}
-
 interface Activity {
   at: string;
   kind: string;

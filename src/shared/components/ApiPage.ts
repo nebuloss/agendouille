@@ -55,6 +55,8 @@ export abstract class ApiPage implements Page {
     try {
       await run();
       if (done !== undefined) this.toasts.show(done);
+      // What else on the page depends on the state (the admin's bell) reads again.
+      this.doc.dispatchEvent(new Event('agd:changed'));
       await this.refresh();
     } catch (e) {
       this.toasts.error(e);

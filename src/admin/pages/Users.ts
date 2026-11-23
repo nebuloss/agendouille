@@ -1,3 +1,4 @@
+import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
@@ -155,6 +156,9 @@ export class UserPage extends AdminPage {
       this.api.get<{ users: UserRow[] }>('/users'),
     ]);
     const u = d.user;
+    const crumb = this.doc.getElementById('trail-name');
+    if (crumb !== null) crumb.textContent = u.display_name || u.name;
+    this.doc.title = `${u.display_name || u.name} · agendouille`;
     return [
       h('p', { class: 'text-sm text-on-surface-variant' }, `Identifiant ${u.name} · créé le ${day(u.created_at)} · vu ${ago(u.last_seen_at)}`),
       u.disabled ? h('p', { class: ui.error }, 'Désactivé : ses appareils et ses navigateurs ne marchent plus.') : null,
@@ -172,11 +176,21 @@ export class UserPage extends AdminPage {
             action('Déconnecter', () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), 'Déconnecté.'), 'text')]),
           'Aucun navigateur.')),
       section('Calendriers',
-        h('h3', {}, 'Les siens'),
-        table(['Calendrier', 'Événements', 'Taille', 'Partagé avec'],
-          d.calendars_owned.map((c) => [h('span', {}, swatch(c.color), c.name), String(c.events), bytes(c.bytes),
-            h('span', {}, ...c.shares.map((s) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, `${s.target} · ${accessLabel(s.access)}`)))]), 'Aucun.'),
-        h('h3', {}, 'Partagés avec lui ou elle'),
+        h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements."),
+        h('h3', { class: 'text-sm font-semibold' }, 'Les siens'),
+        table(['Calendrier', 'Événements', 'Taille', 'Partagé avec', ''],
+          d.calendars_owned.map((c) => [
+            h('span', { class: 'inline-flex items-center' }, swatch(c.color), c.name),
+            String(c.events),
+            bytes(c.bytes),
+            h('span', { class: 'flex flex-wrap gap-1' }, ...c.shares.map((s) => h('span', { class: 'inline-flex h-7 items-center gap-1 rounded-md3-s bg-surface-high pl-2 text-xs font-semibold text-on-surface' },
+              `${s.target} · ${accessLabel(s.access)}`,
+              iconButtonSm('close', `Retirer le partage avec ${s.target}`, () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(s.target)}`), 'Partage retiré.'))))),
+            h('span', { class: 'flex flex-wrap items-center justify-end gap-1' },
+              action('Donner', () => this.transferCalendar(c, users), 'text', 'give', 'sm'),
+              action('Supprimer', () => this.removeCalendar(c), 'danger-text', 'trash', 'sm')),
+          ]), 'Aucun.'),
+        h('h3', { class: 'text-sm font-semibold' }, 'Partagés avec lui ou elle'),
         table(['Calendrier', 'Accès', 'Par'], d.calendars_shared.map((c) => [c.name, accessLabel(c.access), c.via]), 'Aucun.'),
       ),
       section('Compte',
@@ -187,6 +201,25 @@ export class UserPage extends AdminPage {
           action('Supprimer…', () => this.remove(u, d.calendars_owned, users), 'danger'),
         )),
     ];
+  }
+
+  private async transferCalendar(c: CalendarMeta, users: UserRow[]): Promise<void> {
+    const select = h('select', {}, ...users.filter((u) => u.name !== this.name).map((u) => h('option', { value: u.name }, u.display_name)));
+    const keep = h('input', { type: 'checkbox', checked: true });
+    const v = await dialog(this.doc, `Donner ${c.name}`, [field('À', select), h('label', { class: ui.check }, keep, `${this.name} garde lecture et écriture`)],
+      [{ label: 'Annuler', value: 'no' }, { label: 'Donner', value: 'yes', kind: 'filled' }]);
+    if (v !== 'yes' || select.value === '') return;
+    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: select.value, keep: keep.checked }), 'Calendrier donné.');
+  }
+
+  private async removeCalendar(c: CalendarMeta): Promise<void> {
+    const typed = h('input', { autocomplete: 'off' });
+    const v = await dialog(this.doc, `Supprimer ${c.name} ?`, [
+      h('p', {}, `Ses ${c.events} événement(s) disparaissent pour tout le monde. Seule une sauvegarde peut les rendre.`),
+      field(`Tapez « ${c.name} » pour confirmer`, typed),
+    ], [{ label: 'Annuler', value: 'no' }, { label: 'Supprimer', value: 'yes', kind: 'danger' }]);
+    if (v !== 'yes') return;
+    await this.act(() => this.api.delete(`/calendars/${seg(c.ref)}`, { confirm: typed.value }), 'Calendrier supprimé.');
   }
 
   private profile(u: User): HTMLElement {
@@ -263,3 +296,10 @@ export class UserPage extends AdminPage {
 }
 
 export { confirmDialog };
+
+/** A small round icon button inside a chip. */
+function iconButtonSm(ic: 'close', label: string, run: () => Promise<void>): HTMLButtonElement {
+  const b = h('button', { type: 'button', class: 'state-layer grid size-7 place-items-center rounded-full [&_.ic]:size-4', 'aria-label': label, title: label }, icon(ic));
+  b.addEventListener('click', () => void run());
+  return b;
+}

@@ -56,6 +56,8 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/backups/{file}", h.downloadBackup)
 	api("POST /api/admin/backups/{file}/restore", h.restore)
 	api("GET /api/admin/system", h.system)
+	api("GET /api/admin/notices", h.notices)
+	api("POST /api/admin/notices/read", h.readNotices)
 }
 
 func (h *handlers) apiAuth(next http.HandlerFunc) http.Handler {

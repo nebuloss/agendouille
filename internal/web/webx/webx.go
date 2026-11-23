@@ -46,9 +46,18 @@ var (
 	tmplErr  error
 )
 
+// funcs are what the templates may call.
+var funcs = template.FuncMap{
+	// railItem is one entry of the admin UI's rail: where, what, its icon's
+	// path, and whether it is the page.
+	"railItem": func(href, label, icon string, current bool) map[string]any {
+		return map[string]any{"Href": href, "Label": label, "Icon": icon, "Current": current}
+	},
+}
+
 // Templates parses the embedded templates once.
 func Templates() (*template.Template, error) {
-	tmplOnce.Do(func() { tmpl, tmplErr = assets.Templates(nil) })
+	tmplOnce.Do(func() { tmpl, tmplErr = assets.Templates(funcs) })
 	return tmpl, tmplErr
 }
 

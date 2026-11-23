@@ -15,12 +15,18 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['ph
   await page.goto(base + '/admin/signin', { waitUntil: 'networkidle0' });
   await page.type('input[name=password]', password);
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type=submit]')]);
-  for (const path of ['/admin', '/admin/users', '/admin/users/lea', '/admin/groups', '/admin/calendars', '/admin/activity', '/admin/settings', '/admin/backups']) {
+  for (const path of ['/admin', '/admin/users', '/admin/users/lea', '/admin/groups', '/admin/activity', '/admin/settings', '/admin/backups']) {
     await page.goto(base + path, { waitUntil: 'networkidle0' });
     await new Promise((r) => setTimeout(r, 300));
     const name = path.replaceAll('/', '_').replace(/^_/, '') || 'root';
     await page.screenshot({ path: `${out}/${label}-${name}.png`, fullPage: label === 'desktop' });
   }
+  // The notification centre, open.
+  await page.goto(base + '/admin', { waitUntil: 'networkidle0' });
+  await page.click('#bell-slot button');
+  await new Promise((r) => setTimeout(r, 400));
+  await page.screenshot({ path: `${out}/${label}-notices.png` });
+  await page.keyboard.press('Escape');
   if (label === 'desktop') {
     await page.goto(base + '/admin/users/lea', { waitUntil: 'networkidle0' });
     const [button] = await page.$$('xpath/.//button[contains(., "Créer un QR")]');

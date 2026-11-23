@@ -36,7 +36,7 @@ export const ui = {
   fab: 'state-layer fixed right-4 bottom-24 z-30 inline-flex h-14 items-center gap-3 rounded-md3-l bg-primary-container px-5 font-semibold text-on-primary-container elevation-2 md:static md:h-12 md:rounded-md3-l [&_.ic]:size-6',
 
   /** A card: a tonal surface, its title and actions on one line. */
-  card: 'flex min-w-0 flex-col gap-3 rounded-md3-xl bg-surface-container p-4 lg:px-5 lg:pb-5',
+  card: 'flex min-w-0 flex-col gap-3 rounded-md3-xl bg-surface-container p-4 lg:px-5 lg:pb-5 [&>button]:self-start',
   cardHead: 'flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2',
   cardTitle: 'mr-auto text-lg leading-7 font-normal text-on-surface',
   cardAside: 'flex flex-wrap items-center gap-2',
