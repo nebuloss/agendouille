@@ -954,6 +954,18 @@ func (ps *profiles) put(token string, p profile, now time.Time) {
 	ps.byID[token] = p
 }
 
+// peek is a link still waiting, by its token alone, without using it up:
+// the DAVx5 page, opened on a phone that has no session.
+func (ps *profiles) peek(token, kind string, now time.Time) ([]byte, bool) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	p, ok := ps.byID[token]
+	if !ok || p.kind != kind || now.After(p.expires) {
+		return nil, false
+	}
+	return p.body, true
+}
+
 func (ps *profiles) take(token, kind string, userID, deviceID int64, now time.Time) ([]byte, bool) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -1002,7 +1014,14 @@ func (h *handlers) addDevice(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if d.Kind == "davx5" || d.Kind == "app" {
 		link := "davx5://" + url.QueryEscape(d.Username) + ":" + url.QueryEscape(d.Secret) + "@" + pub.Host + "/dav/"
 		out["davx5_uri"] = link
-		if qr, err := webx.QRSVG(link); err == nil {
+		// DAVx5 has no QR scanner, and a camera app does not open davx5://:
+		// the code holds an https address of ours instead, whose page opens
+		// DAVx5 with the link (ten minutes, then gone).
+		token := newProfileToken()
+		pending.put(token, profile{userID: p.User.ID, deviceID: d.ID, kind: "davx5", body: []byte(link)}, h.d.Clock())
+		handoff := base + "/davx5/" + token
+		out["davx5_page"] = handoff
+		if qr, err := webx.QRSVG(handoff); err == nil {
 			out["qr_svg"] = qr
 		}
 	}

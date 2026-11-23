@@ -5,8 +5,10 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -62,6 +64,9 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.Handle("POST /api/approvals/{code}", guard(h.api(h.approvalPost)))
 
 	mux.HandleFunc("POST /api/app/enroll", h.appEnroll)
+	mux.HandleFunc("GET /app/agendouille.apk", h.apkFile)
+	mux.HandleFunc("GET /davx5/{token}", h.davx5Page)
+	mux.HandleFunc("GET /.well-known/assetlinks.json", h.assetLinks)
 	mux.Handle("POST /api/app/session", h.basic(h.appSession))
 	mux.Handle("GET /api/app/config", h.basic(h.appConfig))
 	return nil
@@ -201,8 +206,71 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 // enrollPage only shows a button: a GET never burns the link, since chat
 // apps and mail scanners open links to preview them.
 func (h *handlers) enrollPage(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, http.StatusOK, "app/enroll.html", "app.title.welcome", map[string]any{"Token": r.PathValue("token")})
+	data := map[string]any{"Token": r.PathValue("token")}
+	// On a phone, the app: open this link in it (any server, through its
+	// own scheme), or get it first (PLAN.md 7.2).
+	if a := assets.AndroidApp(); a != nil {
+		link := h.d.PublicURL() + "/enroll/" + url.PathEscape(r.PathValue("token"))
+		data["AppLink"] = template.URL("agendouille://enroll?u=" + url.QueryEscape(link))
+		data["APKSHA256"] = a.SHA256
+		data["Android"] = strings.Contains(r.UserAgent(), "Android")
+	}
+	h.render(w, r, http.StatusOK, "app/enroll.html", "app.title.welcome", data)
 }
+
+// davx5Page is where the QR code of a new DAVx5 device leads, on the
+// phone: a button that opens DAVx5 with the account filled in, and the
+// same by hand. The token is the secret (ten minutes, then gone).
+func (h *handlers) davx5Page(w http.ResponseWriter, r *http.Request) {
+	body, ok := pending.peek(r.PathValue("token"), "davx5", h.d.Clock())
+	if !ok {
+		h.render(w, r, http.StatusGone, "app/davx5.html", "app.title.davx5", map[string]any{"Gone": true})
+		return
+	}
+	link := string(body)
+	u, err := url.Parse(link)
+	if err != nil || u.User == nil {
+		http.NotFound(w, r)
+		return
+	}
+	pass, _ := u.User.Password()
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	h.render(w, r, http.StatusOK, "app/davx5.html", "app.title.davx5", map[string]any{
+		"Link": template.URL(link), "Server": h.d.PublicURL() + "/dav/", "Username": u.User.Username(), "Password": pass,
+	})
+}
+
+// apkFile is the Android app of this server's version (PLAN.md 7.6).
+func (h *handlers) apkFile(w http.ResponseWriter, r *http.Request) {
+	a := assets.AndroidApp()
+	if a == nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.android.package-archive")
+	w.Header().Set("Content-Disposition", `attachment; filename="agendouille.apk"`)
+	w.Header().Set("X-Content-SHA256", a.SHA256)
+	http.ServeContent(w, r, "agendouille.apk", time.Time{}, bytes.NewReader(a.Body))
+}
+
+// assetLinks lets Android open this server's enrollment links in the app
+// (App Links): the app's package and its signing certificate.
+func (h *handlers) assetLinks(w http.ResponseWriter, r *http.Request) {
+	a := assets.AndroidApp()
+	if a == nil || a.Cert == "" {
+		http.NotFound(w, r)
+		return
+	}
+	webx.JSON(w, http.StatusOK, []map[string]any{{
+		"relation": []string{"delegate_permission/common.handle_all_urls"},
+		"target": map[string]any{"namespace": "android_app", "package_name": AndroidPackage,
+			"sha256_cert_fingerprints": []string{a.Cert}},
+	}})
+}
+
+// AndroidPackage is the app's package name (android/AndroidManifest.xml).
+const AndroidPackage = "io.github.nebuloss.agendouille"
 
 func enrollError(err error) (int, string) {
 	switch {
@@ -372,8 +440,12 @@ func (h *handlers) appSession(w http.ResponseWriter, r *http.Request, p *auth.Pr
 }
 
 func (h *handlers) appConfig(w http.ResponseWriter, _ *http.Request, _ *auth.Principal) {
+	apkSHA, apkVersion := "", ""
+	if a := assets.AndroidApp(); a != nil {
+		apkSHA, apkVersion = a.SHA256, a.Version
+	}
 	webx.JSON(w, http.StatusOK, map[string]any{"server_version": h.d.Version, "min_app_version": "0.0.0",
-		"apk_sha256": "", "bridge": 1, "sync_interval_s": h.d.Settings.Get().AppSyncIntervalMinutes * 60})
+		"apk_sha256": apkSHA, "apk_version": apkVersion, "bridge": 1, "sync_interval_s": h.d.Settings.Get().AppSyncIntervalMinutes * 60})
 }
 
 // initial is the letter on a user's avatar: the first of the display name,

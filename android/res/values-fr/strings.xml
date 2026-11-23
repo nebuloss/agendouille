@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Français ; le guide de style est docs/i18n.md. -->
+<resources>
+  <string name="welcome_title">Bienvenue dans agendouille</string>
+  <string name="welcome_body">Pour connecter ce téléphone, scannez avec l’appareil photo le QR code que votre administrateur vous a remis, puis choisissez de l’ouvrir avec agendouille.</string>
+  <string name="welcome_paste">Vous pouvez aussi coller le lien de connexion ici :</string>
+  <string name="welcome_paste_hint">https://…/enroll/…</string>
+  <string name="welcome_continue">Se connecter</string>
+  <string name="bad_link">Ce n’est pas un lien de connexion agendouille. Vérifiez l’adresse, puis réessayez.</string>
+  <string name="enrolling">Connexion de ce téléphone…</string>
+  <string name="enroll_failed">Ce téléphone n’a pas pu être connecté : %1$s</string>
+  <string name="enroll_used">Ce lien de connexion a déjà été utilisé. Demandez-en un nouveau à votre administrateur.</string>
+  <string name="enroll_expired">Ce lien de connexion a expiré. Demandez-en un nouveau à votre administrateur.</string>
+  <string name="enroll_other">Ce téléphone est déjà connecté en tant que %1$s sur %2$s. Retirez d’abord ce compte, depuis la page Moi.</string>
+  <string name="offline">Impossible de joindre le serveur. Vérifiez votre connexion, puis réessayez.</string>
+  <string name="retry">Réessayer</string>
+  <string name="revoked">Ce téléphone a été retiré d’agendouille. Demandez un nouveau lien de connexion à votre administrateur pour l’utiliser à nouveau.</string>
+  <string name="update_title">Une mise à jour est disponible</string>
+  <string name="update_body">La version %1$s d’agendouille est disponible sur votre serveur (ce téléphone a la %2$s).</string>
+  <string name="update_install">Télécharger</string>
+  <string name="update_later">Plus tard</string>
+  <string name="camera_needed">L’appareil photo est nécessaire pour scanner un QR code.</string>
+  <string name="no_browser">Aucune application ne peut ouvrir ce lien.</string>
+  <string name="download_started">Téléchargement lancé.</string>
+</resources>

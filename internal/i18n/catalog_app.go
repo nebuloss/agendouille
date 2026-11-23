@@ -4,6 +4,57 @@ package i18n
 // links and approvals (internal/web/assets/templates/app).
 func init() {
 	register(map[string]map[Lang]string{
+		"app.title.davx5": {FR: "Configurer DAVx5", EN: "Set up DAVx5"},
+		"app.davx5.title": {FR: "Configurer DAVx5", EN: "Set up DAVx5"},
+		"app.davx5.step1": {
+			FR: "Installez DAVx5 sur ce téléphone, si ce n’est pas déjà fait :",
+			EN: "Install DAVx5 on this phone, if it is not there yet:",
+		},
+		"app.davx5.step2": {
+			FR: "Touchez « Ouvrir dans DAVx5 » : le compte s’y remplit tout seul.",
+			EN: "Tap ‘Open in DAVx5’: the account fills itself in.",
+		},
+		"app.davx5.step3": {
+			FR: "Dans DAVx5, validez la connexion, puis choisissez les calendriers à synchroniser.",
+			EN: "In DAVx5, confirm the sign-in, then choose the calendars to sync.",
+		},
+		"app.davx5.open":   {FR: "Ouvrir dans DAVx5", EN: "Open in DAVx5"},
+		"app.davx5.manual": {FR: "Saisir le compte à la main", EN: "Enter the account by hand"},
+		"app.davx5.manualHelp": {
+			FR: "Dans DAVx5, ajoutez un compte avec « Se connecter avec une URL et un nom d’utilisateur », puis saisissez :",
+			EN: "In DAVx5, add an account with ‘Login with URL and user name’, then enter:",
+		},
+		"app.davx5.server":   {FR: "Adresse", EN: "Base URL"},
+		"app.davx5.username": {FR: "Utilisateur", EN: "User name"},
+		"app.davx5.password": {FR: "Mot de passe", EN: "Password"},
+		"app.davx5.expires": {
+			FR: "Cette page ne fonctionne que dix minutes après l’ajout de l’appareil. Passé ce délai, retirez l’appareil et ajoutez-le à nouveau.",
+			EN: "This page only works for ten minutes after the device was added. After that, remove the device and add it again.",
+		},
+		"app.davx5.gone": {
+			FR: "Ce lien a expiré. Dans agendouille, retirez l’appareil, puis ajoutez-le à nouveau pour obtenir un nouveau code.",
+			EN: "This link has expired. In agendouille, remove the device, then add it again to get a new code.",
+		},
+		"app.enroll.androidTitle": {
+			FR: "Sur un téléphone Android",
+			EN: "On an Android phone",
+		},
+		"app.enroll.androidHelp": {
+			FR: "L’application agendouille synchronise vos calendriers avec ceux du téléphone. Installez-la, puis ouvrez ce lien avec elle.",
+			EN: "The agendouille app syncs your calendars with the phone’s. Install it, then open this link with it.",
+		},
+		"app.enroll.openApp": {
+			FR: "Ouvrir dans l’application",
+			EN: "Open in the app",
+		},
+		"app.enroll.getApp": {
+			FR: "Télécharger l’application",
+			EN: "Download the app",
+		},
+		"app.enroll.orBrowser": {
+			FR: "Ou continuez dans ce navigateur :",
+			EN: "Or continue in this browser:",
+		},
 		// Titles, in the header and the browser's tab.
 		"app.title.calendar":  {FR: "Calendrier", EN: "Calendar"},
 		"app.title.calendars": {FR: "Calendriers", EN: "Calendars"},

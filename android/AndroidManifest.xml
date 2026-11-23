@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The agendouille Android app (PLAN.md 7): the family web app in a WebView,
+  an Android account holding the device's credential, and (M7) the CalDAV
+  sync adapter. Built by android/Makefile, no Gradle. The Makefile fills
+  @APP_LINKS@ with an App Link filter for the server's host when APP_HOST is
+  set: an App Link names its host at build time, and each family runs its
+  own server, so the agendouille:// scheme works with any server.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.nebuloss.agendouille">
+
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.CAMERA" />
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+  <application
+      android:label="@string/app_name"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher"
+      android:theme="@style/AppTheme"
+      android:allowBackup="false"
+      android:usesCleartextTraffic="@USES_CLEARTEXT@"
+      android:supportsRtl="true">
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:launchMode="singleTask"
+        android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <!-- agendouille://enroll?u=<the enrollment link>: any server. -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="agendouille" android:host="enroll" />
+      </intent-filter>
+@APP_LINKS@
+    </activity>
+
+    <service
+        android:name=".AuthenticatorService"
+        android:exported="true"
+        android:permission="android.permission.ACCOUNT_MANAGER">
+      <intent-filter>
+        <action android:name="android.accounts.AccountAuthenticator" />
+      </intent-filter>
+      <meta-data
+          android:name="android.accounts.AccountAuthenticator"
+          android:resource="@xml/authenticator" />
+    </service>
+  </application>
+</manifest>

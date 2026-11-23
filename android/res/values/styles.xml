@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The framework's Material theme, no AppCompat: the web app draws the
+       rest. values-night switches it with the system's dark mode. -->
+  <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+    <item name="android:colorPrimary">#8f4c38</item>
+    <item name="android:colorAccent">#8f4c38</item>
+    <item name="android:statusBarColor">#faf9f7</item>
+    <item name="android:navigationBarColor">#faf9f7</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="android:windowBackground">@color/background</item>
+  </style>
+  <color name="background">#faf9f7</color>
+  <color name="text">#1d1b1a</color>
+  <color name="muted">#53433f</color>
+  <color name="primary">#8f4c38</color>
+  <color name="on_primary">#ffffff</color>
+</resources>
