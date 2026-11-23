@@ -5,7 +5,7 @@ import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
 import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
-import { accessLabel } from '@/admin/pages/More.ts';
+import { accessLabel, activityTable, tileLink, type Activity } from '@/admin/pages/More.ts';
 
 export interface User {
   name: string;
@@ -148,6 +148,10 @@ export class UserPage extends AdminPage {
     return `/users/${seg(this.name)}`;
   }
 
+  private get sub(): string {
+    return this.root.dataset['sub'] ?? '';
+  }
+
   protected async render(): Promise<Child[]> {
     const [d, { groups }, { users }] = await Promise.all([
       this.api.get<UserDetail>(this.path()),
@@ -155,26 +159,68 @@ export class UserPage extends AdminPage {
       this.api.get<{ users: UserRow[] }>('/users'),
     ]);
     const u = d.user;
-    const crumb = this.doc.getElementById('trail-name');
-    if (crumb !== null) crumb.textContent = u.display_name || u.name;
-    this.doc.title = `${u.display_name || u.name} · agendouille`;
+    for (const el of this.doc.querySelectorAll<HTMLElement>('[data-item-name] span')) el.textContent = u.display_name || u.name;
+    switch (this.sub) {
+      case 'signin':
+        return [
+          this.signin(u, d.enrolments),
+          section('Navigateurs connectés',
+            table(['Navigateur', 'Vu', ''],
+              d.sessions.map((x) => [x.app ? `Application · ${x.user_agent}` : x.user_agent, ago(x.seen_at),
+                action('Déconnecter', () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), 'Déconnecté.'), 'text', 'logout', 'sm')]),
+              'Aucun navigateur.')),
+        ];
+      case 'devices':
+        return [section('Appareils de synchronisation',
+          table(['Appareil', 'Type', 'Accès', 'Dernière synchro', 'Client', ''],
+            d.devices.map((x) => [x.label, x.kind, x.cap === 'read' ? 'lecture' : 'lecture et écriture', ago(x.last_used_at), x.client,
+              action('Révoquer', () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), 'Appareil révoqué.'), 'danger-text', 'trash', 'sm')]),
+            'Aucun appareil. La personne en ajoute depuis Appareils, dans l’application.'))];
+      case 'calendars':
+        return [this.calendarsCard(d, users)];
+      case 'groups':
+        return [this.groupsCard(d.groups, groups)];
+      case 'activity': {
+        const { activity } = await this.api.get<{ activity: Activity[] }>('/activity', { user: u.name });
+        return [section('Activité', activityTable(activity))];
+      }
+      default:
+        return this.overview(u, d, users);
+    }
+  }
+
+  /** The user's overview: who, at a glance, and the account. */
+  private overview(u: User, d: UserDetail, users: UserRow[]): Child[] {
+    const base = this.path();
+    const avatar = h('span', { class: 'grid size-14 shrink-0 place-items-center rounded-full text-2xl font-bold text-white' }, (u.display_name || u.name).slice(0, 1).toUpperCase());
+    if (/^#[0-9a-f]{6}$/i.test(u.color)) avatar.style.setProperty('background-color', u.color);
+    else avatar.classList.add('bg-primary');
     return [
-      h('p', { class: 'text-sm text-on-surface-variant' }, `Identifiant ${u.name} · créé le ${day(u.created_at)} · vu ${ago(u.last_seen_at)}`),
+      h('section', { class: `${ui.card} flex-row flex-wrap items-center gap-4` }, avatar,
+        h('div', { class: 'flex min-w-0 flex-1 flex-col gap-1' },
+          h('h2', { class: 'truncate text-2xl font-normal' }, u.display_name || u.name),
+          h('span', { class: 'text-sm text-on-surface-variant' }, `Identifiant ${u.name} · créé le ${day(u.created_at)} · vu ${ago(u.last_seen_at)}`),
+          d.groups.length > 0 ? h('div', { class: 'flex flex-wrap gap-1.5 pt-1' }, ...d.groups.map((g) => h('a', { href: `/groups/${seg(g)}`, class: 'inline-flex h-6 items-center rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface no-underline' }, g))) : null),
+        u.disabled ? h('span', { class: ui.pill.err }, 'désactivé') : null),
       u.disabled ? h('p', { class: ui.error }, 'Désactivé : ses appareils et ses navigateurs ne marchent plus.') : null,
+      h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
+        tileLink(String(d.devices.length), 'appareils', `${base}/devices`),
+        tileLink(String(d.calendars_owned.length), 'calendriers à lui ou elle', `${base}/calendars`),
+        tileLink(String(d.calendars_shared.length), 'calendriers partagés avec lui ou elle', `${base}/calendars`),
+        tileLink(String(d.sessions.length), 'navigateurs connectés', `${base}/signin`)),
       this.profile(u),
-      this.groupsCard(d.groups, groups),
-      this.signin(u, d.enrolments),
-      section('Appareils de synchronisation',
-        table(['Appareil', 'Type', 'Accès', 'Dernière synchro', 'Client', ''],
-          d.devices.map((x) => [x.label, x.kind, x.cap === 'read' ? 'lecture' : 'lecture et écriture', ago(x.last_used_at), x.client,
-            action('Révoquer', () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), 'Appareil révoqué.'), 'text')]),
-          'Aucun appareil.')),
-      section('Navigateurs connectés',
-        table(['Navigateur', 'Vu', ''],
-          d.sessions.map((x) => [x.app ? `Application · ${x.user_agent}` : x.user_agent, ago(x.seen_at),
-            action('Déconnecter', () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), 'Déconnecté.'), 'text')]),
-          'Aucun navigateur.')),
-      section('Calendriers',
+      section('Compte',
+        h('div', { class: 'flex flex-wrap items-center gap-2' },
+          u.disabled
+            ? action('Réactiver', () => this.act(() => this.api.patch(this.path(), { disabled: false }), 'Réactivé.'))
+            : action('Désactiver', () => this.act(() => this.api.patch(this.path(), { disabled: true }), 'Désactivé.')),
+          action('Supprimer…', () => this.remove(u, d.calendars_owned, users), 'danger'),
+        )),
+    ];
+  }
+
+  private calendarsCard(d: UserDetail, users: UserRow[]): HTMLElement {
+    return section('Calendriers',
         h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements."),
         h('h3', { class: 'text-sm font-semibold' }, 'Les siens'),
         table(['Calendrier', 'Événements', 'Taille', 'Partagé avec', ''],
@@ -191,15 +237,7 @@ export class UserPage extends AdminPage {
           ]), 'Aucun.'),
         h('h3', { class: 'text-sm font-semibold' }, 'Partagés avec lui ou elle'),
         table(['Calendrier', 'Accès', 'Par'], d.calendars_shared.map((c) => [c.name, accessLabel(c.access), c.via]), 'Aucun.'),
-      ),
-      section('Compte',
-        h('div', { class: 'flex flex-wrap items-center gap-2' },
-          u.disabled
-            ? action('Réactiver', () => this.act(() => this.api.patch(this.path(), { disabled: false }), 'Réactivé.'))
-            : action('Désactiver', () => this.act(() => this.api.patch(this.path(), { disabled: true }), 'Désactivé.')),
-          action('Supprimer…', () => this.remove(u, d.calendars_owned, users), 'danger'),
-        )),
-    ];
+      );
   }
 
   private async transferCalendar(c: CalendarMeta, users: UserRow[]): Promise<void> {

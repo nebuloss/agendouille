@@ -3,6 +3,26 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: a view per user and per group, as claudication's items
+
+The user: "like cafard or claudication we must have a per group/per user
+view".
+
+- **An item's path is its overview, and its pages sit under it**, as
+  claudication's accounts and clients: `/users/lea` (who, groups, counts
+  that open the pages, profile, account) with `signin` (the sign-in QR and
+  the browsers), `devices`, `calendars`, `groups`, `activity`;
+  `/groups/famille` (members at a glance, counts, profile, delete) with
+  `members` and `calendars` (those shared with the group, a share
+  removable from there). An unknown page goes back to the item.
+- **The rail follows the level** (`internal/web/admin/nav.go`): the
+  sections at the top; on an item, the way back to its list, then its
+  pages. The trail goes down to the page; the item's crumb is filled with
+  its display name by the page. Both are drawn by the server, so every
+  entry is a plain link.
+- A group's own Activité is left out: the activity has no group filter on
+  the server yet, and a group acts through its members' pages.
+
 ## 2026-11-23: admin pages without /admin, creation in a modal
 
 The user: "no need admin prefix in url. also for users and groups creation

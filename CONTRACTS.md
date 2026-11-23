@@ -275,7 +275,7 @@ no same-origin):
 |---|---|---|
 | GET, POST | `/signin` | none; password (two argon2 derivations at once at most) |
 | POST | `/signout` | `agd_admin`, same-origin |
-| GET | `/`, `/users[/{name}]`, `/groups`, `/activity`, `/settings`, `/backups` | `agd_admin`; on the admin listener only, so no `/admin` prefix (DECISIONS); `/calendars` and every old `/admin/...` path redirect |
+| GET | `/`, `/users[/{name}[/{page}]]`, `/groups[/{name}[/{page}]]`, `/activity`, `/settings`, `/backups` (pages: nav.go) | `agd_admin`; on the admin listener only, so no `/admin` prefix (DECISIONS); `/calendars` and every old `/admin/...` path redirect |
 | GET | `/static/admin/...`, `/static/shared/...` | none |
 | | `/api/admin/*` (3.5) | `agd_admin`; writes same-origin |
 

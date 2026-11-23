@@ -15,7 +15,7 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['ph
   await page.goto(base + '/signin', { waitUntil: 'networkidle0' });
   await page.type('input[name=password]', password);
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type=submit]')]);
-  for (const path of ['/', '/users', '/users/lea', '/groups', '/activity', '/settings', '/backups']) {
+  for (const path of ['/', '/users', '/users/lea', '/users/lea/calendars', '/users/lea/signin', '/groups', '/groups/famille', '/groups/famille/members', '/activity', '/settings', '/backups']) {
     await page.goto(base + path, { waitUntil: 'networkidle0' });
     await new Promise((r) => setTimeout(r, 300));
     const name = path.replaceAll('/', '_').replace(/^_/, '') || 'overview';
@@ -37,7 +37,7 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['ph
     await page.keyboard.press('Escape');
   } else errors.push(`${label}: no "Nouvel utilisateur" button`);
   if (label === 'desktop') {
-    await page.goto(base + '/users/lea', { waitUntil: 'networkidle0' });
+    await page.goto(base + '/users/lea/signin', { waitUntil: 'networkidle0' });
     const [button] = await page.$$('xpath/.//button[contains(., "Créer un QR")]');
     if (button) {
       await button.click();

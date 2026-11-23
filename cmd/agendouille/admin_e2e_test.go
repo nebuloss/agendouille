@@ -152,6 +152,22 @@ func TestM3AdminUI(t *testing.T) {
 		t.Fatalf("the enrolment: %v", enrol)
 	}
 	A.json("POST", "/users", map[string]any{"name": "maman", "groups": []string{"famille"}}, 201)
+	// Per user and per group views: an item's overview and its pages, the
+	// rail of its level with the way back, the trail down to the page.
+	for _, p := range []string{"/users/lea", "/users/lea/signin", "/users/lea/devices", "/users/lea/calendars", "/users/lea/groups",
+		"/users/lea/activity", "/groups/famille", "/groups/famille/members", "/groups/famille/calendars"} {
+		a := x.do("GET", x.admin+p, nil, cookie(auth.AdminCookie, A.session))
+		if a.status != 200 || !strings.Contains(a.body, `aria-label="Pages"`) || !strings.Contains(a.body, `data-item-name`) {
+			t.Errorf("item page %s: %d", p, a.status)
+		}
+	}
+	if a := x.do("GET", x.admin+"/users/lea/devices", nil, cookie(auth.AdminCookie, A.session)); !strings.Contains(a.body, `href="/users/lea/devices" class="state-layer`) ||
+		!strings.Contains(a.body, `<span>Appareils</span></a>`) || !strings.Contains(a.body, `href="/users"`) {
+		t.Errorf("the rail of a user's page: %s", a.body)
+	}
+	if a := x.do("GET", x.admin+"/users/lea/nonsense", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/users/lea" {
+		t.Errorf("an unknown page of a user: %d %s", a.status, a.header.Get("Location"))
+	}
 
 	// The phone's browser opens the link, signed in; the admin sees it used.
 	if a := x.do("POST", link, nil, nil); a.status != http.StatusSeeOther || cookieOf(a, auth.AppCookie) == "" {

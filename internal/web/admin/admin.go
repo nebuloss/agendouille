@@ -6,6 +6,7 @@ package admin
 import (
 	"errors"
 	"net/http"
+	"net/url"
 
 	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/deps"
@@ -27,17 +28,15 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.HandleFunc("GET /signin", h.signinPage)
 	mux.Handle("POST /signin", guard(http.HandlerFunc(h.signin)))
 	mux.Handle("POST /signout", guard(http.HandlerFunc(h.signout)))
-	mux.Handle("GET /{$}", h.page(h.shell("overview", "Vue d'ensemble")))
-	for path, page := range map[string][2]string{
-		"GET /users":        {"users", "Utilisateurs"},
-		"GET /users/{name}": {"user", "Utilisateur"},
-		"GET /groups":       {"groups", "Groupes"},
-		"GET /activity":     {"activity", "Activité"},
-		"GET /settings":     {"settings", "Réglages"},
-		"GET /backups":      {"backups", "Sauvegardes"},
-	} {
-		mux.Handle(path, h.page(h.shell(page[0], page[1])))
+	mux.Handle("GET /{$}", h.page(h.shell("overview", "", "Vue d'ensemble")))
+	for _, s := range sections {
+		mux.Handle("GET /"+s.id, h.page(h.shell(s.id, s.id, s.label)))
 	}
+	// An item's overview and its pages (nav.go): a user, a group.
+	mux.Handle("GET /users/{name}", h.page(h.shell("user", "users", "")))
+	mux.Handle("GET /users/{name}/{sub}", h.page(h.shell("user", "users", "")))
+	mux.Handle("GET /groups/{name}", h.page(h.shell("group", "groups", "")))
+	mux.Handle("GET /groups/{name}/{sub}", h.page(h.shell("group", "groups", "")))
 	// Calendars are under their owner now, as on claudication's pages: an
 	// old link lands on the users.
 	mux.Handle("GET /calendars", h.page(func(w http.ResponseWriter, r *http.Request) {
@@ -58,12 +57,27 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	return nil
 }
 
-// shell is a page of the admin UI: the layout, the navigation, and a
-// mount point the admin bundle fills from /api/admin (PLAN.md 9.4).
-func (h *handlers) shell(page, title string) http.HandlerFunc {
+// shell is a page of the admin UI: the layout, the rail and the trail of
+// its level (nav.go), and a mount point the admin bundle fills from
+// /api/admin (PLAN.md 9.4). page picks the TypeScript page, section the
+// top level; an item's title is its name, until the page names it better.
+func (h *handlers) shell(page, section, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		name, sub := r.PathValue("name"), r.PathValue("sub")
+		if name != "" && !knownPage(section, sub) {
+			http.Redirect(w, r, "/"+section+"/"+url.PathEscape(name), http.StatusSeeOther)
+			return
+		}
+		if name != "" {
+			title = name
+			if sub != "" {
+				label, _ := labelOf(itemPages[section], sub)
+				title = label + " · " + name
+			}
+		}
 		webx.Render(w, h.d.Log, http.StatusOK, "admin/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.Admin,
-			Data: map[string]any{"Page": page, "Title": title, "Name": r.PathValue("name"), "Version": h.d.Version}})
+			Data: map[string]any{"Page": page, "Title": title, "Name": name, "Sub": sub, "Version": h.d.Version,
+				"Nav": navOf(section, name, sub)}})
 	}
 }
 

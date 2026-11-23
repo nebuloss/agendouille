@@ -3,7 +3,7 @@
 import './admin.css';
 import { adminApi } from '@/admin/pages/base.ts';
 import { NoticeCenter } from '@/admin/Notices.ts';
-import { ActivityPage, BackupsPage, GroupsPage, SettingsPage } from '@/admin/pages/More.ts';
+import { ActivityPage, BackupsPage, GroupPage, GroupsPage, SettingsPage } from '@/admin/pages/More.ts';
 import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UserPage, UsersPage } from '@/admin/pages/Users.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
@@ -15,6 +15,7 @@ export const pages = new Pages({
   users: (doc) => new UsersPage(doc, api),
   user: (doc) => new UserPage(doc, api),
   groups: (doc) => new GroupsPage(doc, api),
+  group: (doc) => new GroupPage(doc, api),
   activity: (doc) => new ActivityPage(doc, api),
   settings: (doc) => new SettingsPage(doc, api),
   backups: (doc) => new BackupsPage(doc, api),
@@ -23,6 +24,11 @@ export const pages = new Pages({
 whenReady(document, () => {
   document.documentElement.dataset['bundle'] = 'admin';
   pages.mount(document);
+  // On a phone the rail is a row and the trail can be wider than the
+  // screen: bring the page's own entry, and the trail's end, into view.
+  document.querySelector('.rail [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const trail = document.querySelector<HTMLElement>('.trail');
+  if (trail !== null) trail.scrollLeft = trail.scrollWidth;
   // The bell, on every page of the shell; it counts again after a change.
   const slot = document.getElementById('bell-slot');
   if (slot !== null) {
