@@ -7,6 +7,7 @@
  * is always 24 hours. The only time a zone matters is "now", read with
  * Intl in the family zone, whatever zone the browser is in.
  */
+import { locale } from '@/shared/i18n/i18n.ts';
 
 export interface Wall {
   readonly y: number;
@@ -105,12 +106,23 @@ export function nowIn(zone: string, now: number = Date.now()): Wall {
   return { y: get('year'), m: get('month'), d: get('day'), h: get('hour') % 24, mi: get('minute'), s: get('second') };
 }
 
-const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('fr-FR', { ...o, timeZone: 'UTC' });
-const longDay = fmt({ weekday: 'long', day: 'numeric', month: 'long' });
-const shortDay = fmt({ weekday: 'short', day: 'numeric' });
-const monthYear = fmt({ month: 'long', year: 'numeric' });
-const fullDate = fmt({ day: 'numeric', month: 'long', year: 'numeric' });
-const weekdayShort = fmt({ weekday: 'short' });
+// Labels in the page's language (src/shared/i18n), made when first used:
+// the language is known only once the page is there.
+const formats = new Map<string, Intl.DateTimeFormat>();
+const fmt = (o: Intl.DateTimeFormatOptions): Intl.DateTimeFormat => {
+  const key = locale() + JSON.stringify(o);
+  let f = formats.get(key);
+  if (f === undefined) {
+    f = new Intl.DateTimeFormat(locale(), { ...o, timeZone: 'UTC' });
+    formats.set(key, f);
+  }
+  return f;
+};
+const longDay = { format: (d: Date): string => fmt({ weekday: 'long', day: 'numeric', month: 'long' }).format(d) };
+const shortDay = { format: (d: Date): string => fmt({ weekday: 'short', day: 'numeric' }).format(d) };
+const monthYear = { format: (d: Date): string => fmt({ month: 'long', year: 'numeric' }).format(d) };
+const fullDate = { format: (d: Date): string => fmt({ day: 'numeric', month: 'long', year: 'numeric' }).format(d) };
+const weekdayShort = { format: (d: Date): string => fmt({ weekday: 'short' }).format(d) };
 
 /** "mercredi 25 novembre". */
 export function labelDay(w: Wall): string {

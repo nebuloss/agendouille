@@ -21,7 +21,7 @@ describe('Countdown', () => {
     c.tick();
     c.tick();
     expect(done).toBe(1);
-    expect(root.textContent).toBe('Nouveau code…');
+    expect(root.textContent).toBe('Génération d’un nouveau code…');
     c.dispose();
   });
 });

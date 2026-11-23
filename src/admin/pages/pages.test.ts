@@ -77,7 +77,18 @@ describe('format', () => {
     expect(bytes(512)).toBe('512 o');
     expect(bytes(1536)).toBe('1,5 Kio');
     expect(ago(new Date(Date.now() - 3 * 86400e3).toISOString())).toBe('il y a 3 jours');
-    expect(ago(undefined)).toBe('jamais');
+    expect(ago(undefined)).toBe('Jamais');
+  });
+
+  it('sizes and ages in English when the page is', () => {
+    document.documentElement.lang = 'en';
+    try {
+      expect(bytes(1536)).toBe('1.5 KiB');
+      expect(ago(new Date(Date.now() - 3 * 86400e3).toISOString())).toBe('3 days ago');
+      expect(ago(undefined)).toBe('Never');
+    } finally {
+      document.documentElement.lang = 'fr';
+    }
   });
 });
 

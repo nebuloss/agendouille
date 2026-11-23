@@ -1,5 +1,6 @@
 import { h } from '@/shared/core/Dom.ts';
 import type { Disposable } from '@/shared/core/Disposable.ts';
+import { t } from '@/shared/components/Countdown.msg.ts';
 
 /**
  * A QR code's life, shown like an authenticator app's: a bar that drains,
@@ -27,7 +28,7 @@ export class Countdown implements Disposable {
     this.bar = h('i', { class: 'block h-full rounded-full bg-primary transition-[width,background-color] duration-300 ease-linear data-[low]:bg-error' });
     this.label = h('p', { class: 'text-center text-xs tabular-nums text-on-surface-variant', 'aria-live': 'off' });
     root.replaceChildren(
-      h('div', { class: 'h-1.5 overflow-hidden rounded-full bg-surface-highest', role: 'progressbar', 'aria-label': 'Temps restant pour ce code' }, this.bar),
+      h('div', { class: 'h-1.5 overflow-hidden rounded-full bg-surface-highest', role: 'progressbar', 'aria-label': t('remaining') }, this.bar),
       this.label,
     );
     root.classList.add('flex', 'flex-col', 'gap-1.5');
@@ -47,7 +48,7 @@ export class Countdown implements Disposable {
     this.bar.style.setProperty('width', `${(share * 100).toFixed(1)}%`);
     this.bar.toggleAttribute('data-low', share < 0.2);
     const s = Math.ceil(left / 1000);
-    this.label.textContent = left > 0 ? `Nouveau code dans ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Nouveau code…';
+    this.label.textContent = left > 0 ? t('newCodeIn', { time: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }) : t('newCode');
     if (left === 0 && !this.done) {
       this.done = true;
       this.dispose();

@@ -1,0 +1,38 @@
+import { messages } from '@/shared/i18n/i18n.ts';
+
+export const t = messages({
+  fr: {
+    cancel: 'Annuler',
+    empty: 'Aucun élément pour le moment.',
+    show: 'Afficher',
+    hide: 'Masquer',
+    copy: 'Copier',
+    copied: 'Copié',
+    copyFailed: 'Échec de la copie',
+    appearance: 'Apparence',
+    themeAuto: 'Automatique',
+    themeLight: 'Clair',
+    themeDark: 'Sombre',
+    themeIsAuto: 'Thème : automatique',
+    themeIsLight: 'Thème : clair',
+    themeIsDark: 'Thème : sombre',
+    language: 'Langue',
+  },
+  en: {
+    cancel: 'Cancel',
+    empty: 'Nothing here yet.',
+    show: 'Show',
+    hide: 'Hide',
+    copy: 'Copy',
+    copied: 'Copied',
+    copyFailed: 'Copy failed',
+    appearance: 'Appearance',
+    themeAuto: 'Automatic',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeIsAuto: 'Theme: automatic',
+    themeIsLight: 'Theme: light',
+    themeIsDark: 'Theme: dark',
+    language: 'Language',
+  },
+});

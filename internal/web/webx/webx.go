@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/web/assets"
 )
 
@@ -25,6 +26,8 @@ type Page struct {
 	// Theme is the reader's choice (ThemeCookie): "light", "dark", or ""
 	// to follow the system. Render sets it.
 	Theme string
+	// Lang is the page's language (internal/i18n). Render sets it.
+	Lang i18n.Lang
 }
 
 // ThemeCookie holds the reader's choice of theme, set by the page
@@ -62,6 +65,9 @@ var (
 
 // funcs are what the templates may call.
 var funcs = template.FuncMap{
+	// t is the message in the page's language (internal/i18n); Render binds
+	// it to the request's language, this one is only for parsing.
+	"t": func(key string, args ...string) string { return i18n.T(i18n.Default, key, args...) },
 	// railItem is one entry of the admin UI's rail: where, what, its icon's
 	// path, and whether it is the page.
 	"railItem": func(href, label, icon string, current bool) map[string]any {
@@ -80,9 +86,14 @@ func Templates() (*template.Template, error) {
 // not half a page.
 func Render(w http.ResponseWriter, r *http.Request, log *slog.Logger, status int, name string, p Page) {
 	p.Theme = themeOf(r)
+	p.Lang = i18n.FromRequest(r)
 	t, err := Templates()
 	if err == nil {
 		t, err = t.Clone()
+	}
+	if err == nil {
+		lang := p.Lang
+		t = t.Funcs(template.FuncMap{"t": func(key string, args ...string) string { return i18n.T(lang, key, args...) }})
 	}
 	if err == nil {
 		// The page template gets Data as its dot, so it never needs a

@@ -1,4 +1,6 @@
 import { currentTheme, nextTheme, setTheme, type Theme } from '@/shared/core/Theme.ts';
+import { LANGS, lang, setLang, type Lang } from '@/shared/i18n/i18n.ts';
+import { t } from '@/shared/components/Ui.msg.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { icon, type IconName } from '@/shared/components/icons.ts';
 import { ui, type ButtonVariant } from '@/shared/components/recipes.ts';
@@ -76,7 +78,7 @@ export function formDialog(doc: Document, title: string, body: Child[], submitLa
   const el = doc.createElement('dialog');
   el.className = ui.dialog;
   const error = h('p', { class: ui.error, role: 'alert', hidden: true });
-  const cancel = h('button', { class: ui.btn('text'), type: 'button' }, 'Annuler');
+  const cancel = h('button', { class: ui.btn('text'), type: 'button' }, t('cancel'));
   const ok = h('button', { class: ui.btn('filled'), type: 'submit' }, submitLabel);
   const form = h('form', { class: 'flex max-h-[inherit] flex-col', novalidate: false },
     h('div', { class: ui.dialogHead }, h('h2', {}, title)),
@@ -118,7 +120,7 @@ export function formDialog(doc: Document, title: string, body: Child[], submitLa
 /** Asks yes or no. */
 export async function confirmDialog(doc: Document, title: string, text: string, yes: string, danger = false): Promise<boolean> {
   const v = await dialog(doc, title, [h('p', {}, text)], [
-    { label: 'Annuler', value: 'no' },
+    { label: t('cancel'), value: 'no' },
     { label: yes, value: 'yes', kind: danger ? 'danger' : 'filled' },
   ]);
   return v === 'yes';
@@ -150,7 +152,7 @@ export function check(box: HTMLInputElement, ...label: Child[]): HTMLElement {
  * A table on its card; rows are lists of cells. Below sm it stacks into
  * cards, each cell under its column's heading (theme.css's table-stack).
  */
-export function table(head: string[], rows: Child[][], empty = 'Rien pour le moment.'): HTMLElement {
+export function table(head: string[], rows: Child[][], empty = t('empty')): HTMLElement {
   if (rows.length === 0) return h('p', { class: ui.empty }, empty);
   const t = h('table', { class: ui.table });
   t.append(h('thead', {}, h('tr', { class: ui.tr }, ...head.map((c) => h('th', { scope: 'col', class: ui.th }, c)))));
@@ -207,18 +209,18 @@ export function card(title: string, aside: Child[], ...children: Child[]): HTMLE
 export function secretField(value: string, label: string): HTMLElement {
   const text = h('code', { class: 'min-w-0 flex-1 font-mono text-[13px] break-all select-all', 'aria-label': label }, '•'.repeat(16));
   let shown = false;
-  const toggle = h('button', { type: 'button', class: ui.btn('text', 'sm'), 'aria-pressed': 'false' }, icon('show'), 'Afficher');
+  const toggle = h('button', { type: 'button', class: ui.btn('text', 'sm'), 'aria-pressed': 'false' }, icon('show'), t('show'));
   toggle.addEventListener('click', () => {
     shown = !shown;
     text.textContent = shown ? value : '•'.repeat(16);
     toggle.setAttribute('aria-pressed', String(shown));
-    toggle.replaceChildren(icon(shown ? 'hide' : 'show'), shown ? 'Masquer' : 'Afficher');
+    toggle.replaceChildren(icon(shown ? 'hide' : 'show'), shown ? t('hide') : t('show'));
   });
-  const copy = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('link'), 'Copier');
+  const copy = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('link'), t('copy'));
   copy.addEventListener('click', () => {
     const done = (ok: boolean): void => {
-      copy.replaceChildren(icon(ok ? 'check' : 'warn'), ok ? 'Copié' : 'Copie impossible');
-      setTimeout(() => copy.replaceChildren(icon('link'), 'Copier'), 2000);
+      copy.replaceChildren(icon(ok ? 'check' : 'warn'), ok ? t('copied') : t('copyFailed'));
+      setTimeout(() => copy.replaceChildren(icon('link'), t('copy')), 2000);
     };
     const clip = (globalThis.navigator as Navigator | undefined)?.clipboard;
     if (clip === undefined) {
@@ -235,8 +237,8 @@ export function secretField(value: string, label: string): HTMLElement {
  * Three segments; the choice applies at once and is remembered.
  */
 export function themeChoice(doc: Document = document): HTMLElement {
-  const choices: [Theme, string, IconName][] = [['auto', 'Automatique', 'contrast'], ['light', 'Clair', 'sun'], ['dark', 'Sombre', 'moon']];
-  const group = h('div', { class: ui.seg, role: 'radiogroup', 'aria-label': 'Apparence' });
+  const choices: [Theme, string, IconName][] = [['auto', t('themeAuto'), 'contrast'], ['light', t('themeLight'), 'sun'], ['dark', t('themeDark'), 'moon']];
+  const group = h('div', { class: ui.seg, role: 'radiogroup', 'aria-label': t('appearance') });
   const draw = (): void => {
     const now = currentTheme(doc);
     group.replaceChildren(...choices.map(([value, label, ic]) => {
@@ -255,7 +257,7 @@ export function themeChoice(doc: Document = document): HTMLElement {
 
 /** The theme as one round button that cycles (the admin's header). */
 export function themeButton(doc: Document = document): HTMLElement {
-  const LABEL: Record<Theme, string> = { auto: 'Thème : automatique', light: 'Thème : clair', dark: 'Thème : sombre' };
+  const LABEL: Record<Theme, string> = { auto: t('themeIsAuto'), light: t('themeIsLight'), dark: t('themeIsDark') };
   const ICON: Record<Theme, IconName> = { auto: 'contrast', light: 'sun', dark: 'moon' };
   const b = h('button', { type: 'button', class: ui.iconBtn });
   const draw = (): void => {
@@ -269,5 +271,25 @@ export function themeButton(doc: Document = document): HTMLElement {
     draw();
   });
   draw();
+  return b;
+}
+
+/** The language, as a select; choosing one reloads the page in it. */
+export function langChoice(doc: Document = document): HTMLElement {
+  const current = lang(doc);
+  const select = h('select', { 'aria-label': t('language'), class: ui.input },
+    ...(Object.keys(LANGS) as Lang[]).map((l) => h('option', { value: l, selected: l === current, lang: l }, LANGS[l])));
+  select.addEventListener('change', () => setLang(select.value as Lang, doc));
+  select.classList.add('!w-auto');
+  return select;
+}
+
+/** The language as a small button (the admin's header): the other one. */
+export function langButton(doc: Document = document): HTMLElement {
+  const current = lang(doc);
+  const other: Lang = current === 'fr' ? 'en' : 'fr';
+  const b = h('button', { type: 'button', lang: other, class: 'state-layer inline-flex h-8 items-center rounded-md3-full px-2.5 text-[13px] font-semibold text-on-surface-variant',
+    title: LANGS[other], 'aria-label': LANGS[other] }, other.toUpperCase());
+  b.addEventListener('click', () => setLang(other, doc));
   return b;
 }

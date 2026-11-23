@@ -2,6 +2,8 @@
  * An error the server described (CONTRACTS.md 3.1), or a failure to reach
  * it. message is the server's own sentence and is shown as it is.
  */
+import { t } from '@/shared/core/Api.msg.ts';
+
 export class ApiError extends Error {
   constructor(
     readonly code: string,
@@ -14,17 +16,17 @@ export class ApiError extends Error {
   }
 
   static offline(): ApiError {
-    return new ApiError('offline', 'Le serveur ne répond pas.', 0);
+    return new ApiError('offline', t('offline'), 0);
   }
 
   static from(raw: unknown, status: number): ApiError {
     if (raw !== null && typeof raw === 'object') {
       const o = raw as Record<string, unknown>;
       const code = typeof o['error'] === 'string' ? o['error'] : 'http_error';
-      const message = typeof o['message'] === 'string' && o['message'] !== '' ? o['message'] : `Erreur ${status}.`;
+      const message = typeof o['message'] === 'string' && o['message'] !== '' ? o['message'] : t('httpError', { status });
       return new ApiError(code, message, status, o);
     }
-    return new ApiError('http_error', `Erreur ${status}.`, status);
+    return new ApiError('http_error', t('httpError', { status }), status);
   }
 }
 
