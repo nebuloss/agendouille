@@ -1,0 +1,24 @@
+{
+  "name": "agendouille",
+  "version": "0.1.0",
+  "description": "The family's calendars, at home: a web app and an admin UI",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nebuloss/agendouille.git"
+  },
+  "scripts": {
+    "build": "vite build --mode app && vite build --mode admin",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

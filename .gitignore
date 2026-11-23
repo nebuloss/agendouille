@@ -16,6 +16,8 @@
 # README.txt is committed because embed needs the directory to be non-empty.
 internal/web/assets/static/app/*
 !internal/web/assets/static/app/README.txt
+internal/web/assets/static/admin/*
+!internal/web/assets/static/admin/README.txt
 
 node_modules/
 

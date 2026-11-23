@@ -12,7 +12,12 @@ the two disagree on. Record every deviation, with the reason, in
 
 ## Status
 
-Planning. Nothing is built yet; next is M0 (PLAN section 15).
+M0 is done: `agendouille serve|config|version`, the bootstrap config
+(`internal/config`), the admin listener with `/healthz` and the admin
+bundle (`internal/web/assets`, one bundle per surface), the two Vite
+bundles, `src/shared/core` (Dom, Disposable, Clock, Backoff, Pages) with
+tests, the import-rule test, CI, release, `scripts/remote.sh`. Next is M1
+(PLAN section 15).
 
 ## Conventions come from cafard and claudication
 
@@ -24,17 +29,22 @@ password printed once at install) from `~/misc/claudication`. PLAN section
 
 ## Build and test
 
-```sh
-npm ci
-npm run typecheck        # tsc; vite does not typecheck
-npm test                 # vitest
-npm run build            # src/ -> internal/web/assets/static/{app,admin}/
-scripts/check-sinks.sh   # no HTML sinks in src/
+The editing machine has neither Go nor Node: everything runs on dev-build
+through `scripts/remote.sh`, which rsyncs the tree there first.
 
-scripts/remote.sh        # sync to dev-build: gofmt -l, build, vet, test -race
-scripts/android.sh test  # JVM tests of the Android app, in its container on dev-build
-scripts/android.sh apk   # the debug APK, same place
+```sh
+scripts/remote.sh        # gofmt -l, go build, go vet, go test -race
+scripts/remote.sh web    # npm ci, typecheck, vitest, both bundles, the sinks check
+scripts/remote.sh all    # web, then the Go checks (so they see the bundles)
+scripts/remote.sh <cmd>  # anything in the remote tree, e.g. 'rtk go test ./internal/config'
+scripts/check-sinks.sh   # runs here too: no HTML sinks in src/
+
+scripts/android.sh test  # (M6) JVM tests of the Android app, on dev-build
+scripts/android.sh apk   # (M6) the debug APK, same place
 ```
+
+A new npm dependency: change `package.json`, run `scripts/remote.sh 'rtk npm
+install'`, and copy `package-lock.json` back with `scp`.
 
 - **Go and the APK are built on dev-build only** (through `rtk`). Never
   build on the editing machine. A pass on dev-build is the only pass that

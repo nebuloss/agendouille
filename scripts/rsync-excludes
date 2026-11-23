@@ -1,0 +1,13 @@
+# What scripts/remote.sh never syncs to dev-build. The database holds the
+# family's calendars and agendouille.yaml may hold addresses: neither leaves
+# the machine it lives on. node_modules is installed on dev-build itself,
+# and the worktrees are other checkouts. A leading / anchors a pattern to
+# the tree root, so it cannot match a same-named entry deeper.
+/.git
+/.claude/
+/node_modules
+/data/
+*.db
+*.db-wal
+*.db-shm
+/agendouille.yaml

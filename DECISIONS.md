@@ -3,6 +3,24 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M0 notes
+
+- **No Node or Go on the editing machine.** AGENTS.md said npm checks run
+  on dev-code; they cannot. `scripts/remote.sh web|all` runs them on
+  dev-build (Node 20, Go 1.26 through the auto toolchain), and
+  `package-lock.json` is copied back from there.
+- **Two separate Vite builds**, not one build with two entries: each bundle
+  carries its own copy of `src/shared`, so no shared chunk exists that the
+  public listener would have to serve next to the admin one. The shared
+  code is small; the duplication costs bytes, not correctness.
+- **`admin_allow_insecure` defaults to `false`** (PLAN said "true on a
+  private address"): off loopback, plain http for the admin UI is accepted
+  only when the bootstrap file says so in so many words. Fewer guesses
+  about what "private" means behind a NAT.
+- **dev-build has no Docker**, but has a JDK 17 and an Android SDK in
+  `~/android-build`. M6 uses those there, and a container only in CI
+  (PLAN 13.5 updated).
+
 ## 2026-11-23: MIT, and DAVx5 read but not copied
 
 The user chose MIT for the whole project, and agreed to the way DAVx5 is

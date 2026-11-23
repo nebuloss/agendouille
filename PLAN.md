@@ -795,7 +795,7 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | `data_dir` | `/var/lib/agendouille` | database, backups |
 | `admin_listen` | `127.0.0.1:8792` | The admin UI. Never changed from the UI, so a mistake there cannot lock the admin out |
 | `admin_public_url` | `http://<admin_listen>` | |
-| `admin_allow_insecure` | `true` when `admin_public_url` is `http://` on a private address | |
+| `admin_allow_insecure` | `false` | Must be `true` for a plain `http://` admin URL off loopback (a LAN-only admin UI); off loopback, `admin_public_url` is required |
 | `log_level` | `info` | |
 
 ### 11.2 Settings (in the database, edited in the admin UI, applied live)
@@ -883,7 +883,10 @@ cafard's `install.sh`, hardened systemd unit, OpenRC, LXC drop-in, renamed;
 
 ### 13.5 The Android build (Decided: no Gradle, no Kotlin, no Android Studio)
 
-- `android/docker/Dockerfile`: a JDK, Android `build-tools` (`aapt2`, `d8`,
+- On dev-build: the JDK and the Android SDK pieces already in
+  `~/android-build` (`jdk-17…`, `sdk/`); dev-build has no Docker (found in
+  M0). In CI: the same pieces in a container.
+- `android/docker/Dockerfile` (CI): a JDK, Android `build-tools` (`aapt2`, `d8`,
   `zipalign`, `apksigner`) and one `platforms;android-NN` (`android.jar`),
   fetched by `sdkmanager` at image build. A few hundred MB, on dev-build
   and in CI only.

@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check and build the frontend
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+          test -s internal/web/assets/static/app/app.js
+          test -s internal/web/assets/static/admin/admin.js
+          scripts/check-sinks.sh
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: false
+
+      - name: Test
+        run: go test -race ./...
+
+      # Static, cgo off, both bundles embedded: each file is the whole
+      # server. The APK joins the release in M6.
+      - name: Build for every target
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          build() {
+            GOOS="$1" GOARCH="$2" GOARM="${4:-}" go build \
+              -trimpath \
+              -ldflags="-s -w -X main.version=$version" \
+              -o "$3" ./cmd/agendouille
+            echo "  $3: $(stat -c%s "$3") bytes"
+          }
+          build linux amd64 agendouille-linux-amd64
+          build linux arm64 agendouille-linux-arm64
+          build linux arm   agendouille-linux-armv7 7
+
+      # The binary runs, reports exactly the tagged version, serves
+      # /healthz with it, and embeds the admin bundle.
+      - name: Smoke test the linux amd64 build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          printed=$(./agendouille-linux-amd64 version)
+          echo "$printed"
+          [ "$printed" = "agendouille $version" ] || { echo "the binary does not report the tagged version"; exit 1; }
+
+          data=$(mktemp -d)
+          ./agendouille-linux-amd64 serve -admin-listen 127.0.0.1:18792 -data-dir "$data" >"$data/out" 2>&1 &
+          pid=$!
+          for _ in $(seq 50); do curl -fsS http://127.0.0.1:18792/healthz >/dev/null 2>&1 && break; sleep 0.2; done
+          health=$(curl -fsS http://127.0.0.1:18792/healthz) || { cat "$data/out"; exit 1; }
+          echo "healthz: $health"
+          [ "$health" = "ok $version" ] || { echo "/healthz does not report the tagged version"; exit 1; }
+          curl -fsS -o /dev/null http://127.0.0.1:18792/static/admin/admin.js || { echo "the admin bundle is not embedded"; exit 1; }
+          kill "$pid"
+          wait "$pid" || true
+
+      - name: Checksums
+        run: |
+          sha256sum agendouille-linux-* > SHA256SUMS
+          cat SHA256SUMS
+          [ "$(wc -l < SHA256SUMS)" -eq 3 ] || { echo "SHA256SUMS should list 3 files"; exit 1; }
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            agendouille-linux-amd64
+            agendouille-linux-arm64
+            agendouille-linux-armv7
+            SHA256SUMS
+          generate_release_notes: true
