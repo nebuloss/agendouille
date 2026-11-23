@@ -4,6 +4,7 @@ import { parseLocal } from '@/shared/core/Dates.ts';
 import { agenda, month, week, whenText, type ViewContext } from '@/app/components/views.ts';
 import { CalendarPage } from '@/app/pages/CalendarPage.ts';
 import { CalendarsPage, browserName } from '@/app/pages/Manage.ts';
+import { secretField } from '@/shared/components/Ui.ts';
 import type { Occurrence } from '@/app/api.ts';
 
 function shell(page: string): void {
@@ -122,5 +123,17 @@ describe('app pages', () => {
   it('names browsers', () => {
     expect(browserName('Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0')).toBe('Firefox, Linux');
     expect(browserName('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36')).toBe('Chrome, Android');
+  });
+});
+
+describe('secretField', () => {
+  it('masks a secret until asked, then shows it', () => {
+    const f = secretField('agd_abcd-efgh-ijkl', 'Mot de passe');
+    expect(f.textContent).not.toContain('agd_');
+    const show = [...f.querySelectorAll('button')].find((b) => b.textContent === 'Afficher')!;
+    show.click();
+    expect(f.textContent).toContain('agd_abcd-efgh-ijkl');
+    show.click();
+    expect(f.textContent).not.toContain('agd_');
   });
 });

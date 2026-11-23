@@ -192,3 +192,34 @@ export function card(title: string, aside: Child[], ...children: Child[]): HTMLE
     h('div', { class: ui.cardHead }, h('h2', { class: ui.cardTitle }, title), aside.length > 0 ? h('div', { class: ui.cardAside }, ...aside) : null),
     ...children);
 }
+
+/**
+ * A secret shown once (a device password, a subscription address): masked
+ * until asked, with a button to show it and one to copy it, so it is not
+ * on the screen for whoever looks over a shoulder.
+ */
+export function secretField(value: string, label: string): HTMLElement {
+  const text = h('code', { class: 'min-w-0 flex-1 font-mono text-[13px] break-all select-all', 'aria-label': label }, '•'.repeat(16));
+  let shown = false;
+  const toggle = h('button', { type: 'button', class: ui.btn('text', 'sm'), 'aria-pressed': 'false' }, icon('show'), 'Afficher');
+  toggle.addEventListener('click', () => {
+    shown = !shown;
+    text.textContent = shown ? value : '•'.repeat(16);
+    toggle.setAttribute('aria-pressed', String(shown));
+    toggle.replaceChildren(icon(shown ? 'hide' : 'show'), shown ? 'Masquer' : 'Afficher');
+  });
+  const copy = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('link'), 'Copier');
+  copy.addEventListener('click', () => {
+    const done = (ok: boolean): void => {
+      copy.replaceChildren(icon(ok ? 'check' : 'warn'), ok ? 'Copié' : 'Copie impossible');
+      setTimeout(() => copy.replaceChildren(icon('link'), 'Copier'), 2000);
+    };
+    const clip = (globalThis.navigator as Navigator | undefined)?.clipboard;
+    if (clip === undefined) {
+      done(false);
+      return;
+    }
+    clip.writeText(value).then(() => done(true), () => done(false));
+  });
+  return h('div', { class: 'flex flex-wrap items-center gap-2 rounded-md3-s bg-surface-lowest px-3 py-2' }, text, toggle, copy);
+}

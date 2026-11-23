@@ -4,7 +4,7 @@ import { Countdown } from '@/shared/components/Countdown.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
-import { action, card, check, confirmDialog, dialog, field, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, check, confirmDialog, dialog, field, secretField, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
 
@@ -263,12 +263,12 @@ export class DevicesPage extends AppPage {
     const manual = h('dl', { class: ui.kv },
       h('dt', {}, 'Serveur'), h('dd', {}, h('code', {}, d.manual.server)),
       h('dt', {}, 'Utilisateur'), h('dd', {}, h('code', {}, d.username)),
-      h('dt', {}, 'Mot de passe'), h('dd', {}, h('code', { class: ui.secret }, d.secret)));
+      h('dt', {}, 'Mot de passe'), h('dd', {}, secretField(d.secret, 'Mot de passe de l’appareil')));
     const body: Child[] = [];
     if (d.davx5_uri !== undefined) {
       body.push(h('p', {}, 'Sur le téléphone, installez DAVx5, puis scannez ce code avec l’appareil photo, ou touchez le lien depuis le téléphone.'));
       if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(d.qr_svg), alt: 'QR code pour DAVx5', width: 240, height: 240 }));
-      body.push(h('p', {}, h('a', { href: d.davx5_uri }, 'Ouvrir dans DAVx5')));
+      body.push(h('p', { class: 'flex justify-center' }, h('a', { href: d.davx5_uri, class: ui.btn('tonal') }, icon('phone'), 'Ouvrir dans DAVx5')));
     }
     if (d.mobileconfig_url !== undefined) {
       body.push(h('p', {}, 'Ouvrez cette page sur l’iPhone, touchez le bouton, puis Réglages, Profil téléchargé, Installer. Le lien ne marche qu’une fois, dix minutes.'),
@@ -290,7 +290,7 @@ export class DevicesPage extends AppPage {
     if (v !== 'ok' || chosen.length === 0) return;
     try {
       const l = await this.api.post<Link>('/links', { label: label.value.trim(), calendars: chosen });
-      await dialog(this.doc, 'Lien créé', [h('p', {}, "Copiez l'adresse maintenant : elle ne sera plus affichée."), h('code', { class: ui.secret }, l.url ?? '')],
+      await dialog(this.doc, 'Lien créé', [h('p', {}, "Copiez l'adresse maintenant : elle ne sera plus affichée."), secretField(l.url ?? '', 'Adresse du lien')],
         [{ label: "C'est copié", value: 'ok', kind: 'filled' }]);
       await this.refresh();
     } catch (e) {
