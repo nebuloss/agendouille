@@ -396,7 +396,7 @@ if [ -n "$admin_password" ]; then
 |   $admin_password
 |
 |  Shown once: only its hash is stored, and it is in no log.
-|  Sign in at $admin_url/admin
+|  Sign in at $admin_url/
 |  Change it in the admin UI, or: $BINARY admin passwd -config $CONFIG
 +--------------------------------------------------------------------------
 EOF
@@ -407,7 +407,7 @@ if [ "$new_install" = yes ]; then
 
 Next:
 
-  1. Sign in at $admin_url/admin with the password above.
+  1. Sign in at $admin_url/ with the password above.
   2. Settings, Network: the public address the family uses (your proxy's
      https:// address) and the listener behind it, if not done here.
   3. Users: add the family, put them in groups, and give each a sign-in QR.

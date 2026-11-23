@@ -30,7 +30,7 @@ type adminClient struct {
 func signInAdmin(t *testing.T, x *e2e) adminClient {
 	t.Helper()
 	body, edit := form(url.Values{"password": {testAdminPassword}})
-	a := x.do("POST", x.admin+"/admin/signin", body, edit)
+	a := x.do("POST", x.admin+"/signin", body, edit)
 	s := cookieOf(a, auth.AdminCookie)
 	if s == "" {
 		t.Fatalf("admin sign-in: %d", a.status)
@@ -76,14 +76,20 @@ func TestM3AdminUI(t *testing.T) {
 	}
 	A := signInAdmin(t, x)
 	// The pages are served (the bundle fills them).
-	for _, p := range []string{"/admin", "/admin/users", "/admin/users/lea", "/admin/groups", "/admin/activity", "/admin/settings", "/admin/backups"} {
+	for _, p := range []string{"/", "/users", "/users/lea", "/groups", "/activity", "/settings", "/backups"} {
 		if a := x.do("GET", x.admin+p, nil, cookie(auth.AdminCookie, A.session)); a.status != 200 || !strings.Contains(a.body, "admin-content") {
 			t.Errorf("page %s: %d", p, a.status)
 		}
 	}
 	// The old calendars page lands on the users: calendars are under their owner.
-	if a := x.do("GET", x.admin+"/admin/calendars", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/admin/users" {
-		t.Errorf("/admin/calendars: %d %s", a.status, a.header.Get("Location"))
+	if a := x.do("GET", x.admin+"/calendars", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/users" {
+		t.Errorf("/calendars: %d %s", a.status, a.header.Get("Location"))
+	}
+	// Links from before, with the /admin prefix, land on the same page.
+	for old, now := range map[string]string{"/admin": "/", "/admin/users/lea": "/users/lea", "/admin/calendars": "/users"} {
+		if a := x.do("GET", x.admin+old, nil, nil); a.status != http.StatusMovedPermanently || a.header.Get("Location") != now {
+			t.Errorf("%s: %d %s, want %s", old, a.status, a.header.Get("Location"), now)
+		}
 	}
 	// The notification centre: the public side being off is an error,
 	// marked read it stays read, and it is forgotten once fixed.

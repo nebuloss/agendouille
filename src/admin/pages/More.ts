@@ -1,7 +1,7 @@
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiError, seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
-import { action, confirmDialog, dialog, field, section, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
 import { bytes, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 
@@ -26,6 +26,7 @@ export class GroupsPage extends AdminPage {
       this.api.get<{ users: UserLite[] }>('/users'),
     ]);
     return [
+      card('Groupes', [action('Nouveau groupe', () => this.create(), 'filled', 'plus')],
       h('p', { class: 'text-sm text-on-surface-variant' }, "Les membres d'un groupe se voient et peuvent partager leurs calendriers entre eux."),
       table(['Groupe', 'Membres', 'Partages', ''],
         groups.map((g) => [
@@ -35,21 +36,24 @@ export class GroupsPage extends AdminPage {
           h('span', { class: 'flex flex-wrap items-center gap-2' },
             action('Membres…', () => this.members(g, users), 'text'),
             action('Supprimer', () => this.remove(g), 'text')),
-        ]), 'Aucun groupe.'),
-      section('Créer un groupe', this.addForm()),
+        ]), 'Aucun groupe.')),
     ];
   }
 
-  private addForm(): HTMLElement {
+  /** "Nouveau groupe": the form in a modal. */
+  private async create(): Promise<void> {
     const name = h('input', { required: true, pattern: '[a-z][a-z0-9-]{0,31}', placeholder: 'famille', autocomplete: 'off' });
     const display = h('input', { placeholder: 'Famille' });
-    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' }, h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field('Identifiant', name), field('Nom affiché', display)),
-      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Créer'));
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      void this.act(() => this.api.post('/groups', { name: name.value.trim(), display_name: display.value.trim() }), 'Groupe créé.');
+    const ok = await formDialog(this.doc, 'Nouveau groupe', [
+      field('Identifiant', name, 'Minuscules, chiffres et tirets ; ne change plus.'),
+      field('Nom affiché', display),
+    ], 'Créer', async () => {
+      await this.api.post('/groups', { name: name.value.trim(), display_name: display.value.trim() });
     });
-    return form;
+    if (!ok) return;
+    this.toasts.show('Groupe créé.');
+    this.doc.dispatchEvent(new Event('agd:changed'));
+    await this.refresh();
   }
 
   private async members(g: Group, users: UserLite[]): Promise<void> {
@@ -255,7 +259,7 @@ export class BackupsPage extends AdminPage {
     try {
       const res = await this.api.post<{ message: string }>(`/backups/${seg(b.name)}/restore`, { confirm: b.name });
       this.toasts.show(res.message);
-      setTimeout(() => this.doc.location.assign('/admin/signin'), 5000);
+      setTimeout(() => this.doc.location.assign('/signin'), 5000);
     } catch (e) {
       this.toasts.error(e instanceof ApiError ? e : new Error(String(e)));
     }

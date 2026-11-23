@@ -60,6 +60,55 @@ export function dialog(doc: Document, title: string, body: Child[], buttons: Dia
   });
 }
 
+/**
+ * A form in a modal: it stays open while the server says no, with the
+ * reason inside it, and closes once submit has worked. Resolves true when
+ * it did, false when the form was cancelled. The browser checks the
+ * fields first (required, pattern).
+ */
+export function formDialog(doc: Document, title: string, body: Child[], submitLabel: string, submit: () => Promise<void>): Promise<boolean> {
+  const el = doc.createElement('dialog');
+  el.className = ui.dialog;
+  const error = h('p', { class: ui.error, role: 'alert', hidden: true });
+  const cancel = h('button', { class: ui.btn('text'), type: 'button' }, 'Annuler');
+  const ok = h('button', { class: ui.btn('filled'), type: 'submit' }, submitLabel);
+  const form = h('form', { class: 'flex max-h-[inherit] flex-col', novalidate: false },
+    h('div', { class: ui.dialogHead }, h('h2', {}, title)),
+    h('div', { class: ui.dialogBody }, ...body, error),
+    h('div', { class: ui.dialogFoot }, cancel, ok));
+  el.append(form);
+  doc.body.append(el);
+  return new Promise((resolve) => {
+    let done = false;
+    el.addEventListener('close', () => {
+      el.remove();
+      resolve(done);
+    }, { once: true });
+    cancel.addEventListener('click', () => el.close());
+    el.addEventListener('click', (e) => {
+      if (e.target === el) el.close();
+    });
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      ok.disabled = true;
+      error.hidden = true;
+      submit().then(() => {
+        done = true;
+        el.close();
+      }, (err: unknown) => {
+        error.textContent = err instanceof Error ? err.message : String(err);
+        error.hidden = false;
+      }).finally(() => {
+        ok.disabled = false;
+      });
+    });
+    if (typeof el.showModal === 'function') el.showModal();
+    else el.setAttribute('open', '');
+    const first = form.querySelector<HTMLElement>('input, select, textarea');
+    first?.focus();
+  });
+}
+
 /** Asks yes or no. */
 export async function confirmDialog(doc: Document, title: string, text: string, yes: string, danger = false): Promise<boolean> {
   const v = await dialog(doc, title, [h('p', {}, text)], [

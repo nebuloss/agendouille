@@ -273,9 +273,9 @@ no same-origin):
 
 | Method | Path | Auth |
 |---|---|---|
-| GET, POST | `/admin/signin` | none; password (two argon2 derivations at once at most) |
-| POST | `/admin/signout` | `agd_admin`, same-origin |
-| GET | `/admin`, `/admin/users[/{name}]`, `/admin/groups`, `/admin/calendars`, `/admin/activity`, `/admin/settings`, `/admin/backups` | `agd_admin` |
+| GET, POST | `/signin` | none; password (two argon2 derivations at once at most) |
+| POST | `/signout` | `agd_admin`, same-origin |
+| GET | `/`, `/users[/{name}]`, `/groups`, `/activity`, `/settings`, `/backups` | `agd_admin`; on the admin listener only, so no `/admin` prefix (DECISIONS); `/calendars` and every old `/admin/...` path redirect |
 | GET | `/static/admin/...`, `/static/shared/...` | none |
 | | `/api/admin/*` (3.5) | `agd_admin`; writes same-origin |
 

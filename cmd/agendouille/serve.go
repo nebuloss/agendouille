@@ -192,7 +192,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	if _, err := srv.StartAdmin(cfg.AdminListen, adminHandler); err != nil {
 		return err
 	}
-	log.Info("admin UI", "url", cfg.AdminURL()+"/admin", "version", version,
+	log.Info("admin UI", "url", cfg.AdminURL()+"/", "version", version,
 		"app_bundle", assets.Built(assets.App), "admin_bundle", assets.Built(assets.Admin), "data_dir", cfg.DataDir)
 
 	// The public listener follows the public_listen setting from now on.

@@ -12,23 +12,32 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['ph
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${label} console: ${m.text()}`); });
   page.on('pageerror', (e) => errors.push(`${label} page: ${e.message}`));
   await page.setViewport(viewport);
-  await page.goto(base + '/admin/signin', { waitUntil: 'networkidle0' });
+  await page.goto(base + '/signin', { waitUntil: 'networkidle0' });
   await page.type('input[name=password]', password);
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type=submit]')]);
-  for (const path of ['/admin', '/admin/users', '/admin/users/lea', '/admin/groups', '/admin/activity', '/admin/settings', '/admin/backups']) {
+  for (const path of ['/', '/users', '/users/lea', '/groups', '/activity', '/settings', '/backups']) {
     await page.goto(base + path, { waitUntil: 'networkidle0' });
     await new Promise((r) => setTimeout(r, 300));
-    const name = path.replaceAll('/', '_').replace(/^_/, '') || 'root';
+    const name = path.replaceAll('/', '_').replace(/^_/, '') || 'overview';
     await page.screenshot({ path: `${out}/${label}-${name}.png`, fullPage: label === 'desktop' });
   }
   // The notification centre, open.
-  await page.goto(base + '/admin', { waitUntil: 'networkidle0' });
+  await page.goto(base + '/', { waitUntil: 'networkidle0' });
   await page.click('#bell-slot button');
   await new Promise((r) => setTimeout(r, 400));
   await page.screenshot({ path: `${out}/${label}-notices.png` });
   await page.keyboard.press('Escape');
+  // Creating a user is a modal.
+  await page.goto(base + '/users', { waitUntil: 'networkidle0' });
+  const add = await page.$('xpath/.//button[contains(., "Nouvel utilisateur")]');
+  if (add) {
+    await add.click();
+    await new Promise((r) => setTimeout(r, 400));
+    await page.screenshot({ path: `${out}/${label}-new-user.png` });
+    await page.keyboard.press('Escape');
+  } else errors.push(`${label}: no "Nouvel utilisateur" button`);
   if (label === 'desktop') {
-    await page.goto(base + '/admin/users/lea', { waitUntil: 'networkidle0' });
+    await page.goto(base + '/users/lea', { waitUntil: 'networkidle0' });
     const [button] = await page.$$('xpath/.//button[contains(., "Créer un QR")]');
     if (button) {
       await button.click();

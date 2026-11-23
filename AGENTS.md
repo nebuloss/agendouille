@@ -69,7 +69,7 @@ M0 and M1 are done. What exists:
   `scripts/devdeploy.sh`, `admin passwd --if-unset`, the andouille icon.
   Deployed to CT 408 `dmz-agendouille`, public at
   https://agendouille.patapouf.club (DMZ NPM, proxy host 7), admin UI at
-  https://agendouille.dmz.patapouf.club/admin (LAN NPM `srv-npm`, host 26):
+  https://agendouille.dmz.patapouf.club (LAN NPM `srv-npm`, host 26):
   `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,

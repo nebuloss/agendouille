@@ -159,43 +159,47 @@ func TestM1(t *testing.T) {
 	if a := x.do("GET", x.admin+"/healthz", nil, nil); a.status != 200 {
 		t.Fatalf("admin /healthz: %d", a.status)
 	}
-	for _, p := range []string{"/dav/", "/.well-known/caldav", "/signin", "/api/me", "/static/app/app.js"} {
+	for _, p := range []string{"/dav/", "/.well-known/caldav", "/approve", "/enrol/x", "/api/me", "/static/app/app.js"} {
 		if a := x.do("GET", x.admin+p, nil, nil); a.status != http.StatusNotFound {
 			t.Errorf("admin listener %s: %d, want 404", p, a.status)
 		}
+	}
+	// Its /signin is the admin's (no /admin prefix on its own listener).
+	if a := x.do("GET", x.admin+"/signin", nil, nil); a.status != 200 || !strings.Contains(a.body, "Mot de passe administrateur") {
+		t.Errorf("admin listener /signin: %d", a.status)
 	}
 	if x.srv.PublicAddr() != nil {
 		t.Fatal("the public listener is up before public_listen is set")
 	}
 
 	// --- admin sign-in
-	if a := x.do("GET", x.admin+"/admin", nil, nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/admin/signin" {
-		t.Errorf("/admin signed out: %d %s", a.status, a.header.Get("Location"))
+	if a := x.do("GET", x.admin+"/", nil, nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/signin" {
+		t.Errorf("/ signed out: %d %s", a.status, a.header.Get("Location"))
 	}
 	body, edit := form(url.Values{"password": {"wrong password!"}})
-	if a := x.do("POST", x.admin+"/admin/signin", body, edit); a.status != http.StatusUnauthorized {
+	if a := x.do("POST", x.admin+"/signin", body, edit); a.status != http.StatusUnauthorized {
 		t.Errorf("a wrong admin password: %d", a.status)
 	}
 	body, edit = form(url.Values{"password": {testAdminPassword}})
-	a := x.do("POST", x.admin+"/admin/signin", body, edit)
+	a := x.do("POST", x.admin+"/signin", body, edit)
 	adminSession := cookieOf(a, auth.AdminCookie)
 	if a.status != http.StatusSeeOther || adminSession == "" {
 		t.Fatalf("admin sign-in: %d, cookie %q", a.status, adminSession)
 	}
-	if a := x.do("GET", x.admin+"/admin", nil, cookie(auth.AdminCookie, adminSession)); a.status != 200 {
-		t.Errorf("/admin signed in: %d", a.status)
+	if a := x.do("GET", x.admin+"/", nil, cookie(auth.AdminCookie, adminSession)); a.status != 200 {
+		t.Errorf("/ signed in: %d", a.status)
 	}
 	// A cross-site form cannot sign the admin out (or in).
 	body, edit = form(url.Values{}, func(r *http.Request) {
 		r.Header.Set("Sec-Fetch-Site", "cross-site")
 		r.AddCookie(&http.Cookie{Name: auth.AdminCookie, Value: adminSession})
 	})
-	if a := x.do("POST", x.admin+"/admin/signout", body, edit); a.status != http.StatusForbidden {
+	if a := x.do("POST", x.admin+"/signout", body, edit); a.status != http.StatusForbidden {
 		t.Errorf("a cross-site sign-out: %d, want 403", a.status)
 	}
 
 	// --- every form page shows its form (an empty page once passed this test)
-	if a := x.do("GET", x.admin+"/admin/signin", nil, nil); !strings.Contains(a.body, `name="password"`) {
+	if a := x.do("GET", x.admin+"/signin", nil, nil); !strings.Contains(a.body, `name="password"`) {
 		t.Errorf("the admin sign-in page has no password field:\n%s", a.body)
 	}
 
@@ -252,7 +256,7 @@ func TestM1(t *testing.T) {
 
 	// --- an agd_app session never opens the admin UI
 	for _, name := range []string{auth.AppCookie, auth.AdminCookie} {
-		if a := x.do("GET", x.admin+"/admin", nil, cookie(name, leaPhone)); a.status != http.StatusSeeOther {
+		if a := x.do("GET", x.admin+"/", nil, cookie(name, leaPhone)); a.status != http.StatusSeeOther {
 			t.Errorf("an app session as %s on /admin: %d, want a redirect to sign-in", name, a.status)
 		}
 	}
@@ -315,8 +319,8 @@ func TestM1(t *testing.T) {
 	if a := x.do("POST", x.public+"/api/app/session", nil, basic); a.status != http.StatusForbidden {
 		t.Errorf("a DAVx5 credential asking for a WebView session: %d, want 403", a.status)
 	}
-	if a := x.do("GET", x.admin+"/admin", nil, basic); a.status != http.StatusSeeOther {
-		t.Errorf("/admin with a device credential: %d", a.status)
+	if a := x.do("GET", x.admin+"/", nil, basic); a.status != http.StatusSeeOther {
+		t.Errorf("the admin UI with a device credential: %d", a.status)
 	}
 
 	// --- the Android app enrols and opens its WebView

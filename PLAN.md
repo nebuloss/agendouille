@@ -638,7 +638,7 @@ or Apple's relays; approval (8.2) is what always works.
 
 ### 8.7 The admin
 
-The admin signs in at `/admin/signin` on the admin listener with its
+The admin signs in at `/signin` on the admin listener with its
 password (argon2id), nothing else: no approval, so a phone session on the
 internet side can never reach the admin UI. Admin sessions last 12 hours
 (Default).
@@ -707,15 +707,15 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 
 | Path | Page |
 |---|---|
-| `/admin/signin` | Password |
-| `/admin` | Overview: users, groups, calendars, devices not synced for a week, storage used, last backup, version, warnings (no public listener yet, the admin surface on a public listener, a backup older than two days) |
-| `/admin/users` | List: name, groups, calendars owned, devices, last seen. "Add user" |
-| `/admin/users/<name>` | Profile, groups; **enrolment QR** (make, show, revoke, used or not); devices and browsers (revoke); calendars owned and shared with them (names, counts, sizes); disable, enable; remove (with the transfer-or-delete step, 6) |
-| `/admin/groups` | Groups: name, colour, members; add, rename, delete (a group with shares asks first) |
-| `/admin/calendars` | Every calendar: owner, name, events, size, shares. **No events.** The admin can remove a share, transfer a calendar, delete one (typing its name) |
-| `/admin/activity` | Who did what, without event titles: "Léa created an event in maman~ecole from Pixel 8", "Maman shared École with Enfants", admin actions |
-| `/admin/settings` | Every setting of 11.2, grouped: Network, Storage and backups, Limits, Defaults. Applied live |
-| `/admin/backups` | List, download, back up now, restore (13.6) |
+| `/signin` | Password |
+| `/` | Overview: users, groups, calendars, devices not synced for a week, storage used, last backup, version, warnings (no public listener yet, the admin surface on a public listener, a backup older than two days) |
+| `/users` | List: name, groups, calendars owned, devices, last seen. "Add user" |
+| `/users/<name>` | Profile, groups; **enrolment QR** (make, show, revoke, used or not); devices and browsers (revoke); calendars owned and shared with them (names, counts, sizes); disable, enable; remove (with the transfer-or-delete step, 6) |
+| `/groups` | Groups: name, colour, members; add, rename, delete (a group with shares asks first) |
+| (on `/users/<name>`) | Every calendar: owner, name, events, size, shares. **No events.** The admin can remove a share, transfer a calendar, delete one (typing its name) |
+| `/activity` | Who did what, without event titles: "Léa created an event in maman~ecole from Pixel 8", "Maman shared École with Enfants", admin actions |
+| `/settings` | Every setting of 11.2, grouped: Network, Storage and backups, Limits, Defaults. Applied live |
+| `/backups` | List, download, back up now, restore (13.6) |
 
 ### 9.5 TypeScript layout (Default, as cafard)
 

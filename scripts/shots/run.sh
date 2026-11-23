@@ -58,7 +58,7 @@ pid=$!
 trap 'kill $pid 2>/dev/null; rm -rf "$D"' EXIT
 sleep 1
 jar="$D/jar"
-curl -s -o /dev/null -c "$jar" --data-urlencode "password=$pw" http://127.0.0.1:18892/admin/signin
+curl -s -o /dev/null -c "$jar" --data-urlencode "password=$pw" http://127.0.0.1:18892/signin
 curl -s -o /dev/null -b "$jar" -X POST -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:18892/api/admin/backups
 ln -sfn "$HOME/shots/node_modules" scripts/shots/node_modules
 node scripts/shots/shoot.mjs http://127.0.0.1:18892 "$pw" "$out"

@@ -2,7 +2,7 @@ import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
-import { action, confirmDialog, dialog, field, section, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel } from '@/admin/pages/More.ts';
@@ -74,7 +74,7 @@ interface UserDetail {
   calendars_shared: { ref: string; name: string; access: string; via: string }[];
 }
 
-const userLink = (name: string): HTMLElement => h('a', { href: `/admin/users/${seg(name)}` }, name);
+const userLink = (name: string): HTMLElement => h('a', { href: `/users/${seg(name)}` }, name);
 
 /** Shows a fresh enrolment's QR code and link, once (PLAN.md 7.2). */
 export async function showEnrolment(doc: Document, who: string, e: Enrolment): Promise<void> {
@@ -95,6 +95,7 @@ export class UsersPage extends AdminPage {
       this.api.get<{ groups: Group[] }>('/groups'),
     ]);
     return [
+      card('Utilisateurs', [action('Nouvel utilisateur', () => this.create(groups), 'filled', 'plus')],
       table(
         ['Nom', 'Affiché', 'Groupes', 'Appareils', 'Calendriers', 'Vu', ''],
         users.map((u) => [
@@ -107,39 +108,37 @@ export class UsersPage extends AdminPage {
           u.disabled ? h('span', { class: ui.pill.err }, 'désactivé') : '',
         ]),
         'Aucun utilisateur pour le moment.',
-      ),
-      section('Ajouter un utilisateur', this.addForm(groups)),
+      )),
     ];
   }
 
-  private addForm(groups: Group[]): HTMLElement {
+  /** "Nouvel utilisateur": the form in a modal, then the sign-in QR. */
+  private async create(groups: Group[]): Promise<void> {
     const name = h('input', { name: 'name', required: true, autocomplete: 'off', pattern: '[a-z][a-z0-9-]{0,31}', placeholder: 'lea' });
     const display = h('input', { name: 'display_name', placeholder: 'Léa' });
     const checks = groups.map((g) => h('input', { type: 'checkbox', value: g.name }));
-    const form = h('form', { class: 'add-user flex flex-col items-start gap-4 [&>div]:w-full' },
-      h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' },
-        field('Identifiant', name, 'Minuscules, chiffres et tirets ; ne change plus.'),
-        field("Nom affiché", display),
-      ),
+    let made: { user: User; enrolment?: Enrolment } | null = null;
+    const ok = await formDialog(this.doc, 'Nouvel utilisateur', [
+      field('Identifiant', name, 'Minuscules, chiffres et tirets ; ne change plus.'),
+      field('Nom affiché', display),
       groups.length > 0
-        ? h('div', {}, h('span', { class: ui.label }, 'Groupes'), h('div', { class: 'flex flex-wrap gap-x-5 gap-y-2' }, ...groups.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))))
-        : h('p', { class: 'text-sm text-on-surface-variant' }, "Aucun groupe : créez-en un pour que les gens se voient et partagent."),
-      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Ajouter et afficher le QR de connexion'),
-    );
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      void this.act(async () => {
-        const res = await this.api.post<{ user: User; enrolment?: Enrolment }>('/users', {
-          name: name.value.trim(),
-          display_name: display.value.trim(),
-          groups: checks.filter((c) => c.checked).map((c) => c.value),
-          enrol: true,
-        });
-        if (res.enrolment !== undefined) await showEnrolment(this.doc, res.user.display_name, res.enrolment);
-        else this.toasts.show("Ajouté. Configurez public_url dans les réglages pour créer son QR de connexion.");
+        ? h('div', { class: ui.field }, h('span', { class: ui.label }, 'Groupes'),
+          h('div', { class: 'add-user-groups flex flex-wrap gap-x-5 gap-y-2' }, ...groups.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))))
+        : h('p', { class: 'text-sm' }, "Aucun groupe : créez-en un pour que les gens se voient et partagent."),
+    ], 'Ajouter', async () => {
+      made = await this.api.post<{ user: User; enrolment?: Enrolment }>('/users', {
+        name: name.value.trim(),
+        display_name: display.value.trim(),
+        groups: checks.filter((c) => c.checked).map((c) => c.value),
+        enrol: true,
       });
     });
-    return form;
+    if (!ok || made === null) return;
+    const res: { user: User; enrolment?: Enrolment } = made;
+    this.doc.dispatchEvent(new Event('agd:changed'));
+    await this.refresh();
+    if (res.enrolment !== undefined) await showEnrolment(this.doc, res.user.display_name, res.enrolment);
+    else this.toasts.show("Ajouté. Configurez public_url dans les réglages pour créer son QR de connexion.");
   }
 }
 
@@ -288,7 +287,7 @@ export class UserPage extends AdminPage {
     for (const c of choices) calendars[c.ref] = c.select.value === '' ? { delete: true } : { transfer_to: c.select.value };
     try {
       await this.api.post(`${this.path()}/remove`, { calendars });
-      this.doc.location.assign('/admin/users');
+      this.doc.location.assign('/users');
     } catch (e) {
       this.toasts.error(e);
     }

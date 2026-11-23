@@ -30,8 +30,8 @@ export class OverviewPage extends AdminPage {
     return [
       ...o.warnings.map((w) => h('p', { class: ui.error, 'data-code': w.code }, w.message)),
       h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
-        tile(o.users, 'utilisateurs', '/admin/users'),
-        tile(o.groups, 'groupes', '/admin/groups'),
+        tile(o.users, 'utilisateurs', '/users'),
+        tile(o.groups, 'groupes', '/groups'),
         tile(o.calendars, 'calendriers'),
         tile(o.events, 'événements'),
         tile(o.devices, 'appareils'),
@@ -44,7 +44,7 @@ export class OverviewPage extends AdminPage {
       ),
       section('Appareils sans nouvelles depuis une semaine',
         table(['Utilisateur', 'Appareil', 'Type', 'Vu'],
-          o.stale_devices.map((d) => [h('a', { href: `/admin/users/${encodeURIComponent(d.user)}` }, d.user), d.label, d.kind, ago(d.last_used_at)]),
+          o.stale_devices.map((d) => [h('a', { href: `/users/${encodeURIComponent(d.user)}` }, d.user), d.label, d.kind, ago(d.last_used_at)]),
           'Tous les appareils se sont synchronisés cette semaine.'),
       ),
     ];

@@ -58,8 +58,10 @@ describe('admin pages', () => {
     await settle();
     expect(document.querySelector('td img')).toBeNull();
     expect(document.body.textContent).toContain('<img src=x onerror=alert(1)>');
-    expect(document.querySelector('a[href="/admin/users/lea"]')).not.toBeNull();
-    expect(document.querySelectorAll('form.add-user input[type="checkbox"]').length).toBe(1);
+    expect(document.querySelector('a[href="/users/lea"]')).not.toBeNull();
+    // "Nouvel utilisateur" opens the form in a modal, with one box per group.
+    [...document.querySelectorAll('button')].find((b) => b.textContent === 'Nouvel utilisateur')!.click();
+    expect(document.querySelectorAll('dialog .add-user-groups input[type="checkbox"]').length).toBe(1);
   });
 
   it('an error from the server is shown in place of the page', async () => {

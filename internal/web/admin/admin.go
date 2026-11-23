@@ -22,28 +22,38 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	}
 	h := &handlers{d: d}
 	guard := func(next http.Handler) http.Handler { return webx.SameOrigin(d.Config.AdminURL, next) }
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
-	})
-	mux.HandleFunc("GET /admin/signin", h.signinPage)
-	mux.Handle("POST /admin/signin", guard(http.HandlerFunc(h.signin)))
-	mux.Handle("POST /admin/signout", guard(http.HandlerFunc(h.signout)))
-	mux.Handle("GET /admin", h.page(h.shell("overview", "Vue d'ensemble")))
+	// The admin listener serves the admin surface alone, so its pages sit
+	// at the root, with no /admin prefix (the user's call).
+	mux.HandleFunc("GET /signin", h.signinPage)
+	mux.Handle("POST /signin", guard(http.HandlerFunc(h.signin)))
+	mux.Handle("POST /signout", guard(http.HandlerFunc(h.signout)))
+	mux.Handle("GET /{$}", h.page(h.shell("overview", "Vue d'ensemble")))
 	for path, page := range map[string][2]string{
-		"GET /admin/users":        {"users", "Utilisateurs"},
-		"GET /admin/users/{name}": {"user", "Utilisateur"},
-		"GET /admin/groups":       {"groups", "Groupes"},
-		"GET /admin/activity":     {"activity", "Activité"},
-		"GET /admin/settings":     {"settings", "Réglages"},
-		"GET /admin/backups":      {"backups", "Sauvegardes"},
+		"GET /users":        {"users", "Utilisateurs"},
+		"GET /users/{name}": {"user", "Utilisateur"},
+		"GET /groups":       {"groups", "Groupes"},
+		"GET /activity":     {"activity", "Activité"},
+		"GET /settings":     {"settings", "Réglages"},
+		"GET /backups":      {"backups", "Sauvegardes"},
 	} {
 		mux.Handle(path, h.page(h.shell(page[0], page[1])))
 	}
 	// Calendars are under their owner now, as on claudication's pages: an
 	// old link lands on the users.
-	mux.Handle("GET /admin/calendars", h.page(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	mux.Handle("GET /calendars", h.page(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
 	}))
+	// Links from before (/admin, /admin/users/lea, a bookmark) land on the
+	// same page without the prefix.
+	legacy := func(w http.ResponseWriter, r *http.Request) {
+		to := "/" + r.PathValue("rest")
+		if to == "/calendars" {
+			to = "/users"
+		}
+		http.Redirect(w, r, to, http.StatusMovedPermanently)
+	}
+	mux.HandleFunc("GET /admin", legacy)
+	mux.HandleFunc("GET /admin/{rest...}", legacy)
 	h.registerAPI(mux, guard)
 	return nil
 }
@@ -67,7 +77,7 @@ func (h *handlers) page(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, err := h.d.Auth.Session(r, auth.SurfaceAdmin)
 		if err != nil || !p.Admin {
-			http.Redirect(w, r, "/admin/signin", http.StatusSeeOther)
+			http.Redirect(w, r, "/signin", http.StatusSeeOther)
 			return
 		}
 		next(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
@@ -92,11 +102,11 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	auth.SetCookie(w, auth.SurfaceAdmin, secret, h.secure(), 0)
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *handlers) signout(w http.ResponseWriter, r *http.Request) {
 	h.d.Auth.SignOut(r, auth.SurfaceAdmin)
 	auth.ClearCookie(w, auth.SurfaceAdmin, h.secure())
-	http.Redirect(w, r, "/admin/signin", http.StatusSeeOther)
+	http.Redirect(w, r, "/signin", http.StatusSeeOther)
 }

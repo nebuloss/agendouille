@@ -3,6 +3,22 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: admin pages without /admin, creation in a modal
+
+The user: "no need admin prefix in url. also for users and groups creation
+use a modal".
+
+- **The admin pages sit at the root of the admin listener** (`/`,
+  `/users`, `/users/lea`, `/groups`, `/activity`, `/backups`, `/settings`,
+  `/signin`, `/signout`): that listener serves the admin surface alone,
+  on its own mux, so nothing collides with the family app's `/`. The API
+  stays at `/api/admin/*`, as CONTRACTS 3.5 has it. Every old `/admin/...`
+  link redirects (301) to the same page without the prefix.
+- **"Nouvel utilisateur" and "Nouveau groupe" are buttons in their card's
+  head opening a modal** (`formDialog`): the browser checks the fields,
+  the modal stays open with the server's reason when it says no (a name
+  taken), and closes once created; a new user's sign-in QR follows.
+
 ## 2026-11-23: the admin UI laid out like claudication and cafard
 
 The user: "organize admin ui like claudication and cafard with horizontal

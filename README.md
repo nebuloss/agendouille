@@ -23,7 +23,7 @@ additional API. One Go binary, SQLite, behind a reverse proxy in the DMZ.
 **Status: M4.** CalDAV works, read and write, with calendars owned by
 users and shared with users or groups. The admin UI manages users,
 groups, sign-in QR codes, calendars (their metadata only), settings and
-backups at `http://127.0.0.1:8792/admin`. The family web app shows the
+backups at `http://127.0.0.1:8792/`. The family web app shows the
 calendars by agenda, week and month, edits events (one, this and
 following, or all of a series), creates and shares calendars, and sets
 up phones (DAVx5 by QR, iPhone by profile, Thunderbird by hand) and

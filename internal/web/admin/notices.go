@@ -29,10 +29,10 @@ type notice struct {
 }
 
 var warningNotice = map[string]struct{ severity, link string }{
-	"no_public_listener":   {"error", "/admin/settings"},
-	"public_listener_down": {"error", "/admin/settings"},
-	"admin_insecure":       {"warn", "/admin/settings"},
-	"backup_old":           {"warn", "/admin/backups"},
+	"no_public_listener":   {"error", "/settings"},
+	"public_listener_down": {"error", "/settings"},
+	"admin_insecure":       {"warn", "/settings"},
+	"backup_old":           {"warn", "/backups"},
 }
 
 // currentNotices is every current notice, newest problem first within a severity.
@@ -57,7 +57,7 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 		}
 		out = append(out, notice{ID: "device:" + strconv.FormatInt(d.ID, 10), Kind: "device", Severity: "warn", Title: title,
 			Detail: "Appareil de " + d.User + " : vérifiez qu'il est allumé et que son mot de passe est le bon, ou retirez-le.",
-			Link:   "/admin/users/" + url.PathEscape(d.User), Since: d.LastUsedAt})
+			Link:   "/users/" + url.PathEscape(d.User), Since: d.LastUsedAt})
 	}
 	users, err := h.d.Directory.Users(ctx)
 	if err != nil {
@@ -71,7 +71,7 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 		out = append(out, notice{ID: "user:never:" + u.Name, Kind: "user", Severity: "info",
 			Title:  u.DisplayName + " ne s'est jamais connecté",
 			Detail: "Donnez-lui un QR de connexion depuis sa page.",
-			Link:   "/admin/users/" + url.PathEscape(u.Name), Since: &created})
+			Link:   "/users/" + url.PathEscape(u.Name), Since: &created})
 	}
 	rank := map[string]int{"error": 0, "warn": 1, "info": 2}
 	sort.SliceStable(out, func(a, b int) bool { return rank[out[a].Severity] < rank[out[b].Severity] })
