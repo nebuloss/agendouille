@@ -10,6 +10,8 @@ import {
 import { ago } from '@/shared/render/format.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
 import { t } from '@/app/pages/Manage.msg.ts';
+import { Bridge, BridgeError, bridge } from '@/shared/core/Bridge.ts';
+import { approvalTarget, scanQR } from '@/app/components/Scanner.ts';
 
 /** A page of the family web app that renders from the API into #app-content. */
 abstract class AppPage extends ApiPage {
@@ -407,6 +409,15 @@ export class MePage extends AppPage {
     const color = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(me.color) ? me.color : '#1e88e5' });
     const language = langChoice(this.doc);
     language.classList.add('self-start'); // as wide as its choices, not the field
+    // In the Android app, "this phone" replaces "this browser" once the
+    // bridge answers (CONTRACTS.md 6); in a browser it never does.
+    const browserSection = section(t('thisBrowser'),
+      h('p', { class: 'text-sm text-on-surface-variant' }, t('signOutHint')),
+      h('form', { method: 'post', action: '/signout' },
+        h('button', { type: 'submit', class: ui.btn('danger-text') }, icon('logout'), t('signOut'))));
+    void bridge().then((b) => {
+      if (b !== null) browserSection.replaceWith(this.phoneSection(b));
+    });
     return [
       section(t('profile'),
         field(t('displayName'), name), field(t('color'), color),
@@ -422,11 +433,42 @@ export class MePage extends AppPage {
       section(t('otherPhone'),
         h('p', {}, t('otherPhoneIntro')),
         h('div', {}, action(t('showCode'), () => this.enroll(), 'tonal', 'qr'))),
-      section(t('thisBrowser'),
-        h('p', { class: 'text-sm text-on-surface-variant' }, t('signOutHint')),
-        h('form', { method: 'post', action: '/signout' },
-          h('button', { type: 'submit', class: ui.btn('danger-text') }, icon('logout'), t('signOut')))),
+      browserSection,
     ];
+  }
+
+  /** The Android app's own actions (PLAN.md 7.4), over the bridge. */
+  private phoneSection(b: Bridge): HTMLElement {
+    const scan = async (): Promise<void> => {
+      try {
+        await b.call('scan');
+      } catch (e) {
+        this.toasts.error(new Error(e instanceof BridgeError && e.code === 'camera_denied' ? t('cameraDenied') : String(e)));
+        return;
+      }
+      const text = await scanQR(this.doc);
+      if (text === null) return;
+      const target = approvalTarget(text, this.doc.location.origin);
+      if (target === null) this.toasts.error(new Error(t('notASigninCode')));
+      else this.doc.location.assign(target);
+    };
+    const davx5 = async (): Promise<void> => {
+      try {
+        await b.call('davx5.handoff');
+      } catch (e) {
+        this.toasts.error(new Error(e instanceof BridgeError && e.code === 'davx5_missing' ? t('davx5Missing') : t('davx5Failed')));
+      }
+    };
+    const remove = async (): Promise<void> => {
+      if (!(await confirmDialog(this.doc, t('removePhoneTitle'), t('removePhoneBody'), t('removePhone'), true))) return;
+      await b.call('account.remove').catch(() => undefined);
+    };
+    return section(t('thisPhone'),
+      h('p', { class: 'text-sm text-on-surface-variant' }, t('thisPhoneHint', { version: b.hello?.app_version ?? '?' })),
+      h('div', { class: 'flex flex-col gap-2 sm:flex-row sm:flex-wrap' },
+        action(t('scanToSignIn'), scan, 'filled', 'qr'),
+        action(t('setUpDavx5'), davx5, 'tonal', 'phone'),
+        action(t('removePhone'), remove, 'danger-text', 'logout')));
   }
 
   /**

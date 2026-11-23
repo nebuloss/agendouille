@@ -53,9 +53,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: frontend
+          # The whole bundle directories: the stylesheets, and the scanner's
+          # chunk (jsQR, loaded only on demand) beside app.js.
           path: |
-            internal/web/assets/static/app/app.js
-            internal/web/assets/static/admin/admin.js
+            internal/web/assets/static/app/
+            internal/web/assets/static/admin/
           retention-days: 1
           if-no-files-found: error
 
@@ -136,6 +138,28 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
         run: go build -trimpath -ldflags='-s -w' -o /dev/null ./cmd/agendouille
+
+  # The Android app (PLAN.md 7), without Gradle: the runner's SDK, the
+  # Makefile, a throwaway debug key. Releases sign with the release key.
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: JVM tests
+        run: make -C android test SDK="$ANDROID_SDK_ROOT" JAVA_HOME="$JAVA_HOME" LIB="$RUNNER_TEMP/lib"
+
+      - name: APK
+        run: |
+          make -C android apk SDK="$ANDROID_SDK_ROOT" JAVA_HOME="$JAVA_HOME" \
+            KEYSTORE="$RUNNER_TEMP/ci.keystore" VERSION="ci-${GITHUB_SHA::7}" VERSION_CODE="$GITHUB_RUN_NUMBER"
+          ls -l android/build/agendouille.apk
 
   shell:
     name: Shell

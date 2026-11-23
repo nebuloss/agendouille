@@ -29,6 +29,32 @@ jobs:
           test -s internal/web/assets/static/admin/admin.js
           scripts/check-sinks.sh
 
+      # The Android app of this release, embedded in every server binary
+      # (PLAN.md 7.6). The release key is a secret (base64 of the keystore,
+      # its password, its alias): never in git.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build and sign the Android app
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] || { echo "the ANDROID_KEYSTORE_B64 secret is missing"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          version="${GITHUB_REF_NAME#v}"
+          make -C android test SDK="$ANDROID_SDK_ROOT" JAVA_HOME="$JAVA_HOME" LIB="$RUNNER_TEMP/lib"
+          args=(SDK="$ANDROID_SDK_ROOT" JAVA_HOME="$JAVA_HOME" KEYSTORE="$RUNNER_TEMP/release.keystore" KS_PASS="$KS_PASS" KEY_ALIAS="$KEY_ALIAS")
+          make -C android apk "${args[@]}" VERSION="$version" VERSION_CODE="$GITHUB_RUN_NUMBER"
+          cp android/build/agendouille.apk internal/web/assets/apk/agendouille.apk
+          make -s -C android cert "${args[@]}" > internal/web/assets/apk/cert.txt
+          echo "$version" > internal/web/assets/apk/version.txt
+          cp android/build/agendouille.apk "agendouille-$version.apk"
+          rm -f "$RUNNER_TEMP/release.keystore"
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -37,8 +63,8 @@ jobs:
       - name: Test
         run: go test -race ./...
 
-      # Static, cgo off, both bundles embedded: each file is the whole
-      # server. The APK joins the release in M6.
+      # Static, cgo off, both bundles and the APK embedded: each file is
+      # the whole server.
       - name: Build for every target
         env:
           CGO_ENABLED: '0'
@@ -72,14 +98,17 @@ jobs:
           echo "healthz: $health"
           [ "$health" = "ok $version" ] || { echo "/healthz does not report the tagged version"; exit 1; }
           curl -fsS -o /dev/null http://127.0.0.1:18792/static/admin/admin.js || { echo "the admin bundle is not embedded"; exit 1; }
+          # The APK is on the public surface; the smoke test has none, so the
+          # embed is checked in the binary itself.
+          grep -q "io.github.nebuloss.agendouille" agendouille-linux-amd64 || { echo "the APK is not embedded"; exit 1; }
           kill "$pid"
           wait "$pid" || true
 
       - name: Checksums
         run: |
-          sha256sum agendouille-linux-* > SHA256SUMS
+          sha256sum agendouille-linux-* agendouille-*.apk > SHA256SUMS
           cat SHA256SUMS
-          [ "$(wc -l < SHA256SUMS)" -eq 3 ] || { echo "SHA256SUMS should list 3 files"; exit 1; }
+          [ "$(wc -l < SHA256SUMS)" -eq 4 ] || { echo "SHA256SUMS should list 4 files"; exit 1; }
 
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -88,5 +117,6 @@ jobs:
             agendouille-linux-amd64
             agendouille-linux-arm64
             agendouille-linux-armv7
+            agendouille-*.apk
             SHA256SUMS
           generate_release_notes: true

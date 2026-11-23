@@ -267,7 +267,10 @@ no same-origin):
 |---|---|---|
 | POST | `/api/app/enroll` | no auth; `{"token", "model", "android", "app_version"}` -> `{"user", "device_id", "username", "secret", "dav_url", "app_url"}` (once) |
 | POST | `/api/app/session` | Basic -> sets `agd_app` for the WebView (device kind `app` only) |
-| GET | `/api/app/config` | Basic -> `{"server_version", "min_app_version", "apk_sha256", "bridge": 1, "sync_interval_s"}` |
+| GET | `/app/agendouille.apk` | none: the embedded app (404 in a build without it) |
+| GET | `/.well-known/assetlinks.json` | none: the app's package and signing certificate, for App Links (404 without the app) |
+| GET | `/davx5/{token}` | the token: a new DAVx5 device's page, ten minutes (410 after) |
+| GET | `/api/app/config` | Basic -> `{"server_version", "min_app_version", "apk_sha256", "apk_version", "bridge": 1, "sync_interval_s"}` |
 
 ### 2.3 Surface `admin`
 

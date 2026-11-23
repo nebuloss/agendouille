@@ -3,6 +3,53 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M6, the Android app's shell
+
+- **Package and account type** `io.github.nebuloss.agendouille`, after the
+  repository. The app is plain Java on framework APIs (no AndroidX), built
+  by `android/Makefile` with `aapt2`, `javac` (source 8, against
+  `android.jar` and the build tools' lambda stubs), `d8`, `zipalign` and
+  `apksigner`: 95 KB.
+- **App Links need the host at build time**, and each family runs its own
+  server: the Makefile writes the filter only when `APP_HOST` is set
+  (`scripts/devdeploy.sh` passes it through). Every build also opens
+  `agendouille://enroll?u=<link>`, which the enrollment page offers as
+  "Ouvrir dans l'application" next to the APK download: that works with
+  any server, verified or not.
+- **The credential** is the device's secret, encrypted with an AES-GCM key
+  that never leaves the Android Keystore, in the account's user data. The
+  WebView's session comes from `/api/app/session` with it, each time the
+  app opens. The app signs out when the server says the device is gone: a
+  401 from `/api/app/config` (checked at start and when the app comes back,
+  every five minutes at most) or the page sent to `/signin` and a new
+  session refused.
+- **The scanner is in the page** (PLAN 7.4): the bridge's `scan` only gets
+  the camera permission. It reads with the browser's `BarcodeDetector`
+  when it has one, else with `jsqr` (Apache-2.0, loaded only then, a
+  chunk of its own): `BarcodeDetector` needs Google Play services, which
+  some family phones do not have.
+- **`sync.status` answers `{}` and `sync.now` `not_available`** until the
+  sync adapter (M7).
+- **Updates** compare versions for equality, not order: the server embeds
+  the APK of its own version, so any other is an update, and `dev-<sha>`
+  builds have no order. The download opens in the browser, which hands it
+  to Android's installer (no FileProvider without AndroidX).
+- **JVM tests** cover the pure-Java parts (enrollment links, the bridge
+  codec, versions) with JUnit 4 and org.json from Maven Central, checked
+  against their SHA-1, kept on the build machine. The Activity is checked
+  on a phone.
+
+## 2026-11-23: DAVx5's QR code opens a page of ours
+
+The Appareils page's QR code held the `davx5://` link itself. DAVx5 has
+no QR scanner, and camera apps do not open custom schemes, so scanning it
+did nothing (the user, with DAVx5 from F-Droid). The code now holds
+`https://<host>/davx5/<token>`: a page that opens DAVx5 with the account
+("Ouvrir dans DAVx5") and shows it to type by hand. The token lives ten
+minutes in memory with the rest of the one-time links; the page is
+`no-store`. On the phone itself the dialog's own button still opens
+`davx5://` directly.
+
 ## 2026-11-23: enroll, with two l
 
 The user's spelling: "enroll" and "enrollment" everywhere, in the

@@ -13,7 +13,12 @@
 # AGENDOUILLE_INSTALL_ADMIN_LISTEN, AGENDOUILLE_INSTALL_PUBLIC_URL.
 #
 # Others: BUILD_HOST (default guillaume@10.0.50.21), REMOTE_DIR (the build
-# tree on dev-build, default agendouille-deploy), GOARCH (amd64), GOARM (7).
+# tree on dev-build, default agendouille-deploy), GOARCH (amd64), GOARM (7),
+# APP_HOST (the public host, for the Android app's App Links; without it
+# the app opens enrollment links through agendouille:// only).
+#
+# The Android app is built too, with the same version, and embedded in the
+# server (PLAN.md 7.6), when the build host has the SDK (android/Makefile).
 set -euo pipefail
 
 BUILD_HOST=${BUILD_HOST:-guillaume@10.0.50.21}
@@ -23,6 +28,7 @@ GOARM=${GOARM:-7}
 PVE=${PVE:-}
 CT=${CT:-}
 TARGET=${TARGET:-}
+APP_HOST=${APP_HOST:-}
 
 say() { printf '> %s\n' "$*"; }
 die() { printf 'devdeploy: %s\n' "$*" >&2; exit 1; }
@@ -39,6 +45,7 @@ fi
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 version="dev-$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo '-dirty')"
+code=$(git rev-list --count HEAD)
 
 say "syncing to $BUILD_HOST:$REMOTE_DIR"
 rsync -az --delete --exclude-from=scripts/rsync-excludes ./ "$BUILD_HOST:$REMOTE_DIR/"
@@ -50,6 +57,15 @@ ssh "$BUILD_HOST" "cd $REMOTE_DIR && set -e
 	npm run build --silent >/dev/null
 	test -s internal/web/assets/static/app/app.js
 	test -s internal/web/assets/static/admin/admin.js
+	if [ -d \$HOME/android-build/sdk ]; then
+		make -s -C android apk VERSION=$version VERSION_CODE=$code APP_HOST=$APP_HOST >/dev/null
+		cp android/build/agendouille.apk internal/web/assets/apk/agendouille.apk
+		make -s -C android cert >internal/web/assets/apk/cert.txt
+		echo $version >internal/web/assets/apk/version.txt
+		echo '> Android app embedded'
+	else
+		echo '> no Android SDK on the build host: no app embedded'
+	fi
 	CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH GOARM=$GOARM go build -trimpath \
 		-ldflags='-s -w -X main.version=$version' -o /tmp/agendouille-devdeploy ./cmd/agendouille"
 

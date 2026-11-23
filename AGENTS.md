@@ -72,6 +72,16 @@ M0 and M1 are done. What exists:
   https://agendouille.dmz.patapouf.club (LAN NPM `srv-npm`, host 26):
   `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
 
+- **M6, the Android app's shell:** `android/` (manifest, plain Java:
+  `MainActivity` with the WebView and the bridge, `Credentials` in the
+  Keystore and an Android account, `AuthenticatorService`, `EnrollLink`,
+  `BridgeCodec`, `Versions`; `Makefile` without Gradle; JVM tests in
+  `android/test`), `scripts/android.sh`, the APK embedded by
+  `scripts/devdeploy.sh` and the release, `/app/agendouille.apk`,
+  `assetlinks.json`, `src/shared/core/Bridge.ts`,
+  `src/app/components/Scanner.ts`, the Moi page's "Ce téléphone". Still to
+  check on a phone: M6's "done when".
+
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.
 
@@ -180,5 +190,8 @@ install'`, and copy `package-lock.json` back with `scp`.
   `relative` with `inset-auto` instead.
 - **Dialog buttons other than the confirming one skip validation**
   (`formnovalidate`): Annuler must close with a required field empty.
+- **The APK is embedded from `internal/web/assets/apk/`**, filled by
+  `scripts/devdeploy.sh` (or the release) before `go build`; never commit
+  it. `APP_HOST=<public host>` on the deploy writes the App Link filter.
 - **Templates and static files live under `internal/web/assets/`**:
   `go:embed` cannot reach a parent directory.

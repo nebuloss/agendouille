@@ -7,6 +7,11 @@ import { CalendarsPage, DevicesPage, MePage } from '@/app/pages/Manage.ts';
 import { SigninPage } from '@/app/pages/SigninPage.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
 import { langMenu } from '@/shared/components/Ui.ts';
+import { bridge } from '@/shared/core/Bridge.ts';
+
+// Listening for the Android app's port from the start: it is posted once
+// the page has loaded (CONTRACTS.md 6).
+void bridge();
 
 export const pages = new Pages({
   signin: (doc) => new SigninPage(doc),
