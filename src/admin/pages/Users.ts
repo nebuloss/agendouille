@@ -1,8 +1,9 @@
+import { avatar, calendarMark, entries, groupMark } from '@/admin/entries.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
-import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, confirmDialog, dialog, field, formDialog, section, table } from '@/shared/components/Ui.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel, tileLink } from '@/admin/pages/More.ts';
@@ -26,6 +27,7 @@ export interface UserRow extends User {
 interface Group {
   name: string;
   display_name: string;
+  color: string;
 }
 
 export interface Enrolment {
@@ -75,8 +77,6 @@ interface UserDetail {
   calendars_shared: { ref: string; name: string; access: string; via: string }[];
 }
 
-const userLink = (name: string): HTMLElement => h('a', { href: `/users/${seg(name)}` }, name);
-
 /** Shows a fresh enrolment's QR code and link, once (PLAN.md 7.2). */
 export async function showEnrolment(doc: Document, who: string, e: Enrolment): Promise<void> {
   const body: Child[] = [
@@ -97,19 +97,14 @@ export class UsersPage extends AdminPage {
     ]);
     return [
       card('Utilisateurs', [action('Nouvel utilisateur', () => this.create(groups), 'filled', 'plus')],
-      table(
-        ['Nom', 'Affiché', 'Groupes', 'Appareils', 'Calendriers', 'Vu', ''],
-        users.map((u) => [
-          userLink(u.name),
-          h('span', {}, swatch(u.color), u.display_name),
-          h('span', {}, ...u.groups.map((g) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, g))),
-          String(u.devices),
-          String(u.calendars_owned),
-          ago(u.last_seen_at),
-          u.disabled ? h('span', { class: ui.pill.err }, 'désactivé') : '',
-        ]),
-        'Aucun utilisateur pour le moment.',
-      )),
+        entries(users.map((u) => ({
+          href: `/users/${seg(u.name)}`,
+          lead: avatar(u.display_name || u.name, u.color),
+          title: u.display_name || u.name,
+          sub: `${u.name}${u.groups.length > 0 ? ` · ${u.groups.join(', ')}` : ' · aucun groupe'} · vu ${ago(u.last_seen_at)}`,
+          tags: u.disabled ? [h('span', { class: ui.pill.err }, 'désactivé')] : [],
+          stats: [{ n: String(u.devices), label: 'appareils' }, { n: String(u.calendars_owned), label: 'calendriers' }],
+        })), 'Aucun utilisateur pour le moment.')),
     ];
   }
 
@@ -224,29 +219,25 @@ export class UserPage extends AdminPage {
     ];
   }
 
-  /** The user's calendars as a list, each opening its page (stats, shares, activity). */
+  /** The user's calendars as rows, each opening its page (stats, members, activity). */
   private calendarsCard(d: UserDetail): HTMLElement {
-    const entry = (href: string, color: string, name: string, line: string, right: Child[]): HTMLElement =>
-      h('a', { href, class: 'state-layer flex min-h-16 items-center gap-3 border-b border-outline-variant/50 px-4 py-3 text-on-surface no-underline last:border-0' },
-        swatch(color, 'md'),
-        h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('b', { class: 'truncate font-semibold' }, name), h('span', { class: 'truncate text-xs text-on-surface-variant' }, line)),
-        ...right,
-        h('span', { class: 'text-on-surface-variant' }, icon('right')));
-    const stat = (n: string, label: string): HTMLElement =>
-      h('span', { class: 'hidden w-24 shrink-0 flex-col items-end sm:flex' }, h('b', { class: 'font-semibold tabular-nums' }, n), h('span', { class: 'text-[11px] text-on-surface-variant' }, label));
-    const sharesLine = (c: CalendarMeta): string => c.shares.length === 0 ? 'partagé avec personne'
-      : `partagé avec ${c.shares.map((s) => `${s.target.startsWith('g:') ? 'groupe ' : ''}${s.target.slice(2)} (${accessLabel(s.access)})`).join(', ')}`;
-    const owned = d.calendars_owned.map((c) => entry(`/calendars/${seg(c.ref)}`, c.color, c.name, `${c.ref} · ${sharesLine(c)}`,
-      [stat(String(c.events), 'événements'), stat(bytes(c.bytes), 'taille')]));
-    const shared = d.calendars_shared.map((c) => entry(`/calendars/${seg(c.ref)}`, '', c.name, `de ${c.ref.split('~')[0]} · par ${c.via.startsWith('g:') ? 'le groupe ' + c.via.slice(2) : 'un partage direct'}`,
-      [h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))]));
+    const membersLine = (c: CalendarMeta): string => c.shares.length === 0 ? 'aucun membre'
+      : c.shares.map((s) => `${s.target.startsWith('g:') ? 'groupe ' : ''}${s.target.slice(2)} (${accessLabel(s.access)})`).join(', ');
     return h('div', { class: 'flex flex-col gap-4' },
-      section(`Ses calendriers (${owned.length})`,
-        h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements. Ouvrez-en un pour ses statistiques."),
-        owned.length > 0 ? h('div', { class: ui.well }, ...owned) : h('p', { class: ui.empty }, "Aucun : la personne en crée depuis l'application ou son téléphone.")),
-      section(`Partagés avec lui ou elle (${shared.length})`,
-        shared.length > 0 ? h('div', { class: ui.well }, ...shared) : h('p', { class: ui.empty }, 'Aucun.')));
+      section(`Ses calendriers (${d.calendars_owned.length})`,
+        h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements. Ouvrez-en un pour ses statistiques et ses membres."),
+        entries(d.calendars_owned.map((c) => ({
+          href: `/calendars/${seg(c.ref)}`, lead: calendarMark(c.color), title: c.name, sub: `${c.ref} · ${membersLine(c)}`,
+          stats: [{ n: String(c.events), label: 'événements' }, { n: bytes(c.bytes), label: 'taille' }],
+        })), "Aucun : la personne en crée depuis l'application ou son téléphone.")),
+      section(`Partagés avec lui ou elle (${d.calendars_shared.length})`,
+        entries(d.calendars_shared.map((c) => ({
+          href: `/calendars/${seg(c.ref)}`, lead: calendarMark(''), title: c.name,
+          sub: `de ${c.ref.split('~')[0]} · par ${c.via.startsWith('g:') ? 'le groupe ' + c.via.slice(2) : 'un partage direct'}`,
+          tags: [h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))],
+        })), 'Aucun.')));
   }
+
 
 
   private profile(u: User): HTMLElement {
@@ -261,18 +252,35 @@ export class UserPage extends AdminPage {
     return section('Profil', form);
   }
 
+  /** The user's groups, a row each (opening the group), with the way out and the way in. */
   private groupsCard(mine: string[], all: Group[]): HTMLElement {
-    const checks = all.map((g) => h('input', { type: 'checkbox', value: g.name, checked: mine.includes(g.name) }));
-    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' },
-      h('div', { class: 'flex flex-wrap gap-x-5 gap-y-2' }, ...all.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))),
-      h('p', { class: 'text-xs text-on-surface-variant' }, "On voit les gens de ses groupes, et on ne partage qu'avec eux."),
-      h('button', { class: ui.btn('tonal'), type: 'submit' }, 'Enregistrer les groupes'));
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      void this.act(() => this.api.patch(this.path(), { groups: checks.filter((c) => c.checked).map((c) => c.value) }), 'Groupes enregistrés.');
-    });
-    return section('Groupes', all.length > 0 ? form : h('p', { class: 'text-sm text-on-surface-variant' }, 'Aucun groupe.'));
+    const set = (groups: string[], done: string): Promise<void> => this.act(() => this.api.patch(this.path(), { groups }), done);
+    const others = all.filter((g) => !mine.includes(g.name));
+    return card('Groupes', [action('Ajouter à un groupe', () => this.joinGroup(mine, others), 'filled', 'plus')],
+      h('p', { class: 'text-sm text-on-surface-variant' }, "On voit les gens de ses groupes, et on ne partage qu'avec eux."),
+      entries(all.filter((g) => mine.includes(g.name)).map((g) => ({
+        href: `/groups/${seg(g.name)}`,
+        lead: groupMark(g.color),
+        title: g.display_name || g.name,
+        sub: g.name,
+        actions: [action('Retirer', () => set(mine.filter((x) => x !== g.name), 'Retiré du groupe.'), 'danger-text', 'close', 'sm')],
+      })), 'Dans aucun groupe : il ou elle ne voit personne.'));
   }
+
+  private async joinGroup(mine: string[], others: Group[]): Promise<void> {
+    if (others.length === 0) {
+      this.toasts.show(mine.length === 0 ? "Il n'y a aucun groupe : créez-en un dans Groupes." : 'Déjà dans tous les groupes.');
+      return;
+    }
+    const which = h('select', { required: true }, ...others.map((g) => h('option', { value: g.name }, g.display_name || g.name)));
+    const ok = await formDialog(this.doc, 'Ajouter à un groupe', [field('Groupe', which)], 'Ajouter',
+      () => this.api.patch(this.path(), { groups: [...mine, which.value] }));
+    if (!ok) return;
+    this.toasts.show('Ajouté au groupe.');
+    this.doc.dispatchEvent(new Event('agd:changed'));
+    await this.refresh();
+  }
+
 
   private signin(u: User, enrolments: Enrolment[]): HTMLElement {
     return section('Connexion',

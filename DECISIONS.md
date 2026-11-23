@@ -3,6 +3,24 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: one way to list things in the admin UI
+
+The user: "navigation is not easy at all ... we must be able to click on
+whole width ... display better user using full width tile with remove
+button ... when clicking on a member it should redirect to its user page.
+same for calendar".
+
+- **`src/admin/entries.ts`**: every list of users, groups, members and
+  calendars is full-width rows, the whole row a link to the item's page
+  (a user, a group, a calendar), its actions at the end outside the link
+  (a button cannot live in a link): Retirer, an access, Changer. A round
+  mark for a person (their initial on their colour), a square one for a
+  group or a calendar (its colour).
+- The lists that were tables (Utilisateurs, Groupes, a group's calendars,
+  a calendar's members) and the checkbox forms (a group's members, a
+  user's groups) are such rows now; adding is a modal ("Ajouter un
+  membre", "Ajouter à un groupe").
+
 ## 2026-11-23: settings in the configuration file
 
 The user: "settings must be in a configuration files instead like cafard

@@ -1,3 +1,4 @@
+import { avatar, calendarMark, entries, groupMark } from '@/admin/entries.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { action, card, dialog, field, formDialog, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
@@ -116,31 +117,48 @@ export class CalendarPage extends AdminPage {
    */
   private async members(st: CalendarStats): Promise<HTMLElement> {
     const [{ users }, { groups }] = await Promise.all([
-      this.api.get<{ users: { name: string; display_name: string }[] }>('/users'),
-      this.api.get<{ groups: { name: string; display_name: string }[] }>('/groups'),
+      this.api.get<{ users: { name: string; display_name: string; color: string }[] }>('/users'),
+      this.api.get<{ groups: { name: string; display_name: string; color: string; members: string[] }[] }>('/groups'),
     ]);
-    const nameOf = (t: string): string => t.startsWith('g:')
-      ? `Groupe ${groups.find((g) => g.name === t.slice(2))?.display_name ?? t.slice(2)}`
-      : users.find((u) => u.name === t.slice(2))?.display_name ?? t.slice(2);
-    const target = (t: string): Child => h('a', { href: t.startsWith('g:') ? `/groups/${seg(t.slice(2))}` : `/users/${seg(t.slice(2))}`, class: ui.link }, nameOf(t));
-    const accessSelect = (t: string, current: string): HTMLSelectElement => {
-      const sel = styleControl(h('select', { 'aria-label': `Accès de ${nameOf(t)}` },
+    const accessSelect = (t: string, current: string, label: string): HTMLSelectElement => {
+      const sel = styleControl(h('select', { 'aria-label': `Accès de ${label}` },
         h('option', { value: 'read', selected: current === 'read' }, 'lecture'),
         h('option', { value: 'readwrite', selected: current === 'readwrite' }, 'lecture et écriture')));
-      sel.classList.add('!w-48', '!min-h-9', '!py-1');
+      sel.classList.add('!w-44', '!min-h-9', '!py-1');
       sel.addEventListener('change', () => void this.act(() => this.api.put(`/calendars/${seg(st.ref)}/shares/${seg(t)}`, { access: sel.value }), 'Accès changé.'));
       return sel;
     };
-    const rows: Child[][] = [
-      [h('span', { class: 'inline-flex items-center gap-2' }, h('a', { href: `/users/${seg(st.owner)}`, class: ui.link }, nameOf(`u:${st.owner}`)), h('span', { class: ui.pill.ok }, 'propriétaire')),
-        'tout', action('Changer…', () => this.transfer(st), 'text', 'give', 'sm')],
-      ...st.shares.map((m) => [target(m.target), accessSelect(m.target, m.access),
-        action('Retirer', () => this.act(() => this.api.delete(`/calendars/${seg(st.ref)}/shares/${seg(m.target)}`), 'Membre retiré.'), 'danger-text', 'close', 'sm')]),
+    const owner = users.find((u) => u.name === st.owner);
+    const list = [
+      {
+        href: `/users/${seg(st.owner)}`,
+        lead: avatar(owner?.display_name || st.owner, owner?.color ?? ''),
+        title: owner?.display_name || st.owner,
+        sub: `${st.owner} · peut tout faire, dont le partager et le supprimer`,
+        tags: [h('span', { class: ui.pill.ok }, 'propriétaire')],
+        actions: [action('Changer…', () => this.transfer(st), 'text', 'give', 'sm')],
+      },
+      ...st.shares.map((m) => {
+        const isGroup = m.target.startsWith('g:');
+        const name = m.target.slice(2);
+        const g = isGroup ? groups.find((x) => x.name === name) : undefined;
+        const u = isGroup ? undefined : users.find((x) => x.name === name);
+        const title = isGroup ? `Groupe ${g?.display_name || name}` : u?.display_name || name;
+        return {
+          href: isGroup ? `/groups/${seg(name)}` : `/users/${seg(name)}`,
+          lead: isGroup ? groupMark(g?.color ?? '') : avatar(u?.display_name || name, u?.color ?? ''),
+          title,
+          sub: isGroup ? `${name} · ${g === undefined || g.members.length === 0 ? 'personne dedans' : g.members.join(', ')}` : name,
+          actions: [accessSelect(m.target, m.access, title),
+            action('Retirer', () => this.act(() => this.api.delete(`/calendars/${seg(st.ref)}/shares/${seg(m.target)}`), 'Membre retiré.'), 'danger-text', 'close', 'sm')],
+        };
+      }),
     ];
     return card('Membres', [action('Ajouter un membre', () => this.addMember(st, users, groups), 'filled', 'plus')],
       h('p', { class: 'text-sm text-on-surface-variant' }, "Un membre voit le calendrier sur ses appareils ; en lecture et écriture, il y ajoute et modifie des événements. Un groupe, c'est chacun de ses membres."),
-      table(['Qui', 'Accès', ''], rows));
+      entries(list, ''));
   }
+
 
   private async addMember(st: CalendarStats, users: { name: string; display_name: string }[], groups: { name: string; display_name: string }[]): Promise<void> {
     const taken = new Set(st.shares.map((m) => m.target));
@@ -224,20 +242,19 @@ export class CalendarsPage extends AdminPage {
     const { calendars } = await this.api.get<{ calendars: CalendarRow[] }>('/calendars');
     const search = h('input', { type: 'search', value: this.query, placeholder: 'Nom, propriétaire, membre', 'aria-label': 'Chercher un calendrier',
       class: 'min-w-0 flex-1 border-0 bg-transparent text-sm text-on-surface outline-none' });
-    const list = h('div', { class: ui.well });
+    const list = h('div', {});
     const count = h('span', { class: 'text-xs text-on-surface-variant' });
     const draw = (): void => {
       const q = this.query.trim().toLowerCase();
       const shown = calendars.filter((c) => q === '' || [c.name, c.ref, c.owner, ...c.shares.map((s) => s.target)].some((x) => x.toLowerCase().includes(q)));
       count.textContent = `${shown.length} sur ${calendars.length}`;
-      list.replaceChildren(...(shown.length === 0 ? [h('p', { class: ui.empty }, calendars.length === 0 ? "Aucun calendrier : les gens en créent depuis l'application ou leur téléphone." : 'Aucun ne correspond.')]
-        : shown.map((c) => h('a', { href: `/calendars/${seg(c.ref)}`, class: 'state-layer flex min-h-16 items-center gap-3 border-b border-outline-variant/50 px-4 py-3 text-on-surface no-underline last:border-0' },
-          swatch(c.color, 'md'),
-          h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('b', { class: 'truncate font-semibold' }, c.name),
-            h('span', { class: 'truncate text-xs text-on-surface-variant' }, `à ${c.owner} · ${c.shares.length === 0 ? 'aucun membre' : c.shares.map((s) => `${s.target.startsWith('g:') ? 'groupe ' : ''}${s.target.slice(2)}`).join(', ')}`)),
-          h('span', { class: 'hidden w-24 shrink-0 flex-col items-end sm:flex' }, h('b', { class: 'font-semibold tabular-nums' }, String(c.events)), h('span', { class: 'text-[11px] text-on-surface-variant' }, 'événements')),
-          h('span', { class: 'hidden w-24 shrink-0 flex-col items-end sm:flex' }, h('b', { class: 'font-semibold tabular-nums' }, bytes(c.bytes)), h('span', { class: 'text-[11px] text-on-surface-variant' }, 'taille')),
-          h('span', { class: 'text-on-surface-variant' }, icon('right'))))));
+      list.replaceChildren(entries(shown.map((c) => ({
+        href: `/calendars/${seg(c.ref)}`,
+        lead: calendarMark(c.color),
+        title: c.name,
+        sub: `à ${c.owner} · ${c.shares.length === 0 ? 'aucun membre' : c.shares.map((s) => `${s.target.startsWith('g:') ? 'groupe ' : ''}${s.target.slice(2)}`).join(', ')}`,
+        stats: [{ n: String(c.events), label: 'événements' }, { n: bytes(c.bytes), label: 'taille' }],
+      })), calendars.length === 0 ? "Aucun calendrier : les gens en créent depuis l'application ou leur téléphone." : 'Aucun ne correspond.'));
     };
     search.addEventListener('input', () => {
       this.query = search.value;

@@ -1,9 +1,10 @@
+import { avatar, calendarMark, entries, groupMark } from '@/admin/entries.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { ApiError, seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
-import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, confirmDialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
 import { bytes, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 
@@ -18,6 +19,7 @@ interface Group {
 interface UserLite {
   name: string;
   display_name: string;
+  color: string;
 }
 
 /** Groups: who sees whom (PLAN.md 4.1). */
@@ -29,16 +31,14 @@ export class GroupsPage extends AdminPage {
     ]);
     return [
       card('Groupes', [action('Nouveau groupe', () => this.create(), 'filled', 'plus')],
-      h('p', { class: 'text-sm text-on-surface-variant' }, "Les membres d'un groupe se voient et peuvent partager leurs calendriers entre eux."),
-      table(['Groupe', 'Membres', 'Partages', ''],
-        groups.map((g) => [
-          h('a', { href: `/groups/${seg(g.name)}`, class: ui.link }, swatch(g.color), g.display_name, ' ', h('span', { class: 'text-sm font-normal text-on-surface-variant' }, `(${g.name})`)),
-          h('span', {}, ...g.members.map((m) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, m))),
-          String(g.shares),
-          h('span', { class: 'flex flex-wrap items-center gap-2' },
-            action('Membres…', () => this.members(g, users), 'text'),
-            action('Supprimer', () => this.remove(g), 'text')),
-        ]), 'Aucun groupe.')),
+        h('p', { class: 'text-sm text-on-surface-variant' }, "Les membres d'un groupe se voient et peuvent partager leurs calendriers entre eux."),
+        entries(groups.map((g) => ({
+          href: `/groups/${seg(g.name)}`,
+          lead: groupMark(g.color),
+          title: g.display_name || g.name,
+          sub: `${g.name} · ${g.members.length === 0 ? 'aucun membre' : g.members.map((m) => users.find((u) => u.name === m)?.display_name || m).join(', ')}`,
+          stats: [{ n: String(g.members.length), label: 'membres' }, { n: String(g.shares), label: 'partages' }],
+        })), 'Aucun groupe.')),
     ];
   }
 
@@ -58,22 +58,7 @@ export class GroupsPage extends AdminPage {
     await this.refresh();
   }
 
-  private async members(g: Group, users: UserLite[]): Promise<void> {
-    const checks = users.map((u) => h('input', { type: 'checkbox', value: u.name, checked: g.members.includes(u.name) }));
-    const v = await dialog(this.doc, `Membres de ${g.display_name}`,
-      [h('div', { class: 'flex flex-wrap gap-x-5 gap-y-2' }, ...users.map((u, i) => h('label', { class: ui.check }, checks[i]!, u.display_name)))],
-      [{ label: 'Annuler', value: 'no' }, { label: 'Enregistrer', value: 'yes', kind: 'filled' }]);
-    if (v !== 'yes') return;
-    await this.act(() => this.api.patch(`/groups/${seg(g.name)}`, { members: checks.filter((c) => c.checked).map((c) => c.value) }), 'Membres enregistrés.');
-  }
 
-  private async remove(g: Group): Promise<void> {
-    const text = g.shares > 0
-      ? `${g.shares} partage(s) de calendrier passent par ce groupe ; ils disparaîtront.`
-      : 'Ses membres ne se verront plus par ce groupe.';
-    if (!(await confirmDialog(this.doc, `Supprimer ${g.display_name} ?`, text, 'Supprimer', true))) return;
-    await this.act(() => this.api.delete(`/groups/${seg(g.name)}`, { confirm: '1' }), 'Groupe supprimé.');
-  }
 }
 
 interface CalendarShared {
@@ -127,7 +112,6 @@ export class GroupPage extends AdminPage {
       ev.preventDefault();
       void this.act(() => this.api.patch(this.path(), { display_name: display.value.trim(), color: color.value }), 'Enregistré.');
     });
-    const names = new Map(users.map((u) => [u.name, u.display_name || u.name]));
     return [
       h('section', { class: `${ui.card} flex-row items-center gap-4` },
         swatch(g.color, 'md'),
@@ -136,9 +120,7 @@ export class GroupPage extends AdminPage {
       h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
         tileLink(String(g.members.length), 'membres', `${this.path()}/members`),
         tileLink(String(g.shares), 'partages de calendrier', `${this.path()}/calendars`)),
-      g.members.length > 0
-        ? section('Membres', h('div', { class: 'flex flex-wrap gap-1.5' }, ...g.members.map((m) => h('a', { href: `/users/${seg(m)}`, class: 'inline-flex h-7 items-center rounded-md3-s bg-surface-high px-2.5 text-xs font-semibold text-on-surface no-underline hover:bg-surface-highest' }, names.get(m) ?? m))))
-        : null,
+      this.members(g, users),
       section('Profil', form),
       section('Supprimer le groupe',
         h('p', { class: 'text-sm text-on-surface-variant' }, g.shares > 0 ? `${g.shares} partage(s) de calendrier passent par ce groupe ; ils disparaîtront.` : 'Ses membres ne se verront plus par ce groupe.'),
@@ -147,17 +129,37 @@ export class GroupPage extends AdminPage {
   }
 
   private members(g: Group, users: UserLite[]): HTMLElement {
-    const checks = users.map((u) => h('input', { type: 'checkbox', value: u.name, checked: g.members.includes(u.name) }));
-    const form = h('form', { class: 'flex flex-col items-start gap-4' },
-      users.length === 0 ? h('p', { class: ui.empty }, 'Aucun utilisateur.')
-        : h('div', { class: 'flex flex-wrap gap-x-6 gap-y-3' }, ...users.map((u, i) => h('label', { class: ui.check }, checks[i]!, u.display_name || u.name))),
-      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Enregistrer les membres'));
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      void this.act(() => this.api.patch(this.path(), { members: checks.filter((c) => c.checked).map((c) => c.value) }), 'Membres enregistrés.');
-    });
-    return section('Membres', h('p', { class: 'text-sm text-on-surface-variant' }, "Ceux qui sont dans le groupe se voient, et peuvent partager leurs calendriers avec lui."), form);
+    const set = (members: string[], done: string): Promise<void> => this.act(() => this.api.patch(this.path(), { members }), done);
+    const byName = new Map(users.map((u) => [u.name, u]));
+    return card('Membres', [action('Ajouter un membre', () => this.addMember(g, users), 'filled', 'plus')],
+      h('p', { class: 'text-sm text-on-surface-variant' }, 'Ceux qui sont dans le groupe se voient, et peuvent partager leurs calendriers avec lui.'),
+      entries(g.members.map((m) => {
+        const u = byName.get(m);
+        return {
+          href: `/users/${seg(m)}`,
+          lead: avatar(u?.display_name || m, u?.color ?? ''),
+          title: u?.display_name || m,
+          sub: m,
+          actions: [action('Retirer', () => set(g.members.filter((x) => x !== m), 'Retiré du groupe.'), 'danger-text', 'close', 'sm')],
+        };
+      }), 'Personne dans ce groupe.'));
   }
+
+  private async addMember(g: Group, users: UserLite[]): Promise<void> {
+    const others = users.filter((u) => !g.members.includes(u.name));
+    if (others.length === 0) {
+      this.toasts.show('Tout le monde en est déjà membre.');
+      return;
+    }
+    const who = h('select', { required: true }, ...others.map((u) => h('option', { value: u.name }, u.display_name || u.name)));
+    const ok = await formDialog(this.doc, `Ajouter à ${g.display_name || g.name}`, [field('Qui', who)], 'Ajouter',
+      () => this.api.patch(this.path(), { members: [...g.members, who.value] }));
+    if (!ok) return;
+    this.toasts.show('Ajouté au groupe.');
+    this.doc.dispatchEvent(new Event('agd:changed'));
+    await this.refresh();
+  }
+
 
   private async calendars(g: Group): Promise<HTMLElement> {
     const { calendars } = await this.api.get<{ calendars: CalendarShared[] }>('/calendars');
@@ -165,18 +167,19 @@ export class GroupPage extends AdminPage {
     const shared = calendars.filter((c) => c.shares.some((s) => s.target === target));
     return section('Calendriers partagés avec le groupe',
       h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements."),
-      table(['Calendrier', 'Propriétaire', 'Accès', 'Événements', ''],
-        shared.map((c) => {
-          const s = c.shares.find((x) => x.target === target)!;
-          return [
-            h('a', { href: `/calendars/${seg(c.ref)}`, class: `${ui.link} inline-flex items-center` }, swatch(c.color), c.name),
-            h('a', { href: `/users/${seg(c.owner)}`, class: ui.link }, c.owner),
-            accessLabel(s.access),
-            String(c.events),
-            action('Retirer le partage', () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(target)}`), 'Partage retiré.'), 'text', 'close', 'sm'),
-          ];
-        }), 'Aucun calendrier partagé avec ce groupe.'));
+      entries(shared.map((c) => {
+        const s = c.shares.find((x) => x.target === target)!;
+        return {
+          href: `/calendars/${seg(c.ref)}`,
+          lead: calendarMark(c.color),
+          title: c.name,
+          sub: `à ${c.owner} · ${c.events} événement${c.events === 1 ? '' : 's'}`,
+          tags: [h('span', { class: s.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(s.access))],
+          actions: [action('Retirer', () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(target)}`), 'Partage retiré.'), 'danger-text', 'close', 'sm')],
+        };
+      }), 'Aucun calendrier partagé avec ce groupe.'));
   }
+
 
   private async remove(g: Group): Promise<void> {
     const text = g.shares > 0
