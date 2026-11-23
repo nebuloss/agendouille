@@ -144,6 +144,97 @@ final class Dav {
         return out;
     }
 
+    /** A calendar object as a report lists it: its href, ETag, and data when asked. */
+    static final class Member {
+        String href;
+        String etag;
+        String data;
+        boolean gone;
+    }
+
+    /** What changed since a sync token (RFC 6578): null token, everything. */
+    static final class Changes {
+        String token;
+        final List<Member> members = new ArrayList<>();
+    }
+
+    /** Thrown when the server no longer knows the token: start again from none. */
+    static final class TokenExpired extends IOException {
+        TokenExpired() {
+            super("sync token expired");
+        }
+    }
+
+    /** sync-collection, as DAVx5 sends it (internal/dav/testdata/clients/davx5). */
+    Changes changes(String calendarUrl, String token) throws IOException {
+        String body = "<?xml version='1.0' encoding='UTF-8' ?><sync-collection xmlns=\"DAV:\">"
+                + (token == null || token.isEmpty() ? "<sync-token />" : "<sync-token>" + xml(token) + "</sync-token>")
+                + "<sync-level>1</sync-level><prop><getetag /></prop></sync-collection>";
+        Answer a = transport.send("REPORT", calendarUrl, "0", "application/xml; charset=utf-8", body);
+        if (a.status == 401) throw new Unauthorized();
+        if (a.status == 403 && a.body.contains("valid-sync-token")) throw new TokenExpired();
+        if (a.status != 207) throw new IOException("sync-collection " + calendarUrl + ": HTTP " + a.status);
+        Changes out = new Changes();
+        out.token = syncToken(a.body);
+        for (Response r : parseMultistatus(a.body)) {
+            String href = absolute(r.href);
+            if (href.equals(calendarUrl)) continue;
+            Member m = new Member();
+            m.href = r.href;
+            Prop etag = r.get(NS_DAV, "getetag");
+            m.etag = etag != null ? etag.text() : null;
+            m.gone = r.status == 404 || (r.props.isEmpty() && r.status != 200);
+            out.members.add(m);
+        }
+        return out;
+    }
+
+    /** calendar-multiget, as DAVx5 sends it: the data and ETag of each href. */
+    List<Member> multiget(String calendarUrl, List<String> hrefs) throws IOException {
+        StringBuilder body = new StringBuilder("<?xml version='1.0' encoding='UTF-8' ?><CAL:calendar-multiget xmlns=\"DAV:\" xmlns:CAL=\""
+                + NS_CALDAV + "\"><prop><getcontenttype /><getetag /><CAL:calendar-data /></prop>");
+        for (String h : hrefs) body.append("<href>").append(xml(h)).append("</href>");
+        body.append("</CAL:calendar-multiget>");
+        Answer a = transport.send("REPORT", calendarUrl, "0", "application/xml; charset=utf-8", body.toString());
+        if (a.status == 401) throw new Unauthorized();
+        if (a.status != 207) throw new IOException("calendar-multiget " + calendarUrl + ": HTTP " + a.status);
+        List<Member> out = new ArrayList<>();
+        for (Response r : parseMultistatus(a.body)) {
+            Member m = new Member();
+            m.href = r.href;
+            Prop etag = r.get(NS_DAV, "getetag");
+            m.etag = etag != null ? etag.text() : null;
+            Prop data = r.get(NS_CALDAV, "calendar-data");
+            m.data = data != null ? data.text.toString() : null;
+            m.gone = data == null;
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** The multistatus' own sync-token (RFC 6578 6.4: a child of multistatus). */
+    static String syncToken(String xml) throws IOException {
+        try {
+            XmlPullParserFactory f = XmlPullParserFactory.newInstance();
+            f.setNamespaceAware(true);
+            XmlPullParser p = f.newPullParser();
+            p.setInput(new StringReader(xml));
+            for (int ev = p.getEventType(); ev != XmlPullParser.END_DOCUMENT; ev = p.next()) {
+                if (ev == XmlPullParser.START_TAG && p.getDepth() == 2 && NS_DAV.equals(p.getNamespace()) && "sync-token".equals(p.getName())) {
+                    String t = p.nextText().trim();
+                    return t.isEmpty() ? null : t;
+                }
+            }
+            return null;
+        } catch (XmlPullParserException e) {
+            throw new IOException("a multistatus that is not XML: " + e.getMessage());
+        }
+    }
+
+    static String xml(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     static String lastSegment(String url) {
         String u = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         return u.substring(u.lastIndexOf('/') + 1);

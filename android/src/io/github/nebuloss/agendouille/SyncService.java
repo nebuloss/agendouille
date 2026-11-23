@@ -57,6 +57,11 @@ public final class SyncService extends Service {
                 List<Dav.Collection> remote = dav.calendars();
                 Map<String, Long> ids = cals.update(remote);
                 result.stats.numEntries += ids.size();
+                // The events of each calendar the person keeps on the phone.
+                EventSync events = new EventSync(account, provider, dav, java.time.ZoneId.systemDefault());
+                for (CalendarSync.Synced c : cals.synced()) {
+                    result.stats.numUpdates += events.sync(c.id, c.url, c.token);
+                }
                 SyncStatus.done(ctx, cals.events());
             } catch (Dav.Unauthorized e) {
                 result.stats.numAuthExceptions++;

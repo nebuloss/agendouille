@@ -76,14 +76,16 @@ M0 and M1 are done. What exists:
   `src/android` (built into `android/assets/web`), and `android/` (plain
   Java: `MainActivity` serving the screens and the bridge v2,
   `Credentials` in the Keystore and an Android account,
-  `AuthenticatorService`, `SyncService` and `CalendarSync` (the calendars;
-  events next), `Dav` and `RawHttp` for CalDAV, `EnrollLink`,
+  `AuthenticatorService`, `SyncService`, `CalendarSync` and `EventSync`
+  (server to phone; the phone's changes next), `ICal` and `EventMapper`
+  (tested over `testdata/ical`), `Dav` and `RawHttp` for CalDAV, `EnrollLink`,
   `ServerAddress`, `BridgeCodec`, `Versions`; `Makefile` without Gradle;
   JVM tests in `android/test`), `scripts/android.sh`, the APK embedded by
   `scripts/devdeploy.sh` and the release, `/app/agendouille.apk`,
   `assetlinks.json`, `src/shared/core/Bridge.ts`,
   `src/shared/components/Scanner.ts`. `scripts/shots/shoot-android.mjs`
-  shoots the screens with a fake bridge. Still to check on a phone.
+  shoots the screens with a fake bridge; `scripts/android-live.sh` runs the
+  sync code on the JVM against a real server. Still to check on a phone.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.

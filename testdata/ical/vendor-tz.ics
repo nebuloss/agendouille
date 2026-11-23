@@ -1,0 +1,15 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Mozilla.org/NONSGML Mozilla Calendar V1.1//EN
+BEGIN:VEVENT
+UID:vendor-1@agendouille
+DTSTAMP:20261120T100000Z
+DTSTART;TZID=/mozilla.org/20050126_1/Europe/Paris:20261201T090000
+DTEND;TZID=/mozilla.org/20050126_1/Europe/Paris:20261201T100000
+SUMMARY:Réunion parents-professeurs
+DESCRIPTION:Une description assez longue pour être repliée sur plusi
+ eurs lignes par le client qui l’a écrite\, comme le veut la RFC 5545 au-delà
+  de soixante-quinze octets.
+X-MOZ-GENERATION:3
+END:VEVENT
+END:VCALENDAR

@@ -83,6 +83,30 @@ final class CalendarSync {
         return out;
     }
 
+    /** A calendar the person syncs: its id, URL and last sync token. */
+    static final class Synced {
+        final long id;
+        final String url;
+        final String token;
+
+        Synced(long id, String url, String token) {
+            this.id = id;
+            this.url = url;
+            this.token = token;
+        }
+    }
+
+    /** The calendars whose events the phone keeps (SYNC_EVENTS). */
+    List<Synced> synced() throws RemoteException {
+        List<Synced> out = new java.util.ArrayList<>();
+        try (Cursor c = provider.query(asSyncAdapter(Calendars.CONTENT_URI, account), new String[]{Calendars._ID, Calendars._SYNC_ID, Calendars.CAL_SYNC2},
+                Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=? AND " + Calendars.SYNC_EVENTS + "=1",
+                new String[]{account.name, account.type}, null)) {
+            while (c != null && c.moveToNext()) out.add(new Synced(c.getLong(0), c.getString(1), c.getString(2)));
+        }
+        return out;
+    }
+
     /** How many events of the account the phone holds. */
     int events() throws RemoteException {
         try (Cursor c = provider.query(asSyncAdapter(Events.CONTENT_URI, account), new String[]{Events._ID},

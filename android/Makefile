@@ -33,12 +33,15 @@ RES    := $(shell find res -type f)
 # The parts with no Android types, tested on the JVM.
 PURE   := src/io/github/nebuloss/agendouille/EnrollLink.java \
           src/io/github/nebuloss/agendouille/ServerAddress.java \
+          src/io/github/nebuloss/agendouille/ICal.java \
+          src/io/github/nebuloss/agendouille/EventMapper.java \
+          src/io/github/nebuloss/agendouille/Dav.java \
           src/io/github/nebuloss/agendouille/BridgeCodec.java \
           src/io/github/nebuloss/agendouille/Versions.java
-TESTS  := $(shell find test -name '*.java')
-TESTCP := $(LIB)/junit-4.13.2.jar:$(LIB)/hamcrest-core-1.3.jar:$(LIB)/json-20240303.jar
+TESTS  := $(shell find test -name '*Test.java')
+TESTCP := $(LIB)/junit-4.13.2.jar:$(LIB)/hamcrest-core-1.3.jar:$(LIB)/json-20240303.jar:$(LIB)/kxml2-2.3.0.jar
 
-.PHONY: apk test cert clean
+.PHONY: apk test cert clean live-check
 apk: $(B)/agendouille.apk
 
 $(B)/AndroidManifest.xml: AndroidManifest.xml Makefile
@@ -93,13 +96,19 @@ cert: $(KEYSTORE)
 	@$(JAVA_HOME)/bin/keytool -list -v -keystore $(KEYSTORE) -storepass $(KS_PASS) -alias $(KEY_ALIAS) \
 	  | awk '/SHA256:/ { print $$2; exit }'
 
-test: $(LIB)/junit-4.13.2.jar
+test: $(LIB)/junit-4.13.2.jar $(LIB)/kxml2-2.3.0.jar
 	@rm -rf $(B)/test && mkdir -p $(B)/test
 	$(JAVAC) -encoding UTF-8 -cp $(TESTCP) -d $(B)/test $(PURE) $(TESTS)
 	$(JAVA) -cp $(B)/test:$(TESTCP) org.junit.runner.JUnitCore $$(cd test && find . -name '*Test.java' | sed 's|^\./||; s|\.java$$||; s|/|.|g')
 
-# JUnit, Hamcrest and org.json for the JVM tests, from Maven Central,
-# checked against their published SHA-1.
+# JUnit, Hamcrest, org.json and kXML (Android's own XmlPullParser) for the
+# JVM tests, from Maven Central, checked against their published SHA-1.
+$(LIB)/kxml2-2.3.0.jar:
+	@mkdir -p $(LIB)
+	curl -sSfL -o $@ https://repo1.maven.org/maven2/net/sf/kxml/kxml2/2.3.0/kxml2-2.3.0.jar
+	want=$$(curl -sSfL https://repo1.maven.org/maven2/net/sf/kxml/kxml2/2.3.0/kxml2-2.3.0.jar.sha1 | cut -c1-40); \
+	got=$$(sha1sum $@ | cut -c1-40); [ "$$want" = "$$got" ] || { echo "checksum mismatch: kxml2"; rm -f $@; exit 1; }
+
 $(LIB)/junit-4.13.2.jar:
 	@mkdir -p $(LIB)
 	curl -sSfL -o $(LIB)/junit-4.13.2.jar https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar
@@ -110,6 +119,12 @@ $(LIB)/junit-4.13.2.jar:
 	  got=$$(sha1sum $$(basename $$j).jar | cut -c1-40); \
 	  [ "$$want" = "$$got" ] || { echo "checksum mismatch: $$j"; rm -f $$(basename $$j).jar; exit 1; }; \
 	done
+
+# The sync code against a running server (scripts/android-live.sh).
+live-check: $(LIB)/junit-4.13.2.jar $(LIB)/kxml2-2.3.0.jar
+	@rm -rf $(B)/live && mkdir -p $(B)/live
+	$(JAVAC) -encoding UTF-8 -cp $(TESTCP) -d $(B)/live $(PURE) src/io/github/nebuloss/agendouille/RawHttp.java test/io/github/nebuloss/agendouille/LiveCheck.java
+	$(JAVA) -cp $(B)/live:$(TESTCP) io.github.nebuloss.agendouille.LiveCheck $(SERVER) $(LIVE_USER) $(LIVE_PASS)
 
 clean:
 	rm -rf $(B)
