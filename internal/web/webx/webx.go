@@ -22,6 +22,20 @@ type Page struct {
 	Page   string // <body data-page>, picks the TypeScript page
 	Bundle assets.Bundle
 	Data   any
+	// Theme is the reader's choice (ThemeCookie): "light", "dark", or ""
+	// to follow the system. Render sets it.
+	Theme string
+}
+
+// ThemeCookie holds the reader's choice of theme, set by the page
+// (src/shared/core/Theme.ts) and read here so the first paint is right.
+const ThemeCookie = "agd_theme"
+
+func themeOf(r *http.Request) string {
+	if c, err := r.Cookie(ThemeCookie); err == nil && (c.Value == "light" || c.Value == "dark") {
+		return c.Value
+	}
+	return ""
 }
 
 // Stylesheet is the bundle's stylesheet, or "" without the bundle.
@@ -64,7 +78,8 @@ func Templates() (*template.Template, error) {
 // Render executes the template name (which defines "content") inside
 // layout.html. It renders to a buffer first, so a template error is a 500,
 // not half a page.
-func Render(w http.ResponseWriter, log *slog.Logger, status int, name string, p Page) {
+func Render(w http.ResponseWriter, r *http.Request, log *slog.Logger, status int, name string, p Page) {
+	p.Theme = themeOf(r)
 	t, err := Templates()
 	if err == nil {
 		t, err = t.Clone()

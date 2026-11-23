@@ -41,7 +41,7 @@ export async function editEvent(doc: Document, calendars: Calendar[], initial: {
   if (writable.length === 0) return null;
   const cal = h('select', { name: 'calendar' }, ...writable.map((c) => h('option', { value: c.ref, selected: c.ref === initial.calendar }, c.name)));
   const title = h('input', { name: 'summary', value: initial.summary, required: true, autocomplete: 'off', placeholder: 'Ajouter un titre',
-    class: 'w-full border-0 border-b-2 border-outline-variant bg-transparent px-1 pb-2 text-2xl text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary' });
+    class: 'w-full border-0 border-b-2 border-outline-variant bg-transparent px-1 pb-2 text-2xl text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary focus-visible:outline-none' });
   const allDay = h('input', { type: 'checkbox', name: 'all_day', checked: initial.allDay });
   const startDate = h('input', { type: 'date', value: formatDate(initial.start), required: true });
   const startTime = h('input', { type: 'time', value: formatLocal(initial.start).slice(11, 16) });
@@ -85,8 +85,12 @@ export async function editEvent(doc: Document, calendars: Calendar[], initial: {
   const count = h('input', { type: 'number', min: 1, max: 1000, value: repeat.count, class: `${ui.input} !w-24` });
   const weekly = h('div', { class: 'flex flex-wrap gap-1.5' }, ...DAYS.map((d, i) => dayToggle(dayBoxes[i]!, DAY_LETTERS[d] ?? d, DAY_NAMES[d] ?? d)));
   for (const el of [cal, startDate, startTime, endDate, endTime, where, notes, freq, end, until]) styleControl(el);
-  for (const el of [startDate, endDate]) el.classList.add('!w-auto', 'flex-1');
-  for (const el of [startTime, endTime]) el.classList.add('!w-36');
+  for (const el of [startDate, endDate]) el.classList.add('!w-auto', 'min-w-0', 'flex-1');
+  for (const el of [startTime, endTime]) el.classList.add('!w-32', 'shrink-0');
+  const when = (label: string, date: HTMLInputElement, time: HTMLInputElement): HTMLElement =>
+    h('div', { class: 'flex flex-col gap-1 sm:grid sm:grid-cols-[3rem_minmax(0,1fr)] sm:items-center sm:gap-2' },
+      h('span', { class: 'text-sm text-on-surface-variant' }, label),
+      h('div', { class: 'flex min-w-0 items-center gap-2' }, date, time));
   const unit = h('span', {});
   const UNITS: Record<string, string> = { daily: 'jours', weekly: 'semaines', monthly: 'mois', yearly: 'ans' };
   const details = h('div', { class: 'flex flex-col gap-3' },
@@ -111,8 +115,8 @@ export async function editEvent(doc: Document, calendars: Calendar[], initial: {
     title,
     row('clock',
       h('div', { class: 'pt-2' }, check(allDay, 'Toute la journée')),
-      h('div', { class: 'flex flex-wrap items-center gap-2' }, startDate, startTime),
-      h('div', { class: 'flex flex-wrap items-center gap-2' }, endDate, endTime)),
+      when('Début', startDate, startTime),
+      when('Fin', endDate, endTime)),
     repeatBlock,
     row('pin', where),
     row('notes', notes),

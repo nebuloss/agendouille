@@ -4,7 +4,7 @@ import { Countdown } from '@/shared/components/Countdown.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
-import { action, card, check, confirmDialog, dialog, field, secretField, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, check, confirmDialog, dialog, field, secretField, section, styleControl, swatch, table, themeChoice } from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
 
@@ -379,6 +379,9 @@ export class MePage extends AppPage {
       section('Moi',
         field('Nom affiché', name), field('Couleur', color),
         h('div', { class: 'flex justify-end' }, action('Enregistrer', () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), 'Enregistré.'), 'filled'))),
+      section('Apparence',
+        h('p', { class: 'text-sm text-on-surface-variant' }, 'Automatique suit le réglage de l’appareil. Avec Dark Reader, choisissez « Sombre » : agendouille a son propre thème sombre.'),
+        h('div', {}, themeChoice(this.doc))),
       section('Mes groupes',
         me.groups.length === 0 ? h('p', { class: ui.empty }, "Aucun groupe : l'administrateur vous en ajoute.")
           : h('div', { class: 'flex flex-wrap gap-2' }, ...me.groups.map((g) => h('span', { class: ui.chip }, icon('group'), g.display_name || g.name))),

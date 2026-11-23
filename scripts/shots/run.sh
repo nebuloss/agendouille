@@ -69,4 +69,7 @@ curl -s -o /dev/null -b "$jar" -X PUT -H 'Content-Type: application/json' -H 'Se
   --data '{"mode":"both"}' http://127.0.0.1:18892/api/admin/dav-auth
 enrol2=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
 node scripts/shots/shoot-app.mjs "$enrol2" "$out" certs
+# The calendar's hover states and the event editor, light and dark.
+enrol3=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
+node scripts/shots/shoot-editor.mjs "$enrol3" "$out"
 ls "$out"

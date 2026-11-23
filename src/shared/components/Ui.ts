@@ -1,3 +1,4 @@
+import { currentTheme, nextTheme, setTheme, type Theme } from '@/shared/core/Theme.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { icon, type IconName } from '@/shared/components/icons.ts';
 import { ui, type ButtonVariant } from '@/shared/components/recipes.ts';
@@ -38,7 +39,12 @@ export function dialog(doc: Document, title: string, body: Child[], buttons: Dia
   el.className = ui.dialog;
   const form = h('form', { method: 'dialog', class: 'flex max-h-[inherit] flex-col' });
   const row = h('div', { class: ui.dialogFoot });
-  for (const b of buttons) row.append(h('button', { class: ui.btn(b.kind ?? 'text'), value: b.value, type: 'submit' }, b.label));
+  for (const b of buttons) {
+    // Only the confirming button checks the form: Annuler with an empty
+    // required title must still close the dialog.
+    const confirms = b.kind === 'filled' || b.kind === 'danger';
+    row.append(h('button', { class: ui.btn(b.kind ?? 'text'), value: b.value, type: 'submit', formnovalidate: !confirms }, b.label));
+  }
   form.append(h('div', { class: ui.dialogHead }, h('h2', {}, title)), h('div', { class: ui.dialogBody }, ...body), row);
   el.append(form);
   // A click on the scrim (the dialog element itself, outside the form) closes.
@@ -222,4 +228,46 @@ export function secretField(value: string, label: string): HTMLElement {
     clip.writeText(value).then(() => done(true), () => done(false));
   });
   return h('div', { class: 'flex flex-wrap items-center gap-2 rounded-md3-s bg-surface-lowest px-3 py-2' }, text, toggle, copy);
+}
+
+/**
+ * Appearance: follow the system, light or dark (src/shared/core/Theme.ts).
+ * Three segments; the choice applies at once and is remembered.
+ */
+export function themeChoice(doc: Document = document): HTMLElement {
+  const choices: [Theme, string, IconName][] = [['auto', 'Automatique', 'contrast'], ['light', 'Clair', 'sun'], ['dark', 'Sombre', 'moon']];
+  const group = h('div', { class: ui.seg, role: 'radiogroup', 'aria-label': 'Apparence' });
+  const draw = (): void => {
+    const now = currentTheme(doc);
+    group.replaceChildren(...choices.map(([value, label, ic]) => {
+      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(now === value),
+        class: 'state-layer inline-flex items-center gap-1.5 px-3.5 py-2 text-sm aria-checked:bg-secondary-container aria-checked:text-on-secondary-container' }, icon(ic), label);
+      b.addEventListener('click', () => {
+        setTheme(value, doc);
+        draw();
+      });
+      return b;
+    }));
+  };
+  draw();
+  return group;
+}
+
+/** The theme as one round button that cycles (the admin's header). */
+export function themeButton(doc: Document = document): HTMLElement {
+  const LABEL: Record<Theme, string> = { auto: 'Thème : automatique', light: 'Thème : clair', dark: 'Thème : sombre' };
+  const ICON: Record<Theme, IconName> = { auto: 'contrast', light: 'sun', dark: 'moon' };
+  const b = h('button', { type: 'button', class: ui.iconBtn });
+  const draw = (): void => {
+    const t = currentTheme(doc);
+    b.replaceChildren(icon(ICON[t]));
+    b.title = LABEL[t];
+    b.setAttribute('aria-label', LABEL[t]);
+  };
+  b.addEventListener('click', () => {
+    setTheme(nextTheme(currentTheme(doc)), doc);
+    draw();
+  });
+  draw();
+  return b;
 }

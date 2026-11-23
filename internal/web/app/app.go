@@ -66,8 +66,8 @@ func (h *handlers) clientIP(r *http.Request) string {
 
 func (h *handlers) secure() bool { return webx.Secure(h.d.PublicURL()) }
 
-func (h *handlers) render(w http.ResponseWriter, status int, name, title string, data any) {
-	webx.Render(w, h.d.Log, status, name, webx.Page{Title: title, Page: strings.TrimSuffix(strings.TrimPrefix(name, "app/"), ".html"),
+func (h *handlers) render(w http.ResponseWriter, r *http.Request, status int, name, title string, data any) {
+	webx.Render(w, r, h.d.Log, status, name, webx.Page{Title: title, Page: strings.TrimSuffix(strings.TrimPrefix(name, "app/"), ".html"),
 		Bundle: assets.App, Data: data})
 }
 
@@ -113,8 +113,8 @@ func (h *handlers) basic(next withPrincipal) http.Handler {
 // shell is a page of the family web app: the navigation and a mount point
 // the app bundle fills from the API (PLAN.md 9.3).
 func (h *handlers) shell(page, title string) withPrincipal {
-	return func(w http.ResponseWriter, _ *http.Request, p *auth.Principal) {
-		webx.Render(w, h.d.Log, http.StatusOK, "app/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.App,
+	return func(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+		webx.Render(w, r, h.d.Log, http.StatusOK, "app/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.App,
 			Data: map[string]any{"Page": page, "Title": title, "User": p.User, "Initial": initial(p.User.DisplayName, p.User.Name),
 				"Zone": h.d.Settings.Get().FamilyTimezone}})
 	}
@@ -130,7 +130,7 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 		} else {
 			h.d.Log.Error("starting an approval", "err", err)
 		}
-		h.render(w, status, "app/signin.html", "Se connecter", map[string]any{"Error": msg})
+		h.render(w, r, status, "app/signin.html", "Se connecter", map[string]any{"Error": msg})
 		return
 	}
 	// The code rides in the fragment, which browsers never send: it stays
@@ -141,7 +141,7 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	}
 	// What is left, not when: the page counts it down on its own clock, so
 	// a phone whose clock is wrong still refreshes the code on time.
-	h.render(w, http.StatusOK, "app/signin.html", "Se connecter", map[string]any{"Approval": a, "QR": qr,
+	h.render(w, r, http.StatusOK, "app/signin.html", "Se connecter", map[string]any{"Approval": a, "QR": qr,
 		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()})
 }
 
@@ -191,7 +191,7 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 // enrolPage only shows a button: a GET never burns the link, since chat
 // apps and mail scanners open links to preview them.
 func (h *handlers) enrolPage(w http.ResponseWriter, r *http.Request) {
-	h.render(w, http.StatusOK, "app/enrol.html", "Bienvenue", map[string]any{"Token": r.PathValue("token")})
+	h.render(w, r, http.StatusOK, "app/enrol.html", "Bienvenue", map[string]any{"Token": r.PathValue("token")})
 }
 
 func enrolError(err error) (int, string) {
@@ -213,7 +213,7 @@ func (h *handlers) enrol(w http.ResponseWriter, r *http.Request) {
 		if status == http.StatusInternalServerError {
 			h.d.Log.Error("redeeming an enrolment", "err", err)
 		}
-		h.render(w, status, "app/enrol.html", "Bienvenue", map[string]any{"Error": msg})
+		h.render(w, r, status, "app/enrol.html", "Bienvenue", map[string]any{"Error": msg})
 		return
 	}
 	auth.SetCookie(w, auth.SurfaceApp, secret, h.secure(), h.d.Settings.Get().SessionTTL())
@@ -240,8 +240,8 @@ func approvalError(err error) (int, string, string) {
 	return http.StatusInternalServerError, "error", "Une erreur est survenue."
 }
 
-func (h *handlers) approvePage(w http.ResponseWriter, _ *http.Request, _ *auth.Principal) {
-	h.render(w, http.StatusOK, "app/approve.html", "Approuver", map[string]any{})
+func (h *handlers) approvePage(w http.ResponseWriter, r *http.Request, _ *auth.Principal) {
+	h.render(w, r, http.StatusOK, "app/approve.html", "Approuver", map[string]any{})
 }
 
 // approvePost is the form flow: a code alone looks the request up and
@@ -254,22 +254,22 @@ func (h *handlers) approvePost(w http.ResponseWriter, r *http.Request, p *auth.P
 		if err := h.d.Auth.Approve(r.Context(), p, code, n); err != nil {
 			status, _, msg := approvalError(err)
 			data["Error"] = msg
-			h.render(w, status, "app/approve.html", "Approuver", data)
+			h.render(w, r, status, "app/approve.html", "Approuver", data)
 			return
 		}
 		data["Done"] = true
-		h.render(w, http.StatusOK, "app/approve.html", "Approuver", data)
+		h.render(w, r, http.StatusOK, "app/approve.html", "Approuver", data)
 		return
 	}
 	view, err := h.d.Auth.LookupApproval(r.Context(), p, code)
 	if err != nil {
 		status, _, msg := approvalError(err)
 		data["Error"] = msg
-		h.render(w, status, "app/approve.html", "Approuver", data)
+		h.render(w, r, status, "app/approve.html", "Approuver", data)
 		return
 	}
 	data["View"] = view
-	h.render(w, http.StatusOK, "app/approve.html", "Approuver", data)
+	h.render(w, r, http.StatusOK, "app/approve.html", "Approuver", data)
 }
 
 func (h *handlers) me(w http.ResponseWriter, r *http.Request, p *auth.Principal) {

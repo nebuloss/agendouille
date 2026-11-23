@@ -8,6 +8,7 @@ import { ActivityPage, BackupsPage, GroupPage, GroupsPage, SettingsPage } from '
 import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UserPage, UsersPage } from '@/admin/pages/Users.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
+import { themeButton } from '@/shared/components/Ui.ts';
 
 const api = adminApi();
 
@@ -32,6 +33,9 @@ whenReady(document, () => {
   document.querySelector('.rail [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   const trail = document.querySelector<HTMLElement>('.trail');
   if (trail !== null) trail.scrollLeft = trail.scrollWidth;
+  // The theme, one button that cycles: system, light, dark.
+  const themeSlot = document.getElementById('theme-slot');
+  if (themeSlot !== null) themeSlot.replaceWith(themeButton(document));
   // The bell, on every page of the shell; it counts again after a change.
   const slot = document.getElementById('bell-slot');
   if (slot !== null) {

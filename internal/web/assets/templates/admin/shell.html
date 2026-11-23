@@ -7,6 +7,7 @@
       <small class="hidden text-[13px] font-semibold text-on-surface-variant sm:inline">administration</small>
       {{with .Version}}<span class="hidden rounded-md3-xs bg-surface-high px-1.5 font-mono text-[11px] text-on-surface-variant md:inline">{{.}}</span>{{end}}
     </a>
+    <span id="theme-slot" class="contents"></span>
     <span id="bell-slot" class="contents"></span>
     <form method="post" action="/signout"><button class="state-layer inline-flex h-8 items-center rounded-md3-full px-3 text-[13px] font-medium whitespace-nowrap text-primary" type="submit">Se déconnecter</button></form>
   </div>

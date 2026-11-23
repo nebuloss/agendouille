@@ -33,7 +33,7 @@ export const ui = {
   /** A round button holding one icon. */
   iconBtn: 'state-layer grid size-10 shrink-0 place-items-center rounded-full text-on-surface-variant',
   /** MD3's floating action button, extended (an icon and a label). */
-  fab: 'state-layer fixed right-4 bottom-24 z-30 inline-flex h-14 items-center gap-3 rounded-md3-l bg-primary-container px-5 font-semibold text-on-primary-container elevation-2 md:static md:h-12 md:rounded-md3-l [&_.ic]:size-6',
+  fab: 'state-layer fixed right-4 bottom-24 z-30 inline-flex h-14 items-center gap-3 rounded-md3-l bg-primary-container px-5 font-semibold text-on-primary-container elevation-2 md:relative md:inset-auto md:h-12 md:rounded-md3-l [&_.ic]:size-6',
 
   /** A card: a tonal surface, its title and actions on one line. */
   card: 'flex min-w-0 flex-col gap-3 rounded-md3-xl bg-surface-container p-4 lg:px-5 lg:pb-5 [&>button]:self-start',

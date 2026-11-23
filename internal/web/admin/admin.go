@@ -73,7 +73,7 @@ func (h *handlers) shell(page, section, title string) http.HandlerFunc {
 				title = label + " · " + name
 			}
 		}
-		webx.Render(w, h.d.Log, http.StatusOK, "admin/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.Admin,
+		webx.Render(w, r, h.d.Log, http.StatusOK, "admin/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.Admin,
 			Data: map[string]any{"Page": page, "Title": title, "Name": name, "Sub": sub, "Version": h.d.Version,
 				"Nav": navOf(section, name, sub)}})
 	}
@@ -81,8 +81,8 @@ func (h *handlers) shell(page, section, title string) http.HandlerFunc {
 
 func (h *handlers) secure() bool { return webx.Secure(h.d.Config.AdminURL()) }
 
-func (h *handlers) render(w http.ResponseWriter, status int, name, page string, data any) {
-	webx.Render(w, h.d.Log, status, name, webx.Page{Title: "Administration", Page: page, Bundle: assets.Admin, Data: data})
+func (h *handlers) render(w http.ResponseWriter, r *http.Request, status int, name, page string, data any) {
+	webx.Render(w, r, h.d.Log, status, name, webx.Page{Title: "Administration", Page: page, Bundle: assets.Admin, Data: data})
 }
 
 func (h *handlers) page(next http.HandlerFunc) http.Handler {
@@ -96,8 +96,8 @@ func (h *handlers) page(next http.HandlerFunc) http.Handler {
 	})
 }
 
-func (h *handlers) signinPage(w http.ResponseWriter, _ *http.Request) {
-	h.render(w, http.StatusOK, "admin/signin.html", "signin", map[string]any{})
+func (h *handlers) signinPage(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, http.StatusOK, "admin/signin.html", "signin", map[string]any{})
 }
 
 func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +110,7 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 		} else {
 			h.d.Log.Error("admin sign-in", "err", err)
 		}
-		h.render(w, status, "admin/signin.html", "signin", map[string]any{"Error": msg})
+		h.render(w, r, status, "admin/signin.html", "signin", map[string]any{"Error": msg})
 		return
 	}
 	auth.SetCookie(w, auth.SurfaceAdmin, secret, h.secure(), 0)

@@ -174,5 +174,11 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **The web app sends and gets naive local times in the family zone.**
   Never `new Date("2026-11-25T14:00")` in the browser (that is the
   browser's zone): use `Dates.ts`.
+- **`state-layer` needs a positioned element:** it sets `position:
+  relative` for its hover overlay. A responsive `static` on the same element
+  lets the overlay cover the whole page (it did, on the FAB): use
+  `relative` with `inset-auto` instead.
+- **Dialog buttons other than the confirming one skip validation**
+  (`formnovalidate`): Annuler must close with a required field empty.
 - **Templates and static files live under `internal/web/assets/`**:
   `go:embed` cannot reach a parent directory.

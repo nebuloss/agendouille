@@ -3,6 +3,16 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: our own dark theme, and Dark Reader told so
+
+Dark Reader inverted pages that already have a dark theme, badly. The
+pages now carry `<meta name="darkreader-lock">` (Dark Reader's documented
+way for a site with its own dark mode) and `color-scheme: light dark`, and
+the reader chooses Automatique, Clair or Sombre: the Moi page in the app,
+a button in the admin header. The choice is a cookie, `agd_theme`, that
+`webx.Render` reads to put `data-theme` on `<html>` before the first
+paint; `Render` takes the request for it.
+
 ## 2026-11-23: device keys, chosen by the admin
 
 The plan wanted keys rather than passwords for sync. CalDAV clients know
