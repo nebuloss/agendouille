@@ -9,6 +9,7 @@ import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel, tileLink } from '@/admin/pages/More.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { t } from '@/admin/pages/Users.msg.ts';
+import { pick } from '@/admin/Picker.ts';
 
 export interface User {
   name: string;
@@ -297,14 +298,14 @@ export class UserPage extends AdminPage {
       this.toasts.show(mine.length === 0 ? t('noGroupsAtAll') : t('inAllGroups'));
       return;
     }
-    const which = h('select', { required: true }, ...others.map((g) => h('option', { value: g.name }, g.display_name || g.name)));
-    const ok = await formDialog(this.doc, t('addToGroup'), [field(t('group'), which)], t('add'),
-      () => this.api.patch(this.path(), { groups: [...mine, which.value] }));
-    if (!ok) return;
-    this.toasts.show(t('addedToGroup'));
-    this.doc.dispatchEvent(new Event('agd:changed'));
-    await this.refresh();
+    const picked = await pick(this.doc, {
+      title: t('addToGroup'), multiple: true, confirm: t('add'),
+      items: others.map((g) => ({ value: g.name, label: g.display_name || g.name, sub: g.name, lead: groupMark(g.color) })),
+    });
+    if (picked === null || picked.length === 0) return;
+    await this.act(() => this.api.patch(this.path(), { groups: [...mine, ...picked] }), t('addedToGroupsN', { count: picked.length }));
   }
+
 
 
   /**
@@ -356,29 +357,51 @@ export class UserPage extends AdminPage {
   /** Removing asks, calendar by calendar, whom to give it to or to delete it (PLAN.md 6). */
   private async remove(u: User, owned: CalendarMeta[], users: UserRow[]): Promise<void> {
     const others = users.filter((x) => x.name !== u.name && !x.disabled);
+    const label = (name: string): string => others.find((o) => o.name === name)?.display_name || name;
     const choices = owned.map((c) => {
-      const select = h('select', {}, h('option', { value: '' }, t('deleteCalendar')),
-        ...others.map((o) => h('option', { value: o.name }, t('giveTo', { name: o.display_name }))));
-      return { ref: c.ref, select, row: field(c.name, select) };
+      const state: { to: string; drop: boolean } = { to: others.length === 1 ? others[0]!.name : '', drop: others.length === 0 };
+      const status = h('span', { class: 'text-sm text-on-surface-variant' });
+      const choose = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('give'));
+      const drop = h('input', { type: 'checkbox', checked: state.drop, disabled: others.length === 0 });
+      const draw = (): void => {
+        status.textContent = state.drop ? t('willBeDeleted') : state.to !== '' ? t('willGoTo', { name: label(state.to) }) : t('noOwnerYet');
+        status.className = !state.drop && state.to === '' ? 'text-sm font-semibold text-error' : 'text-sm text-on-surface-variant';
+        choose.replaceChildren(icon('give'), state.to === '' ? t('chooseOwner') : t('changeOwner'));
+        choose.disabled = state.drop;
+      };
+      choose.addEventListener('click', () => void pick(this.doc, {
+        title: t('pickOwnerTitle', { name: c.name }),
+        items: others.map((o) => ({ value: o.name, label: o.display_name || o.name, sub: o.name, lead: avatar(o.display_name || o.name, o.color) })),
+        selected: state.to !== '' ? [state.to] : [],
+      }).then((p) => {
+        if (p !== null && p.length > 0) state.to = p[0]!;
+        draw();
+      }));
+      drop.addEventListener('change', () => {
+        state.drop = drop.checked;
+        draw();
+      });
+      draw();
+      const row = h('div', { class: 'flex flex-col gap-2 rounded-md3-l bg-surface-lowest p-3' },
+        h('div', { class: 'flex items-center gap-3' }, calendarMark(c.color),
+          h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate' }, c.name), status), choose),
+        h('label', { class: `${ui.check} text-sm` }, drop, t('deleteInstead')));
+      return { c, state, row };
     });
     const body: Child[] = [
       h('p', {}, t('deleteBody', { name: u.display_name })),
-      ...(owned.length > 0 ? [h('p', {}, t('theirCalendars')), ...choices.map((c) => c.row)] : []),
+      ...(owned.length > 0 ? [h('p', { class: 'text-sm' }, others.length === 0 ? t('theirCalendarsNobody') : t('theirCalendars')), ...choices.map((c) => c.row)] : []),
     ];
-    const v = await dialog(this.doc, t('deleteTitle', { name: u.display_name }), body, [
-      { label: t('cancel'), value: 'no' },
-      { label: t('delete'), value: 'yes', kind: 'danger' },
-    ]);
-    if (v !== 'yes') return;
-    const calendars: Record<string, { transfer_to?: string; delete?: boolean }> = {};
-    for (const c of choices) calendars[c.ref] = c.select.value === '' ? { delete: true } : { transfer_to: c.select.value };
-    try {
+    const done = await formDialog(this.doc, t('deleteTitle', { name: u.display_name }), body, t('deleteUserNow'), async () => {
+      const missing = choices.find((c) => !c.state.drop && c.state.to === '');
+      if (missing !== undefined) throw new Error(t('mustChoose', { name: missing.c.name }));
+      const calendars: Record<string, { transfer_to?: string; delete?: boolean }> = {};
+      for (const c of choices) calendars[c.c.ref] = c.state.drop ? { delete: true } : { transfer_to: c.state.to };
       await this.api.post(`${this.path()}/remove`, { calendars });
-      this.doc.location.assign('/users');
-    } catch (e) {
-      this.toasts.error(e);
-    }
+    }, 'danger');
+    if (done) this.doc.location.assign('/users');
   }
+
 }
 
 export { confirmDialog };

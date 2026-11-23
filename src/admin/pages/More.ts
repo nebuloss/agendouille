@@ -8,6 +8,7 @@ import { action, card, confirmDialog, field, formDialog, section, swatch, table 
 import { bytes, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { t } from '@/admin/pages/More.msg.ts';
+import { pick } from '@/admin/Picker.ts';
 
 type Key = Parameters<typeof t>[0];
 
@@ -155,14 +156,14 @@ export class GroupPage extends AdminPage {
       this.toasts.show(t('everyoneIsMember'));
       return;
     }
-    const who = h('select', { required: true }, ...others.map((u) => h('option', { value: u.name }, u.display_name || u.name)));
-    const ok = await formDialog(this.doc, t('addMemberTo', { name: g.display_name || g.name }), [field(t('user'), who)], t('addToGroup'),
-      () => this.api.patch(this.path(), { members: [...g.members, who.value] }));
-    if (!ok) return;
-    this.toasts.show(t('addedToGroup'));
-    this.doc.dispatchEvent(new Event('agd:changed'));
-    await this.refresh();
+    const picked = await pick(this.doc, {
+      title: t('addMemberTo', { name: g.display_name || g.name }), multiple: true, confirm: t('addToGroup'),
+      items: others.map((u) => ({ value: u.name, label: u.display_name || u.name, sub: u.name, lead: avatar(u.display_name || u.name, u.color) })),
+    });
+    if (picked === null || picked.length === 0) return;
+    await this.act(() => this.api.patch(this.path(), { members: [...g.members, ...picked] }), t('addedToGroupN', { count: picked.length }));
   }
+
 
 
   private async calendars(g: Group): Promise<HTMLElement> {

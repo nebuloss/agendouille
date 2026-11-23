@@ -75,12 +75,12 @@ export function dialog(doc: Document, title: string, body: Child[], buttons: Dia
  * it did, false when the form was cancelled. The browser checks the
  * fields first (required, pattern).
  */
-export function formDialog(doc: Document, title: string, body: Child[], submitLabel: string, submit: () => Promise<void>): Promise<boolean> {
+export function formDialog(doc: Document, title: string, body: Child[], submitLabel: string, submit: () => Promise<void>, kind: ButtonVariant = 'filled'): Promise<boolean> {
   const el = doc.createElement('dialog');
   el.className = ui.dialog;
   const error = h('p', { class: ui.error, role: 'alert', hidden: true });
   const cancel = h('button', { class: ui.btn('text'), type: 'button' }, t('cancel'));
-  const ok = h('button', { class: ui.btn('filled'), type: 'submit' }, submitLabel);
+  const ok = h('button', { class: ui.btn(kind), type: 'submit' }, submitLabel);
   const form = h('form', { class: 'flex max-h-[inherit] flex-col', novalidate: false },
     h('div', { class: ui.dialogHead }, h('h2', {}, title)),
     h('div', { class: ui.dialogBody }, ...body, error),

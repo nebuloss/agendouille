@@ -54,6 +54,29 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
       await new Promise((r) => setTimeout(r, 500));
     }
     await page.screenshot({ path: `${out}/desktop-signin-links.png` });
+    // The picker: a calendar's "add members", with a search typed.
+    await page.goto(base + '/calendars/maman~ecole/shares', { waitUntil: 'networkidle2' });
+    await new Promise((r) => setTimeout(r, 500));
+    const addm = await page.$('xpath/.//button[contains(., "Ajouter un membre")]');
+    if (addm) {
+      await addm.click();
+      await new Promise((r) => setTimeout(r, 400));
+      await page.screenshot({ path: `${out}/desktop-picker.png` });
+      await page.type('dialog input[type=search]', 'ma');
+      await new Promise((r) => setTimeout(r, 200));
+      await page.screenshot({ path: `${out}/desktop-picker-search.png` });
+      await page.keyboard.press('Escape');
+    } else errors.push('no "Ajouter un membre" button');
+    // Deleting a user who owns a calendar: its new owner is chosen.
+    await page.goto(base + '/users/lea', { waitUntil: 'networkidle2' });
+    await new Promise((r) => setTimeout(r, 500));
+    const del = await page.$('xpath/.//button[contains(., "Supprimer l")]');
+    if (del) {
+      await del.click();
+      await new Promise((r) => setTimeout(r, 400));
+      await page.screenshot({ path: `${out}/desktop-delete-user.png` });
+      await page.keyboard.press('Escape');
+    } else errors.push('no delete user button');
   }
   await page.close();
 }

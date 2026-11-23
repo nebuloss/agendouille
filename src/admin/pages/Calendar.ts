@@ -1,7 +1,7 @@
 import { avatar, calendarMark, entries, groupMark } from '@/admin/entries.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
-import { action, card, dialog, field, formDialog, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, dialog, field, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
@@ -10,6 +10,7 @@ import { tileLink } from '@/admin/pages/More.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { barList, dailyChart, type DayCount } from '@/admin/charts.ts';
 import { t } from '@/admin/pages/Calendar.msg.ts';
+import { pick } from '@/admin/Picker.ts';
 
 /**
  * One calendar, as the admin sees it (PLAN.md 10: metadata, never an
@@ -180,42 +181,48 @@ export class CalendarPage extends AdminPage {
   }
 
 
-  private async addMember(st: CalendarStats, users: { name: string; display_name: string }[], groups: { name: string; display_name: string }[]): Promise<void> {
+  private async addMember(st: CalendarStats, users: { name: string; display_name: string; color: string }[], groups: { name: string; display_name: string; color: string }[]): Promise<void> {
     const taken = new Set(st.shares.map((m) => m.target));
-    const options = [
-      ...groups.filter((g) => !taken.has(`g:${g.name}`)).map((g) => h('option', { value: `g:${g.name}` }, t('groupNamed', { name: g.display_name || g.name }))),
-      ...users.filter((u) => u.name !== st.owner && !taken.has(`u:${u.name}`)).map((u) => h('option', { value: `u:${u.name}` }, u.display_name || u.name)),
+    const items = [
+      ...groups.filter((g) => !taken.has(`g:${g.name}`)).map((g) => ({ value: `g:${g.name}`, label: g.display_name || g.name, sub: t('groupNamed', { name: g.name }), lead: groupMark(g.color), section: t('groupsSection') })),
+      ...users.filter((u) => u.name !== st.owner && !taken.has(`u:${u.name}`)).map((u) => ({ value: `u:${u.name}`, label: u.display_name || u.name, sub: u.name, lead: avatar(u.display_name || u.name, u.color), section: t('usersSection') })),
     ];
-    if (options.length === 0) {
+    if (items.length === 0) {
       this.toasts.show(t('everyoneIn'));
       return;
     }
-    const who = h('select', { required: true }, ...options);
-    const access = h('select', {}, h('option', { value: 'read' }, t('read')), h('option', { value: 'readwrite' }, t('readwrite')));
-    const ok = await formDialog(this.doc, t('addMemberTo', { name: st.name }), [field(t('member'), who), field(t('access'), access)], t('add'),
-      () => this.api.put(`/calendars/${seg(st.id)}/shares/${seg(who.value)}`, { access: access.value }));
-    if (!ok) return;
-    this.toasts.show(t('memberAdded'));
-    this.doc.dispatchEvent(new Event('agd:changed'));
-    await this.refresh();
+    const access = styleControl(h('select', {}, h('option', { value: 'read' }, t('read')), h('option', { value: 'readwrite' }, t('readwrite'))));
+    const picked = await pick(this.doc, { title: t('addMemberTo', { name: st.name }), items, multiple: true, confirm: t('add'), extra: [field(t('access'), access)] });
+    if (picked === null || picked.length === 0) return;
+    await this.act(async () => {
+      for (const target of picked) await this.api.put(`/calendars/${seg(st.id)}/shares/${seg(target)}`, { access: access.value });
+    }, t('membersAdded', { count: picked.length }));
   }
 
+
   private async transfer(st: CalendarStats): Promise<void> {
-    const { users } = await this.api.get<{ users: { name: string; display_name: string }[] }>('/users');
-    const select = h('select', {}, ...users.filter((u) => u.name !== st.owner).map((u) => h('option', { value: u.name }, u.display_name || u.name)));
+    const { users } = await this.api.get<{ users: { name: string; display_name: string; color: string; disabled?: boolean }[] }>('/users');
+    const candidates = users.filter((u) => u.name !== st.owner && u.disabled !== true);
+    const picked = await pick(this.doc, {
+      title: t('transferTitle', { name: st.name }), empty: t('nobodyToTransfer'),
+      items: candidates.map((u) => ({ value: u.name, label: u.display_name || u.name, sub: u.name, lead: avatar(u.display_name || u.name, u.color) })),
+    });
+    if (picked === null || picked.length === 0) return;
+    const to = picked[0]!;
+    const toName = candidates.find((u) => u.name === to)?.display_name || to;
     const keep = h('input', { type: 'checkbox', checked: true });
-    const v = await dialog(this.doc, t('transferTitle', { name: st.name }), [
-      h('p', {}, t('transferBody')),
-      field(t('newOwner'), select), h('label', { class: ui.check }, keep, t('keepOwner', { owner: st.owner }))],
+    const v = await dialog(this.doc, t('transferConfirm', { name: st.name, to: toName }), [
+      h('p', {}, t('transferBody')), h('label', { class: ui.check }, keep, t('keepOwner', { owner: st.owner }))],
     [{ label: t('cancel'), value: 'no' }, { label: t('transfer'), value: 'yes', kind: 'filled' }]);
-    if (v !== 'yes' || select.value === '') return;
+    if (v !== 'yes') return;
     try {
-      const r = await this.api.post<{ ref?: string; id?: string }>(`/calendars/${seg(st.id)}/transfer`, { to: select.value, keep: keep.checked });
-      this.doc.location.assign(r.id !== undefined ? `/calendars/${seg(r.id)}` : `/users/${seg(select.value)}/calendars`);
+      const r = await this.api.post<{ ref?: string; id?: string }>(`/calendars/${seg(st.id)}/transfer`, { to, keep: keep.checked });
+      this.doc.location.assign(r.id !== undefined ? `/calendars/${seg(r.id)}` : `/users/${seg(to)}/calendars`);
     } catch (e) {
       this.toasts.error(e);
     }
   }
+
 
   private async remove(st: CalendarStats): Promise<void> {
     const typed = h('input', { autocomplete: 'off' });

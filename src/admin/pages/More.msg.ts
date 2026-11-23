@@ -2,6 +2,7 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    addedToGroupN: { one: 'Membre ajouté au groupe.', other: '{count} membres ajoutés au groupe.' },
     // Groups
     groups: 'Groupes',
     newGroup: 'Nouveau groupe',
@@ -116,6 +117,7 @@ export const t = messages({
     restore: 'Restaurer la sauvegarde',
   },
   en: {
+    addedToGroupN: { one: 'Member added to the group.', other: '{count} members added to the group.' },
     groups: 'Groups',
     newGroup: 'New group',
     groupsIntro: 'Members of a group see each other and can share their calendars with one another.',

@@ -2,6 +2,11 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    groupsSection: 'Groupes',
+    usersSection: 'Utilisateurs',
+    membersAdded: { one: 'Membre ajouté.', other: '{count} membres ajoutés.' },
+    nobodyToTransfer: 'Aucun autre utilisateur actif ne peut recevoir ce calendrier.',
+    transferConfirm: 'Transférer « {name} » à {to} ?',
     cancel: 'Annuler',
     add: 'Ajouter',
     remove: 'Retirer',
@@ -103,6 +108,11 @@ export const t = messages({
     adminNoEvents: 'L’administration voit les calendriers, jamais leurs événements. Ouvrez-en un pour voir ses statistiques, son propriétaire et ses membres.',
   },
   en: {
+    groupsSection: 'Groups',
+    usersSection: 'Users',
+    membersAdded: { one: 'Member added.', other: '{count} members added.' },
+    nobodyToTransfer: 'No other active user can receive this calendar.',
+    transferConfirm: 'Transfer ‘{name}’ to {to}?',
     cancel: 'Cancel',
     add: 'Add',
     remove: 'Remove',

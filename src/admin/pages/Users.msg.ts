@@ -2,6 +2,16 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    addedToGroupsN: { one: 'Ajouté au groupe.', other: 'Ajouté à {count} groupes.' },
+    willGoTo: 'Sera transféré à {name}',
+    willBeDeleted: 'Sera supprimé avec tous ses événements',
+    noOwnerYet: 'Aucun nouveau propriétaire choisi',
+    chooseOwner: 'Choisir le propriétaire',
+    changeOwner: 'Changer',
+    pickOwnerTitle: 'Nouveau propriétaire de « {name} »',
+    deleteInstead: 'Supprimer ce calendrier à la place',
+    theirCalendarsNobody: 'Personne d’autre ne peut reprendre ses calendriers : ils seront supprimés.',
+    mustChoose: 'Choisissez un nouveau propriétaire pour « {name} », ou cochez sa suppression.',
     close: 'Fermer',
     cancel: 'Annuler',
     add: 'Ajouter',
@@ -68,6 +78,7 @@ export const t = messages({
     disable: 'Désactiver',
     disabledDone: 'Compte désactivé.',
     deleteUser: 'Supprimer l’utilisateur…',
+    deleteUserNow: 'Supprimer l’utilisateur',
 
     // A user's calendars.
     noMembers: 'aucun membre',
@@ -118,7 +129,7 @@ export const t = messages({
     deleteCalendar: 'Supprimer ce calendrier',
     giveTo: 'Donner à {name}',
     deleteBody: '{name} ne pourra plus se connecter. Les événements que cette personne a ajoutés aux calendriers partagés sont conservés. Cette action est irréversible.',
-    theirCalendars: 'Que faire de ses calendriers ?',
+    theirCalendars: 'Ses calendriers sont conservés et transférés au nouveau propriétaire que vous choisissez. Vous pouvez aussi en supprimer.',
     deleteTitle: 'Supprimer « {name} » ?',
 
     // Device kinds.
@@ -130,6 +141,16 @@ export const t = messages({
     browser: 'Navigateur',
   },
   en: {
+    addedToGroupsN: { one: 'Added to the group.', other: 'Added to {count} groups.' },
+    willGoTo: 'Will be transferred to {name}',
+    willBeDeleted: 'Will be deleted with all its events',
+    noOwnerYet: 'No new owner chosen',
+    chooseOwner: 'Choose owner',
+    changeOwner: 'Change',
+    pickOwnerTitle: 'New owner of ‘{name}’',
+    deleteInstead: 'Delete this calendar instead',
+    theirCalendarsNobody: 'Nobody else can take over their calendars: they will be deleted.',
+    mustChoose: 'Choose a new owner for ‘{name}’, or tick to delete it.',
     close: 'Close',
     cancel: 'Cancel',
     add: 'Add',
@@ -192,6 +213,7 @@ export const t = messages({
     disable: 'Disable',
     disabledDone: 'Account disabled.',
     deleteUser: 'Delete user…',
+    deleteUserNow: 'Delete user',
 
     noMembers: 'no members',
     memberGroup: 'group {name} ({access})',
@@ -238,7 +260,7 @@ export const t = messages({
     deleteCalendar: 'Delete this calendar',
     giveTo: 'Give to {name}',
     deleteBody: '{name} will no longer be able to sign in. Events they added to shared calendars are kept. This cannot be undone.',
-    theirCalendars: 'What should happen to their calendars?',
+    theirCalendars: 'Their calendars are kept and transferred to the new owner you choose. You can also delete them.',
     deleteTitle: 'Delete ‘{name}’?',
 
     kindDavx5: 'DAVx5',
