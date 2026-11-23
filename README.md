@@ -20,12 +20,14 @@ A self-hosted calendar server for a family, at home, with nothing outside.
 Sync is standard CalDAV for everyone; sharing and sign-in go through an
 additional API. One Go binary, SQLite, behind a reverse proxy in the DMZ.
 
-**Status: M3.** CalDAV works, read and write, with calendars owned by
-users and shared with users or groups, and the admin UI manages users,
+**Status: M4.** CalDAV works, read and write, with calendars owned by
+users and shared with users or groups. The admin UI manages users,
 groups, sign-in QR codes, calendars (their metadata only), settings and
-backups at `http://127.0.0.1:8792/admin`. The family web app (M4) is next:
-until then users make calendars from their phones, and devices are added
-with `agendouille device add`. See `PLAN.md` for the design,
+backups at `http://127.0.0.1:8792/admin`. The family web app shows the
+calendars by agenda, week and month, edits events (one, this and
+following, or all of a series), creates and shares calendars, and sets
+up phones (DAVx5 by QR, iPhone by profile, Thunderbird by hand) and
+read-only `.ics` links. Deployment (M5) is next. See `PLAN.md` for the design,
 `CONTRACTS.md` for the interfaces and `DECISIONS.md` for what was decided
 and why.
 

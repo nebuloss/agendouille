@@ -1,8 +1,5 @@
 import { Api } from '@/shared/core/Api.ts';
-import { DisposableBag } from '@/shared/core/Disposable.ts';
-import { h, type Child } from '@/shared/core/Dom.ts';
-import type { Page } from '@/shared/core/Pages.ts';
-import { Toasts } from '@/shared/components/Ui.ts';
+import { ApiPage } from '@/shared/components/ApiPage.ts';
 
 /** The admin API, at /api/admin on the admin listener. */
 export function adminApi(fetchFn?: (input: string, init: RequestInit) => Promise<Response>): Api {
@@ -14,60 +11,13 @@ export function adminApi(fetchFn?: (input: string, init: RequestInit) => Promise
  * navigation, title); the page fills #admin-content from the API and
  * draws itself again after every change.
  */
-export abstract class AdminPage implements Page {
-  protected readonly bag = new DisposableBag();
-  protected readonly root: HTMLElement;
-  protected readonly toasts: Toasts;
-  private readonly title: HTMLElement | null;
-
-  constructor(
-    protected readonly doc: Document,
-    protected readonly api: Api,
-  ) {
-    this.root = doc.getElementById('admin-content') ?? doc.body;
-    this.title = this.root.querySelector('h1');
-    this.toasts = new Toasts(doc.getElementById('toasts'));
+export abstract class AdminPage extends ApiPage {
+  constructor(doc: Document, api: Api) {
+    super(doc, api, 'admin-content');
   }
 
   /** The {name} of the page's path (a user's page). */
   protected get name(): string {
     return this.root.dataset['name'] ?? '';
   }
-
-  start(): void {
-    void this.refresh();
-  }
-
-  dispose(): void {
-    this.bag.dispose();
-  }
-
-  /** Loads and draws again. */
-  async refresh(): Promise<void> {
-    try {
-      const nodes = await this.render();
-      this.show(nodes);
-    } catch (e) {
-      this.show([h('p', { class: 'banner error' }, e instanceof Error ? e.message : String(e))]);
-    }
-  }
-
-  private show(nodes: Child[]): void {
-    while (this.root.lastChild !== null && this.root.lastChild !== this.title) this.root.lastChild.remove();
-    if (this.title === null || this.title.parentNode !== this.root) this.root.replaceChildren();
-    for (const n of nodes) if (n !== null && n !== undefined && n !== false) this.root.append(n);
-  }
-
-  /** Runs an action, shows its error, and draws again when it worked. */
-  protected async act(run: () => Promise<unknown>, done?: string): Promise<void> {
-    try {
-      await run();
-      if (done !== undefined) this.toasts.show(done);
-      await this.refresh();
-    } catch (e) {
-      this.toasts.error(e);
-    }
-  }
-
-  protected abstract render(): Promise<Child[]>;
 }

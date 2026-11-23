@@ -42,6 +42,8 @@ describe('isSafeUrl', () => {
     ['?f=all', true],
     ['https://example.com/x', true],
     ['HTTP://example.com', true],
+    ['davx5://lea:agd_x@cal.example/dav/', true],
+    ['davx5:alert(1)', false],
     ['//evil.example', false],
     ['/\\evil.example', false],
     ['javascript:alert(1)', false],

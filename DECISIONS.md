@@ -3,6 +3,49 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M4 notes
+
+- **No in-page QR scanner, so no `jsqr`.** The approval QR holds a plain
+  `https://…/approve#code` link: a phone's own camera app opens it, which
+  already works on Android and iOS. The Android app gets its own scan
+  button in M6. M4's "done when" loses "the scanner's parsing"; the
+  approval itself is driven by `TestM1` (a laptop signed in from a phone).
+- **Web edits patch, they do not regenerate** (`internal/ical/web.go`):
+  only SUMMARY, LOCATION, DESCRIPTION, DTSTART, DTEND and RRULE are
+  touched, plus DTSTAMP, LAST-MODIFIED and SEQUENCE. "This one" writes an
+  override whose RECURRENCE-ID has the master's DTSTART form; "this and
+  following" ends the old series with UNTIL (or a shorter COUNT) and
+  starts a new object with a new UID, keeping the rest of the COUNT; "all"
+  moves EXDATEs and overrides by as much as the start moved.
+- **The editor's UNTIL is a date**; the server makes it the last second
+  of that day in the family zone, in UTC, for a timed event (RFC 5545
+  wants UTC there), and leaves it a DATE for an all-day one.
+- **Times cross the API as naive local strings in the family zone**
+  (`2026-11-25T14:00:00`, or a date for all-day). The browser never
+  converts zones: `src/shared/core/Dates.ts` does day arithmetic on wall
+  times and reads "now" with `Intl` in the family zone. The screenshots
+  run Chromium in New York on purpose.
+- **`/api/live` lives in `internal/web/app/live.go`**, not in its own
+  `internal/web/sse` package: it is one handler, and it needs the app's
+  principal and helpers. **It replays nothing**: a reconnect, or a
+  listener that fell behind, gets `resync`, and the page reloads its
+  range, which it would have done for a replay anyway (CONTRACTS 7
+  updated).
+- **The `.mobileconfig` needs both** the owner's session and the one-time
+  token from the POST, and works once within ten minutes: the device
+  password is in it and is kept only in memory until then.
+- **Subscription links** (`/ics/<secret>.ics`, served by `internal/dav`
+  on the public listener): read-only, several calendars merged, revocable,
+  with REFRESH-INTERVAL of 15 minutes. The secret is stored hashed, like
+  device passwords.
+- **Moving an event to another calendar** is `calendar.Service.Move`:
+  one transaction, access rechecked on both, a "deleted" change on one and
+  a "created" on the other, so every client sees it.
+- **`isSafeUrl` allows `davx5://`**, the link that sets DAVx5 up in one
+  tap; the screenshots caught `h()` refusing it.
+- **`ApiPage`** (`src/shared/components/ApiPage.ts`) is the page that
+  renders from the API, shared by the admin UI and the family app.
+
 ## 2026-11-23: M3 notes, and the fixes of the M2 review
 
 **An independent review of M2** (a separate agent reading the code cold)

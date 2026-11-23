@@ -40,6 +40,49 @@ func Register(mux *http.ServeMux, d *deps.Deps) {
 	mux.HandleFunc("/dav", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dav/", http.StatusMovedPermanently)
 	})
+	mux.HandleFunc("GET /ics/{file}", s.subscription)
+}
+
+// subscription serves a read-only link (PLAN.md 7): its calendars as one
+// .ics, each still filtered by its user's access at this moment, so a
+// share removed since leaves the link too.
+func (s *server) subscription(w http.ResponseWriter, r *http.Request) {
+	secret, ok := strings.CutSuffix(r.PathValue("file"), ".ics")
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	ctx := r.Context()
+	userID, ids, err := s.d.Auth.OpenLink(ctx, secret)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	u, err := s.d.Directory.UserByID(ctx, userID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	a := calendar.Actor{UserID: u.ID, Name: u.Name, Cap: "read", Via: "ics"}
+	var infos []calendar.Info
+	var names []string
+	for _, id := range ids {
+		i, err := s.d.Calendar.InfoByID(ctx, a, id)
+		if err != nil {
+			continue // deleted, or no longer shared with them
+		}
+		infos = append(infos, i)
+		names = append(names, i.DisplayName())
+	}
+	zone := s.d.Settings.Get().FamilyTimezone
+	data, err := s.d.Calendar.ExportMany(ctx, infos, strings.Join(names, ", "), zone, "PT15M")
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.Header().Set("Cache-Control", "private, max-age=300")
+	_, _ = w.Write(data)
 }
 
 // kind of resource a path names.

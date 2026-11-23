@@ -6,14 +6,14 @@ const FORBIDDEN_ATTRIBUTES = new Set(['srcdoc', 'style']);
 
 /**
  * Whether a URL may go into an href or src: a same-origin path, a fragment,
- * a query, or http(s). Everything else, javascript: and data: included, is
- * refused.
+ * a query, http(s), or davx5:// (the link that sets up DAVx5, PLAN.md 7).
+ * Everything else, javascript: and data: included, is refused.
  */
 export function isSafeUrl(url: string): boolean {
   const value = url.trim();
   if (value.startsWith('#') || value.startsWith('?')) return true;
   if (value.startsWith('/')) return !value.startsWith('//') && !value.startsWith('/\\');
-  return /^https?:\/\//i.test(value);
+  return /^(https?|davx5):\/\//i.test(value);
 }
 
 /**

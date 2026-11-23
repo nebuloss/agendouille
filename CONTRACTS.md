@@ -53,7 +53,7 @@ between its parts**:
 | `internal/dav` | surface `dav` | calendar, sharing, auth, ical, surface |
 | `internal/web/webx` | layouts, JSON errors, same-origin middleware, static per surface | surface, dto |
 | `internal/web/app` | surface `app`: pages, `/api/*`, `/api/app/*`, `/enrol/`, the APK, `assetlinks.json` | calendar, sharing, directory, auth, ical, dto, webx |
-| `internal/web/sse` | surface `app`: `/api/live` | hub, sharing, auth, dto |
+| `internal/web/app` (`live.go`) | surface `app`: `/api/live` | hub, sharing, auth |
 | `internal/web/admin` | surface `admin`: pages, `/api/admin/*` | directory, sharing, calendar (metadata calls only), auth, settings, backup, dto, webx |
 | `internal/dto` | every JSON type of sections 3 and 7 | — |
 
@@ -255,7 +255,7 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | GET | `/api/approvals/{code}` | `agd_app`: what is asking (UA, IP, three numbers) |
 | POST | `/api/approvals/{code}` | `agd_app`, same-origin: `{"number": 42}` |
 | GET, POST | `/api/devices` ; DELETE `/api/devices/{id}` | `agd_app` (writes same-origin); own devices |
-| GET | `/api/devices/{id}/mobileconfig` | own device, within 10 minutes of creation |
+| GET | `/api/devices/{id}/mobileconfig?t=` | own device: `agd_app` and the one-time token the POST answered, within 10 minutes |
 | GET, DELETE | `/api/sessions[/{id}]` | `agd_app`; own sessions |
 | GET, POST, DELETE | `/api/links[/{id}]` | `agd_app`; own subscription links |
 | GET | `/api/live` | `agd_app` (section 7) |
@@ -657,7 +657,7 @@ one (`/api/app/config` tells the app the server's).
 
 ```
 event: hello
-data: {"seq":812}
+data: {}
 
 event: changed
 data: {"seq":813,"calendar":"maman~ecole","name":"9f1c….ics","action":"changed","by":"lea"}
@@ -669,6 +669,7 @@ event: ping            (every 25 s)
 data: {}
 ```
 
-Only changes on calendars the user may read are sent. Reconnecting with
-`Last-Event-ID: <seq>` replays what was missed, or sends one `resync` if it
-is pruned or more than 500 events. The admin UI has no SSE in v1.
+Only changes on calendars the user may read are sent. Nothing is replayed:
+reconnecting with `Last-Event-ID` gets one `resync`, and so does a listener
+that fell behind; the page then reloads what it shows (DECISIONS
+2026-11-23, M4). The admin UI has no SSE in v1.

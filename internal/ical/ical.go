@@ -277,10 +277,13 @@ type Occurrence struct {
 	// RecurrenceID is the original start of the instance, or nil for an
 	// event that does not recur.
 	RecurrenceID *time.Time
-	Start, End   time.Time
-	AllDay       bool
-	Overridden   bool
-	Event        *Component // the master, or the override that replaces this instance
+	// RecurrenceAllDay says the recurrence id is a date (it takes the
+	// master's DTSTART type, which an override may not share).
+	RecurrenceAllDay bool
+	Start, End       time.Time
+	AllDay           bool
+	Overridden       bool
+	Event            *Component // the master, or the override that replaces this instance
 }
 
 func overlaps(start, end, from, to time.Time) bool {
@@ -424,7 +427,7 @@ func (o *Object) Expand(loc *time.Location, from, to time.Time, max int) (occ []
 		}
 		if overlaps(start.t, end.t, from, to) {
 			r := rid.t
-			occ = append(occ, Occurrence{RecurrenceID: &r, Start: start.t, End: end.t, AllDay: start.allDay, Overridden: true, Event: c})
+			occ = append(occ, Occurrence{RecurrenceID: &r, RecurrenceAllDay: rid.allDay, Start: start.t, End: end.t, AllDay: start.allDay, Overridden: true, Event: c})
 		}
 	}
 	if o.Master != nil {
@@ -453,7 +456,7 @@ func (o *Object) Expand(loc *time.Location, from, to time.Time, max int) (occ []
 					continue
 				}
 				r := t
-				occ = append(occ, Occurrence{RecurrenceID: &r, Start: t, End: end, AllDay: start.allDay, Event: o.Master})
+				occ = append(occ, Occurrence{RecurrenceID: &r, RecurrenceAllDay: start.allDay, Start: t, End: end, AllDay: start.allDay, Event: o.Master})
 			}
 		}
 	}

@@ -167,7 +167,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	pubErr := ""
 	bk := backup.New(svc.store.DB(), cfg.DataDir, svc.settings, time.Now, log)
 	d := &deps.Deps{Config: cfg, Settings: svc.settings, Log: log, Store: svc.store, Directory: svc.dir, Auth: svc.auth,
-		Calendar: svc.calendar, Backup: bk, Clock: time.Now, Version: version,
+		Calendar: svc.calendar, Backup: bk, Hub: svc.hub, Clock: time.Now, Version: version,
 		Restart: func(reason string) {
 			select {
 			case restart <- reason:

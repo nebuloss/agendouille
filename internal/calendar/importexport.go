@@ -133,15 +133,29 @@ func (s *Service) Export(ctx context.Context, a Actor, r Ref) ([]byte, error) {
 
 // ExportInfo is Export for a calendar already looked up.
 func (s *Service) ExportInfo(ctx context.Context, i Info) ([]byte, error) {
-	objs, err := s.List(ctx, i)
-	if err != nil {
-		return nil, err
-	}
+	return s.ExportMany(ctx, []Info{i}, i.DisplayName(), i.Timezone, "")
+}
+
+// ExportMany writes several calendars as one .ics (a subscription link).
+// refresh, when set, is the interval clients are told to fetch it at.
+func (s *Service) ExportMany(ctx context.Context, infos []Info, name, zone, refresh string) ([]byte, error) {
 	out := &ical.Component{Name: "VCALENDAR", Props: []ical.Prop{
 		{Name: "VERSION", Value: "2.0"}, {Name: "PRODID", Value: prodID},
-		{Name: "X-WR-CALNAME", Value: ical.EscapeText(i.DisplayName())},
-		{Name: "X-WR-TIMEZONE", Value: i.Timezone},
+		{Name: "X-WR-CALNAME", Value: ical.EscapeText(name)},
+		{Name: "X-WR-TIMEZONE", Value: zone},
 	}}
+	if refresh != "" {
+		out.Props = append(out.Props, ical.Prop{Name: "REFRESH-INTERVAL", Params: map[string][]string{"VALUE": {"DURATION"}}, Value: refresh},
+			ical.Prop{Name: "X-PUBLISHED-TTL", Value: refresh})
+	}
+	var objs []Object
+	for _, i := range infos {
+		list, err := s.List(ctx, i)
+		if err != nil {
+			return nil, err
+		}
+		objs = append(objs, list...)
+	}
 	zones := map[string]bool{}
 	var events []*ical.Component
 	for _, o := range objs {

@@ -254,6 +254,16 @@ func (s *Service) recheck(ctx context.Context, tx *sql.Tx, a Actor, i Info, need
 	return nil
 }
 
+// InfoByID is a calendar the actor may read, by id (subscription links).
+func (s *Service) InfoByID(ctx context.Context, a Actor, id int64) (Info, error) {
+	i, err := scanInfo(s.db.QueryRowContext(ctx, `SELECT `+calCols+` FROM calendars c JOIN users u ON u.id = c.owner_id
+		WHERE c.id = ? AND c.deleted_at IS NULL`, id))
+	if err != nil {
+		return Info{}, err
+	}
+	return s.withAccess(ctx, a, i)
+}
+
 // Info is a calendar the actor may read.
 func (s *Service) Info(ctx context.Context, a Actor, r Ref) (Info, error) { return s.lookup(ctx, a, r) }
 

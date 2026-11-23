@@ -12,6 +12,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/directory"
+	"github.com/nebuloss/agendouille/internal/hub"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/store"
 )
@@ -26,6 +27,7 @@ type Deps struct {
 	Auth      *auth.Service
 	Calendar  *calendar.Service
 	Backup    *backup.Service
+	Hub       *hub.Hub
 	Clock     func() time.Time
 	Version   string
 	// PublicStatus is the public listener's bound address ("" when down)

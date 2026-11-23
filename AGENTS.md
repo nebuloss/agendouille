@@ -53,8 +53,19 @@ M0 and M1 are done. What exists:
   `/api/admin` answer, a real restore). `scripts/shots/run.sh` takes
   screenshots of the admin UI on dev-build.
 
-Next is M4, the family web app (PLAN section 15). M2's by-hand checks with
-real DAVx5, iOS and Thunderbird are still to do.
+- **M4, the family web app:** `internal/ical/web.go` (the web edits, by
+  patching, every scope), `internal/web/app/family.go` (CONTRACTS 3.2 to
+  3.4) and `live.go` (SSE, the `.mobileconfig`), `calendar.Service.Move`,
+  subscription links (`auth/links.go`, `/ics/` in `internal/dav`). The app
+  bundle: `src/shared/core/Dates.ts`, `src/app/model/Recurrence.ts`,
+  `src/app/components/views.ts` (agenda, week, month), `Editor.ts`,
+  `src/app/pages/CalendarPage.ts` and `Manage.ts` (Calendriers, Appareils,
+  Moi). Tests: `family_e2e_test.go` (M4's "done when"),
+  `src/app/**/*.test.ts`. `scripts/shots/run.sh` shoots the app too.
+
+Next is M5, deployment (PLAN section 15). M2's by-hand checks with real
+DAVx5, iOS and Thunderbird are still to do, now with the web app's
+Appareils page to set them up.
 
 ## Conventions come from cafard and claudication
 
@@ -140,6 +151,10 @@ install'`, and copy `package-lock.json` back with `scp`.
   sets up (M5).
 - **Screenshots before saying a page works:** `scripts/remote.sh 'bash
   scripts/shots/run.sh'`, then look at them. Happy-dom tests do not catch
-  layout.
+  layout. The app pages hold `/api/live` open: wait for `networkidle2`,
+  never `networkidle0`.
+- **The web app sends and gets naive local times in the family zone.**
+  Never `new Date("2026-11-25T14:00")` in the browser (that is the
+  browser's zone): use `Dates.ts`.
 - **Templates and static files live under `internal/web/assets/`**:
   `go:embed` cannot reach a parent directory.

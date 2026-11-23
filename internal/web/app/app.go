@@ -33,7 +33,15 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	h := &handlers{d: d}
 	guard := func(next http.Handler) http.Handler { return webx.SameOrigin(d.PublicURL, next) }
 
-	mux.Handle("GET /{$}", h.page(h.home))
+	for path, page := range map[string][2]string{
+		"GET /{$}":       {"calendar", "Calendrier"},
+		"GET /calendars": {"calendars", "Calendriers"},
+		"GET /devices":   {"devices", "Appareils"},
+		"GET /me":        {"me", "Moi"},
+	} {
+		mux.Handle(path, h.page(h.shell(page[0], page[1])))
+	}
+	h.registerFamily(mux, guard)
 	mux.HandleFunc("GET /signin", h.signin)
 	mux.HandleFunc("GET /signin/wait/{id}", h.wait)
 	mux.HandleFunc("GET /enrol/{token}", h.enrolPage)
@@ -102,8 +110,13 @@ func (h *handlers) basic(next withPrincipal) http.Handler {
 	})
 }
 
-func (h *handlers) home(w http.ResponseWriter, _ *http.Request, p *auth.Principal) {
-	h.render(w, http.StatusOK, "app/home.html", "Accueil", map[string]any{"User": p.User})
+// shell is a page of the family web app: the navigation and a mount point
+// the app bundle fills from the API (PLAN.md 9.3).
+func (h *handlers) shell(page, title string) withPrincipal {
+	return func(w http.ResponseWriter, _ *http.Request, p *auth.Principal) {
+		webx.Render(w, h.d.Log, http.StatusOK, "app/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.App,
+			Data: map[string]any{"Page": page, "Title": title, "User": p.User, "Zone": h.d.Settings.Get().FamilyTimezone}})
+	}
 }
 
 // signin starts an approval and shows its QR code, short code and number.

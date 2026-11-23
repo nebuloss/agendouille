@@ -46,8 +46,13 @@ export class Api {
     return this.request<T>('GET', path + queryString(query));
   }
 
-  post<T>(path: string, body: unknown = {}): Promise<T> {
-    return this.request<T>('POST', path, body);
+  post<T>(path: string, body: unknown = {}, ifMatch?: string): Promise<T> {
+    return this.request<T>('POST', path, body, ifMatch);
+  }
+
+  /** PUT, with If-Match when given: a 412 means someone changed it meanwhile. */
+  put<T>(path: string, body: unknown, ifMatch?: string, query?: Record<string, string | undefined>): Promise<T> {
+    return this.request<T>('PUT', path + queryString(query), body, ifMatch);
   }
 
   patch<T>(path: string, body: unknown): Promise<T> {
@@ -58,15 +63,29 @@ export class Api {
     return this.request<void>('DELETE', path + queryString(query));
   }
 
+  /** DELETE with If-Match. */
+  deleteIf(path: string, ifMatch: string, query?: Record<string, string | undefined>): Promise<void> {
+    return this.request<void>('DELETE', path + queryString(query), undefined, ifMatch);
+  }
+
+  /** Sends a file's bytes as they are (an .ics import). */
+  upload<T>(path: string, body: Blob, query?: Record<string, string | undefined>): Promise<T> {
+    return this.request<T>('POST', path + queryString(query), body);
+  }
+
   /** The URL of path, for links (downloads). */
   url(path: string): string {
     return this.base + path;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, ifMatch?: string): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
     const init: RequestInit = { method, headers, credentials: 'same-origin', redirect: 'error' };
-    if (body !== undefined) {
+    if (ifMatch !== undefined) headers['If-Match'] = ifMatch;
+    if (body instanceof Blob) {
+      headers['Content-Type'] = body.type || 'text/calendar';
+      init.body = body;
+    } else if (body !== undefined) {
       headers['Content-Type'] = 'application/json';
       init.body = JSON.stringify(body);
     }

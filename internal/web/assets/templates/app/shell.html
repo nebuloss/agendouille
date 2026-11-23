@@ -1,0 +1,18 @@
+<div class="app" data-zone="{{.Zone}}" data-user="{{.User.Name}}">
+<header class="topbar app-bar">
+  <a class="brand" href="/">agendouille</a>
+  <span class="who">{{.User.DisplayName}}</span>
+</header>
+<nav class="appnav" aria-label="agendouille">
+  <a href="/" {{if eq .Page "calendar"}}aria-current="page"{{end}}>Calendrier</a>
+  <a href="/calendars" {{if eq .Page "calendars"}}aria-current="page"{{end}}>Calendriers</a>
+  <a href="/devices" {{if eq .Page "devices"}}aria-current="page"{{end}}>Appareils</a>
+  <a href="/me" {{if eq .Page "me"}}aria-current="page"{{end}}>Moi</a>
+</nav>
+<section class="content" id="app-content">
+  <h1 class="sr-only">{{.Title}}</h1>
+  <noscript><p class="banner error">agendouille a besoin de JavaScript pour afficher le calendrier.</p></noscript>
+  <p class="loading">Chargement…</p>
+</section>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+</div>

@@ -198,7 +198,7 @@ agendouille/
   internal/web/webx/             shared web plumbing: layouts, JSON errors, same-origin
   internal/web/app/              the family web app: pages, /api/*, /api/app/* (the APK's)
   internal/web/admin/            the admin UI: pages, /api/admin/*
-  internal/web/sse/              /api/live
+  internal/web/app/live.go       /api/live (DECISIONS, M4)
   internal/web/assets/           embed: templates, static/{shared,app,admin}/
   testdata/ical/                 iCalendar fixtures shared by Go and the Android tests
   src/shared/ src/app/ src/admin/  TypeScript (section 9)
@@ -995,11 +995,11 @@ M6, M7).
 
 **M4. Family web app and the additional API**
 - `/api/*`, SSE, the app bundle: calendar views, editor with scopes,
-  calendars page with sharing and transfer, approval page with scanner and
-  short code, devices (DAVx5 link and QR, `.mobileconfig`, Thunderbird,
+  calendars page with sharing and transfer, approval page with short code
+  (no in-page scanner: DECISIONS, M4), devices (DAVx5 link and QR, `.mobileconfig`, Thunderbird,
   subscription links), signed-in browsers, `/me`.
 - *Done when:* vitest covers `Dates` across DST, `Recurrence` both ways,
-  each view's renderer and the scanner's parsing; a Go test drives every
+  each view's renderer; a Go test drives every
   scope and checks a `VALARM` and an `X-` property survive a web edit; a
   laptop signs in by approval from a phone's browser; a calendar shared in
   the web app appears on a DAVx5 phone.
