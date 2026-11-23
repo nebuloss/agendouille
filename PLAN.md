@@ -1,101 +1,128 @@
 # agendouille: implementation plan
 
 > *agendouille* (French, made up): an *agenda* with the *-ouille* of
-> *andouille* and *fripouille*. The family's calendar, not a serious one.
+> *andouille* and *fripouille*. The family's calendars, not serious ones.
 
 This is the full brief for the agent implementing agendouille. Read it end to
 end before writing code.
 
-- **Decided**: not up for debate. Most of these are the user's own answers.
+- **Decided**: not up for debate. Most of these are the user's own answers
+  (`DECISIONS.md` quotes them).
 - **Default**: may change for a concrete reason, written in `DECISIONS.md`.
 
 `CONTRACTS.md` holds the interfaces between parts (Go packages, routes, the
-CalDAV surface, JSON, SSE, the schema). When this file and `CONTRACTS.md`
-disagree on a contract, `CONTRACTS.md` wins; fix the other one in the same
-change.
+CalDAV surface, JSON, the app bridge, the schema). When this file and
+`CONTRACTS.md` disagree on a contract, `CONTRACTS.md` wins; fix the other one
+in the same change.
 
-Conventions (layout, build, CI, release, deployment, frontend style) are
-taken from **cafard** (`~/misc/cafard`), the user's most recent Go +
-TypeScript project. When this plan is silent on a convention, open cafard
-and do what it does. Section 13 lists the files to copy from.
+Conventions (layout, build, CI, release, deployment, frontend style) come
+from **cafard** (`~/misc/cafard`); the operator model (one admin, settings
+in the UI, a password printed once at install) from **claudication**
+(`~/misc/claudication`). When this plan is silent on a convention, open those
+and do what they do. Section 14 lists the files to copy from.
 
 ---
 
 ## 1. What it is
 
-One self-hosted server that holds **a family's shared calendars**.
+A self-hosted calendar server for a family, at home, with no outside
+service (Decided, user: "the goal is to not rely on external provider and
+self host at home"). Three parts:
 
-- Admins make calendars ("Famille", "École", "Sport") and decide, per
-  member, who reads and who writes each one.
-- Members add, change and delete events in the calendars they may write.
-- Phones and desktops reach it over **CalDAV, read and write**: Android
-  through DAVx5 (a sync adapter, so events appear in any calendar app),
-  iPhone and macOS natively, Thunderbird natively.
-- A **web UI** (TypeScript) shows and edits the same calendar from any
-  browser.
-- It runs at home and is reached **from the internet through a reverse
-  proxy** that terminates TLS.
+1. **The server** (Go, one binary, SQLite). Serves CalDAV, the family web
+   app and the admin UI.
+2. **The family web app** (TypeScript). Users see and edit their calendars,
+   create calendars, share them, manage their devices and sign-ins.
+3. **The Android app** (Java shell + the web app in a WebView). A **sync
+   adapter** (events appear in any calendar app on the phone), the family web
+   app, and the **scanner that signs a browser in** with a QR code.
 
 ```
-  Android calendar app ── CalendarContract ── DAVx5 ──┐
-  iPhone / macOS Calendar ───────────────────────────┤ CalDAV (RFC 4791)
-  Thunderbird ───────────────────────────────────────┤ + sync-collection (RFC 6578)
-  a TV / Google Calendar (read-only .ics link) ──────┤
-                                                     ▼
-                         reverse proxy (TLS) ──► agendouille ──► SQLite
-                                                     ▲
-  browser (web UI, TypeScript) ── JSON API + SSE ────┘
+  Android: agendouille app ── sync adapter ── CalendarContract ── any calendar app
+           DAVx5 or any other CalDAV app ──┐
+  iPhone / macOS Calendar ─────────────────┤ CalDAV (RFC 4791) + sync-collection (RFC 6578)
+  Thunderbird ─────────────────────────────┤   = the only sync protocol
+  TV / dashboard (read-only .ics) ─────────┤
+                                           ▼
+            DMZ: reverse proxy (TLS) ──► agendouille :8791 [dav, app] ──► SQLite
+                                                          ▲
+  browser / app WebView ── additional JSON API + SSE ─────┘   (sign-in, sharing, devices)
+  LAN only: admin browser ──► agendouille :8792 [admin]
 ```
+
+### One protocol, plus an additional API (Decided, user)
+
+- **Sync is CalDAV, and only CalDAV**, for every client, our app included.
+  Any CalDAV app keeps working against the same server with the same
+  calendars: DAVx5 and other Android CalDAV apps, iOS, Thunderbird (user:
+  "we stay compatible with other android app", "we use same protocol with
+  additional api").
+- **What CalDAV has no standard for** goes through an **additional JSON
+  API** on the same server: sign-in (enrolment, approvals), sharing,
+  devices, profile. The family web app uses it, and so does our app (its UI
+  is the web app; its Java side uses the few `/api/app/*` calls).
+- Nothing in the additional API is needed to sync. A user with only DAVx5
+  gets every calendar they may read, read-only where they may only read;
+  they use the web app for sharing and sign-ins.
+
+### Who does what (Decided, user)
+
+- **The admin** is the operator of the server, as in claudication: one
+  account, not a family member, with a password. In the admin UI (LAN only)
+  it creates and removes **users**, puts them in **groups**, hands each one a
+  **one-time sign-in QR code**, and manages the server: ports and public
+  URLs, storage and backups, limits and quotas, defaults. It sees
+  **metadata only**, never an event.
+- **Users** manage themselves in the family web app (in a browser or in the
+  Android app): their profile, their **calendars** (create, rename, colour,
+  delete), **sharing** them with people of their groups, their devices and
+  their sign-ins. Users have **no password and no email**.
+- **Groups** decide who can see whom: a user can belong to several groups
+  and sees, and can share with, anyone who shares at least one group with
+  them.
 
 ### Typical uses
 
-- **Add from the phone.** A parent adds "Dentist, Léa, Thursday 17:30" in
-  the phone's calendar app. DAVx5 pushes it; the other phones have it at
-  their next sync (minutes, or seconds with WebDAV-Push, M7).
-- **Look at the week.** Someone opens the web UI on a laptop and sees the
-  week, each calendar in its colour, and who added what.
-- **School calendar.** An admin makes an "École" calendar that the parents
-  write and the children only read.
+- **A new user.** The admin adds Léa to the group "Famille", and the admin
+  UI shows a QR code. Léa scans it with her phone: the agendouille app (or
+  the browser) opens signed in, and the app sets up sync. Her calendars and
+  the ones shared with her are in her phone's calendar app.
+- **Sign in on the laptop.** The laptop's browser shows a QR code; Léa
+  taps "Scan" in the app, picks the number shown on the laptop, and the
+  laptop is signed in. No password, nothing typed.
+- **A shared calendar.** Maman creates "École" in the web app and shares it
+  read-write with Papa and read-only with the group "Enfants". It appears on
+  everyone's phone at their next sync, whether they use our app or DAVx5.
 - **Weekly activity.** "Judo, every Wednesday 14:00 until the end of June",
-  with one Wednesday cancelled and one moved. Recurrence and its
-  exceptions are kept as iCalendar has them, so every client shows the same
-  thing.
-- **Bring a new phone.** The member opens "Add a device" in the web UI,
-  scans a QR code with DAVx5, and the calendar is on the phone. Losing the
-  phone means revoking that device, not changing a password.
-- **Migrate.** The family's existing Google Calendar is exported to `.ics`
-  and imported once (`agendouille import`).
+  with one Wednesday cancelled and one moved. Recurrence and its exceptions
+  are kept as iCalendar has them, so every client shows the same thing.
+- **A calendar from the phone.** An iPhone user, or a DAVx5 user, creates a
+  calendar in their calendar settings; it is theirs, private until shared.
+- **Lost phone.** The admin (or the user, from another signed-in device)
+  revokes it; the admin shows a new one-time QR for the new phone.
+- **Migrate.** An existing Google Calendar is exported to `.ics` and
+  imported into a calendar from the web app.
 
 ### Why build it
 
-Radicale, Baïkal, Nextcloud and Stalwart already serve CalDAV. agendouille
-exists because the user wants:
-
-- a single Go binary with the web UI embedded, deployed like cafard;
-- a family-first model (shared calendars, members, QR sign-in and QR device
-  pairing) instead of a general groupware server;
-- an admin interface that can stay off the DMZ while CalDAV and the family
-  app face the internet (section 9.1);
-- a web UI that is good on a phone, which Radicale and Baïkal do not have;
-- no PHP or Python on the server, and members and the calendar managed in
-  agendouille itself rather than through a server's generic admin pages
-  (DECISIONS 2026-11-23, "our own server").
+Radicale, Baïkal, Davis, Nextcloud, SOGo, RustiCal and EteSync were weighed
+(DECISIONS 2026-11-23). The user wants: no PHP or Python on the server, one
+Go binary deployed like cafard; users, groups and calendars managed the way
+a family needs; a real calendar view in the browser; passwordless sign-in
+with QR codes; nothing outside the home.
 
 ### Non-goals
 
-- **Scheduling** (RFC 6638, iTIP, email invitations). `ATTENDEE` and
-  `ORGANIZER` are stored as sent and shown, nothing is emailed.
-- **Tasks and journals** (`VTODO`, `VJOURNAL`). The calendar accepts
-  `VEVENT` only.
-- **Contacts** (CardDAV).
-- **Personal calendars.** Every calendar is shared; admins make them.
-  Members cannot make calendars (Decided, user: roles are admin and member).
-- **Subscribing to outside calendars** (school holidays from a URL) on the
-  server: open question 4.
-- **Multi-family hosting.** One install, one family.
-- **Our own sync protocol.** Clients write through CalDAV (Decided, user:
-  "if caldav supports write let's use it instead of reinventing our own
-  protocol"). The JSON API exists for the web UI only.
+- **A sync protocol of our own.** Sync is CalDAV (above).
+- **Email** of any kind: no sign-in links, no invitations, no scheduling
+  (RFC 6638, iTIP). `ATTENDEE` and `ORGANIZER` are stored as sent and shown.
+- **Passwords for users.** Only the admin has one.
+- **Tasks and journals** (`VTODO`, `VJOURNAL`) and **contacts** (CardDAV).
+- **An iPhone app.** iPhones use CalDAV and the web app.
+- **Google Play.** The APK is downloaded from the server (section 7.6).
+- **Outside services** at run time: no push through Google, no email
+  provider, no analytics. The only outside contacts are Let's Encrypt (at
+  the proxy, to renew certificates) and dynamic DNS if the home IP changes.
 
 ---
 
@@ -105,38 +132,43 @@ exists because the user wants:
 |---|---|---|
 | Server language | Go, `go 1.26.0` in `go.mod` (as cafard) | |
 | cgo | **Disabled everywhere** (`CGO_ENABLED=0`) | Cross-compiles to linux amd64/arm64/armv7 |
-| Database | `modernc.org/sqlite` (pure Go), WAL, foreign keys on in the DSN | As cafard |
+| Database | `modernc.org/sqlite` (pure Go), WAL, foreign keys on | As cafard |
 | iCalendar | `github.com/emersion/go-ical` (MIT) | Parse and write RFC 5545; keeps unknown properties |
-| Recurrence | `github.com/teambition/rrule-go` (MIT) | Expands `RRULE`/`RDATE`/`EXDATE` for time-range queries and the web UI |
-| CalDAV/WebDAV | **Written in-house**, `internal/dav` (Default) | `emersion/go-webdav`'s server has neither `sync-collection` nor `getctag`; see DECISIONS 2026-11-23 |
-| Time zones | `time` + `time/tzdata` embedded | No dependency on the host's zoneinfo; VTIMEZONE in objects is kept but Go's database is used to compute instants (section 4.4) |
-| Passwords | `golang.org/x/crypto/argon2` (argon2id) | Member passwords |
-| QR codes | `rsc.io/qr` (as cafard) | Device pairing |
-| Config | YAML, `gopkg.in/yaml.v3`, plus flags and env (as cafard) | |
-| HTTP | `net/http` with Go 1.22+ patterns, no router library | Custom methods (`PROPFIND`, `REPORT`) go through one handler under `/dav/` |
-| Own logging | `log/slog` | |
-| Frontend | TypeScript (strict), **plain DOM in classes, no framework**, bundled by Vite into `internal/web/assets/static/app/main.js` and embedded by Go | As cafard |
-| Frontend tests | `vitest` + `happy-dom` | As cafard |
-| CSS | Hand-written, custom properties, Material 3 roles as cafard | |
-| Test-only | `github.com/emersion/go-webdav` (client) | An independent CalDAV client in integration tests |
+| Recurrence | `github.com/teambition/rrule-go` (MIT) | Expansion for time-range queries and the web app |
+| CalDAV/WebDAV server | **In-house**, `internal/dav` (Default) | go-webdav's server has no `sync-collection`, no `getctag` (DECISIONS) |
+| Time zones | `time` + `time/tzdata` embedded | |
+| Admin password | `golang.org/x/crypto/argon2` (argon2id) | The only password |
+| QR codes | `rsc.io/qr` (as cafard) | |
+| Config | YAML bootstrap file + settings in the database (section 11) | `gopkg.in/yaml.v3` |
+| HTTP | `net/http`, no router library | `PROPFIND`, `REPORT`, `MKCALENDAR` go through one handler under `/dav/` |
+| Logging | `log/slog` | |
+| Web frontend | TypeScript (strict), **plain DOM in classes, no framework**, Vite, embedded by Go | As cafard |
+| QR scanning in the browser | `BarcodeDetector` where present, else `jsqr` (Apache-2.0) (Default) | Same code in a browser and in the app's WebView |
+| Frontend tests | `vitest` + `happy-dom` | |
+| Android app | **Java**, Android framework APIs only: no Kotlin, no AndroidX, no Gradle (Decided, user dislikes the Android build) | Built by a Makefile in a container (section 13.5) |
+| Android tests | JUnit 5 on the JVM, for the pure Java parts | Same container |
+| Test-only (Go) | `github.com/emersion/go-webdav` (client) | An independent CalDAV client |
+| Passkeys (optional, M10) | `github.com/go-webauthn/webauthn` (BSD-3) | Only if M10 happens |
 
-Ask in `DECISIONS.md` before adding any other dependency, on either side.
+Ask in `DECISIONS.md` before adding any other dependency, on any side.
 
 ### 2.1 Protocols (Decided)
 
 | Link | Protocol | Notes |
 |---|---|---|
-| Calendar clients | **CalDAV** (RFC 4791) on WebDAV (RFC 4918), read and write | |
-| Incremental sync | **WebDAV sync** (RFC 6578, `sync-collection`), plus `CS:getctag` | DAVx5, iOS and Thunderbird all use one or the other |
+| **Sync, every client** | **CalDAV** (RFC 4791) on WebDAV (RFC 4918), read and write, `MKCALENDAR` | Our app, DAVx5 and other CalDAV apps, iOS, Thunderbird |
+| Incremental sync | **WebDAV sync** (RFC 6578) + `CS:getctag` | |
 | Discovery | `/.well-known/caldav` (RFC 6764), `current-user-principal` (RFC 5397) | |
-| Data | **iCalendar** (RFC 5545), `text/calendar` | |
-| Read-only subscription | A secret `.ics` URL (RFC 5545 over plain GET) | TVs, Google Calendar's "add by URL", dashboards |
-| Instant sync (M7) | **WebDAV-Push** draft (bitfireAT) over Web Push (RFC 8030) | DAVx5 4.5+ with a UnifiedPush distributor |
-| iOS setup | Apple configuration profile (`.mobileconfig`, CalDAV payload) | One tap instead of typing a URL |
-| Android setup | DAVx5 login URI (`davx5://user:pass@host/path`) in a QR code | DAVx5 manual, "Integration" |
-| Web UI | JSON over HTTP, **Server-Sent Events** for live changes | Same-origin, session cookie |
-| Auth, CalDAV | HTTP Basic (RFC 7617) over TLS, **device passwords only** | Section 10 |
-| Auth, web | Session cookie after a password sign-in | Section 10 |
+| Data | **iCalendar** (RFC 5545) | |
+| **The additional API** | JSON over HTTPS (CONTRACTS 2, 3) | Sign-in, sharing, devices, profile; the web app and our app |
+| Read-only subscription | A secret `.ics` URL | TVs, dashboards |
+| Browser sign-in | **Approval** by a signed-in device (section 8.2), session cookie | In-house, no outside service |
+| Sync credentials | HTTP Basic (RFC 7617) over TLS, **one random credential per device** | Section 8.4 |
+| Android app links | Android **App Links** (`/.well-known/assetlinks.json`) | Opens sign-in links in the app when installed |
+| Web app live updates | **Server-Sent Events** | |
+| Push (optional, M9) | **UnifiedPush** with a self-hosted **ntfy**; **WebDAV-Push** draft for DAVx5 | No Google |
+| iOS setup | Apple configuration profile (`.mobileconfig`) | |
+| DAVx5 setup | DAVx5 login URI `davx5://user:secret@host/dav/` | DAVx5 manual, "Integration" |
 
 ---
 
@@ -144,52 +176,50 @@ Ask in `DECISIONS.md` before adding any other dependency, on either side.
 
 ```
 agendouille/
-  cmd/agendouille/main.go        subcommands: serve, config, version, member, device,
-                                 import, export, backup
-  internal/config/               YAML + env + flags, validation (`agendouille config`)
-  internal/deps/                 the Deps struct (breaks import cycles; CONTRACTS 1.2)
-  internal/dto/                  every JSON type of the web API and SSE
+  cmd/agendouille/main.go        serve, config, version, admin, user, group, backup,
+                                 restore, import, export
+  internal/config/               the bootstrap YAML + env + flags (section 11.1)
+  internal/settings/             settings kept in the database, typed, live (11.2)
+  internal/deps/                 the Deps struct (CONTRACTS 1.2)
+  internal/dto/                  every JSON type of the APIs and SSE
   internal/store/                SQLite handle, migrations, queries
-  internal/members/              members, roles, password hashing, the last-admin rule
-  internal/access/               calendars' metadata, the access table, the admin log
-  internal/auth/                 sessions per surface, sign-in links, approvals, device
-                                 passwords, Basic auth, rate limits,
-                                 CSRF (Sec-Fetch-Site / Origin), trusted proxies
-  internal/calendar/             the calendar: objects, change log, sync tokens,
-                                 validation, the one write path (section 4.3)
-  internal/ical/                 parse/patch/serialise helpers over go-ical, time-range
-                                 and recurrence expansion, the web event <-> VEVENT mapping
-  internal/dav/                  WebDAV + CalDAV server: PROPFIND, REPORT, GET, PUT,
-                                 DELETE, OPTIONS, XML, preconditions, well-known
-  internal/dav/testdata/clients/ recorded requests from DAVx5, iOS, Thunderbird
-  internal/hub/                  in-memory fan-out of calendar changes (SSE, WebDAV-Push)
-  internal/devices/              pairing: QR (DAVx5), .mobileconfig, subscription links
-  internal/surface/              the three surfaces (dav, app, admin) and which listener
-                                 serves each (section 9.1)
+  internal/directory/            users, groups, visibility ("who can see whom")
+  internal/sharing/              calendar ownership, shares, effective access
+  internal/auth/                 admin password, sessions, enrolment links, approvals,
+                                 devices (credentials), subscription links, Basic auth,
+                                 rate limits, client IP, same-origin
+  internal/calendar/             calendars and objects: the one write path, changes,
+                                 sync tokens, quotas, import/export
+  internal/ical/                 parse, validate, index, expand, patch (pure)
+  internal/dav/                  WebDAV + CalDAV server, well-known, /ics/
+  internal/dav/testdata/clients/ recorded requests from our app, DAVx5, iOS, Thunderbird
+  internal/hub/                  in-memory fan-out of changes (SSE, push)
+  internal/surface/              surfaces (dav, app, admin), listeners, live rebinding
+  internal/backup/               scheduled snapshots, download, restore
   internal/web/webx/             shared web plumbing: layouts, JSON errors, same-origin
-  internal/web/app/              the family app: pages and /api/*
-  internal/web/admin/            the admin UI: pages and /api/admin/*
-  internal/web/sse/              GET /api/live
-  internal/web/assets/           embed of templates and static
-  internal/web/assets/static/app/    Vite output of src/app (app.js; ignored)
-  internal/web/assets/static/admin/  Vite output of src/admin (admin.js; ignored)
-  src/                           TypeScript sources (section 9)
-  deploy/                        install.sh, agendouille.service, agendouille.openrc,
-                                 agendouille-container.conf, agendouille.yaml.example,
-                                 Caddyfile.example, nginx.conf.example, README.md
+  internal/web/app/              the family web app: pages, /api/*, /api/app/* (the APK's)
+  internal/web/admin/            the admin UI: pages, /api/admin/*
+  internal/web/sse/              /api/live
+  internal/web/assets/           embed: templates, static/{shared,app,admin}/
+  testdata/ical/                 iCalendar fixtures shared by Go and the Android tests
+  src/shared/ src/app/ src/admin/  TypeScript (section 9)
+  android/                       the Android app (section 7)
+    Makefile  AndroidManifest.xml  res/  src/  test/  libs/  docker/Dockerfile
+  deploy/                        install.sh, agendouille.service, .openrc, container
+                                 drop-in, agendouille.yaml.example, Caddyfile.example,
+                                 nginx.conf.example, README.md
   scripts/remote.sh              rsync to dev-build, run checks there
-  scripts/devdeploy.sh           build on dev-build, push the binary to the host
-  .github/workflows/ci.yml       frontend -> artifact -> Go checks, cross-build, shellcheck
-  .github/workflows/release.yml  tag v* -> binaries + SHA256SUMS + GitHub release
-  package.json  tsconfig.json  vite.config.ts  vitest.config.ts
-  go.mod  .gitignore  README.md  AGENTS.md  PLAN.md  CONTRACTS.md  DECISIONS.md
+  scripts/android.sh             build/test the APK in its container on dev-build
+  scripts/devdeploy.sh           build on dev-build, push to the home server
+  .github/workflows/ci.yml       frontend, Go, Android, shellcheck
+  .github/workflows/release.yml  tag v* -> binaries, APK, SHA256SUMS, GitHub release
+  package.json tsconfig.json vite.config.ts vitest.config.ts go.mod
+  README.md AGENTS.md CLAUDE.md PLAN.md CONTRACTS.md DECISIONS.md
 ```
 
-The Go module path is `github.com/nebuloss/agendouille` and the remote
-`git@github.com:nebuloss/agendouille.git` (Default, as the other projects).
-
-An Android app, if M8 happens, goes in `android/` in this repository
-(Default), so the server and its client change in one commit.
+Module path `github.com/nebuloss/agendouille`, remote
+`git@github.com:nebuloss/agendouille.git` (Default). The Android package is
+`io.github.nebuloss.agendouille` (Default, open question 6).
 
 ---
 
@@ -197,774 +227,857 @@ An Android app, if M8 happens, goes in `android/` in this repository
 
 ### 4.1 Concepts
 
-- **Member**: a person of the family. Has a login name (`[a-z][a-z0-9-]{0,31}`),
-  a display name, a colour, and a role: **admin** or **member** (Decided,
-  user). A password is **optional**: a member without one signs in by QR
-  code only (section 8).
-- **Calendar**: a shared calendar. Has a **slug** (`[a-z][a-z0-9-]{0,31}`,
-  fixed once made, because it is in every phone's URL), a display name, a
-  colour, a time zone, a description, and a **default access** given to
-  members added later. Several per install (Decided, user). One,
-  `famille`, is made at first start.
-- **Access**: per member and calendar, `none`, `read` or `readwrite`. Set by
-  admins. Admins have no implicit access to events: they grant it to
-  themselves like to anyone (Default; the admin UI manages calendars, the
-  family app shows events).
-- **Device**: a phone, a laptop's Thunderbird, a TV. Belongs to a member.
-  Has a label, a **device password** (random, shown once), and a cap of
-  `readwrite` or `read`. On a calendar, a device gets the lower of its cap
-  and its member's access. CalDAV accepts device passwords only, never a
-  member's password. Revoking a device stops that device and nothing else.
-- **Subscription link**: a secret URL that serves chosen calendars as one
-  `.ics`, read-only, without a password. Belongs to a member, revocable,
-  filtered by the member's access each time it is fetched.
-- **Sign-in link**: a one-time URL, shown as a QR code, that signs a member
-  in to the family app. Made by an admin (invitation, lost password) or by
-  the member from a device already signed in (section 8).
-- **Calendar object**: one CalDAV resource, `<name>.ics`, in one calendar,
-  holding one iCalendar `VCALENDAR` with all the `VEVENT`s of one `UID`
-  (the master and its overrides by `RECURRENCE-ID`), as RFC 4791 4.1
-  requires. The original text is stored, so what a client sent is what a
-  client gets back, including properties agendouille does not understand
-  (`X-APPLE-*`, `VALARM`, attachments, attendees).
-- **Change**: one row per write (put or delete) with a strictly increasing
-  number across all calendars. Each calendar's sync token and ctag are made
-  from the last change in it (section 4.3). Changes also feed the admin's
-  activity page (who, when, through which device, which event).
+- **Admin**: one operator account (name `admin`), argon2id password. Not a
+  user: it has no calendars and cannot sign in to the family web app.
+- **User**: a login name (`[a-z][a-z0-9-]{0,31}`, fixed), a display name, a
+  colour, groups. No password, no email. Created, disabled and removed by
+  the admin only.
+- **Group**: a name and a colour, made by the admin. A user can be in several
+  groups. **Visibility**: user A *sees* user B when they share a group. Only
+  seen users appear in A's pickers, and A can share only with them (and with
+  A's own groups).
+- **Calendar**: **owned by one user**. A slug (`[a-z0-9][a-z0-9-]{0,62}`,
+  unique per owner, fixed once made: it is in every phone's URL), a name, a
+  colour, a time zone, a description. Made by its owner in the web app, in
+  our app, or by any CalDAV client (`MKCALENDAR`).
+- **Share**: a calendar shared by its owner with a **user** or a **group**,
+  with `read` or `readwrite`. A group share covers its current and future
+  members. A user's access to a calendar is the highest of: owner (all
+  rights), their user share, the shares of their groups. Only users and
+  groups the owner sees can be targets. Sharees can **hide** a calendar for
+  themselves (it leaves their phones too) but cannot change or delete it.
+- **Device**: a credential for sync. One per phone, computer or TV: a label,
+  a kind (`app`, `davx5`, `ios`, `thunderbird`, `other`), a random secret
+  shown once (or handed straight to the app), a cap `readwrite` or `read`.
+  On a calendar, a device gets the lower of its cap and its user's access.
+  The agendouille app's device also opens web sessions for its WebView
+  (section 8.3).
+- **Web session**: a browser (or the app's WebView) signed in to the family
+  web app. 90 days, renewed on use (Default, a setting).
+- **Enrolment link**: a one-time URL made by the admin for a user, shown as
+  a QR code; it signs in the first device (section 8.1).
+- **Approval**: a short-lived request from a browser that wants to sign in,
+  approved from a device already signed in (section 8.2).
+- **Subscription link**: a secret URL serving chosen calendars as one
+  `.ics`, read-only. Belongs to a user, revocable, filtered by their access
+  at each fetch.
+- **Calendar object**: one CalDAV resource `<name>.ics` in one calendar,
+  holding all the `VEVENT`s of one `UID` (master and overrides), as RFC 4791
+  4.1 requires. The original text is stored, so what a client sent is what a
+  client gets back, including properties agendouille does not understand.
+- **Change**: one row per write, strictly increasing across the server.
+  Each calendar's sync token and ctag come from its last change.
 
 ### 4.2 Who did what
 
-Every object records `created_by` and `modified_by` (member ids) and the
-device or session that did it. The web UI colours an event by its calendar,
-marks it with its creator's initial in the creator's colour, and shows
-"added by Maman, changed by Léa". These live in columns, **not**
-in the iCalendar text: CalDAV clients would rewrite or drop them, and they
-must not travel to other servers when someone exports.
+Every object records `created_by`, `modified_by` (users) and the device or
+session. The web app marks an event with its creator's initial in the
+creator's colour and shows "added by Maman, changed by Léa". These live in
+columns, **not** in the iCalendar text.
 
 ### 4.3 The write path (Decided)
 
-There is **one** write path, `calendar.Service.Put` / `Delete`
-(CONTRACTS 1.3). CalDAV `PUT`/`DELETE`, the web API, `agendouille import`
-and anything later all go through it. In one SQLite transaction it:
+One write path, `calendar.Service` (CONTRACTS 1.3): CalDAV, the additional
+API, import, and the app all go through it. In one SQLite transaction it:
 
-1. checks the precondition (`If-Match` etag, `If-None-Match: *`), and
-   answers `412` if it fails;
-2. parses and validates the object (section 4.5);
-3. checks `UID` uniqueness in the calendar (`no-uid-conflict`);
-4. extracts the index columns (summary, first start, last end or open,
-   recurring or not, all-day);
-5. writes the object with a new etag, appends a `changes` row, bumps the
-   calendar's change counter;
-6. after commit, publishes the change on the hub (SSE, WebDAV-Push).
+1. checks access (section 4.1) and the device cap;
+2. checks the precondition (`If-Match`, `If-None-Match: *`), else `412`;
+3. parses and validates the object (4.5) and the quotas (11.2);
+4. checks `UID` uniqueness in the calendar (`no-uid-conflict`);
+5. extracts the index columns (summary, first start, last end or open,
+   recurring, all-day);
+6. writes the object with a new etag, appends a `changes` row, sets the
+   calendar's `seq`;
+7. after commit, publishes the change on the hub (SSE, push).
 
-The **etag** is the hex SHA-256 of the stored text, truncated to 16 bytes,
-in quotes. The change counter is global; each calendar keeps the number of
-its last change. The **sync token** is
-`https://<public host>/ns/sync/<slug>/<n>` with `<n>` that number; the
-**ctag** is `<n>` as a string.
+Calendar-level writes (create, rename, recolour, share, unshare, delete)
+go through the same service and also bump the calendar's `seq` when
+clients must see them (name, colour).
 
-Losing access to a calendar makes it disappear from the member's home (the
-client drops it); getting access makes it appear. A change of access is
-not a change of the calendar, so it does not move its token.
+The **etag** is the hex SHA-256 of the stored text, 16 bytes, quoted. The
+**sync token** is `https://<dav host>/ns/sync/<calendar id>/<n>`; the
+**ctag** is `<n>`.
 
-Deleted objects leave their `changes` row (the tombstone) so
-`sync-collection` can report them. Tombstones older than
-`sync_token_retention` (Default 180 days) are pruned; a sync token older
-than the oldest kept change answers `403 DAV:valid-sync-token`, and the
-client does a full sync (RFC 6578 3.2).
+Tombstones (the `changes` rows of deletions) older than
+`sync_token_retention` (Default 180 days) are pruned; an older token gets
+`403 DAV:valid-sync-token` and the client syncs in full (RFC 6578 3.2).
+
+Gaining access to a calendar (a new share, joining a group) makes it appear
+in the user's home; losing it makes it disappear. Clients pick that up from
+the home listing at their next sync.
 
 ### 4.4 Time
 
-- Instants are computed with Go's embedded tz database by `TZID`. A
-  `VTIMEZONE` in the object is kept in the text but only consulted when its
-  `TZID` is unknown to Go (Outlook's "Romance Standard Time", for one): then
-  the Windows-name map from CLDR is tried, and after that the calendar's
-  zone is assumed and a warning logged.
-- Floating times (no `TZID`, no `Z`) are read in the calendar's time zone.
-- All-day events (`VALUE=DATE`) are dates, not instants; the index stores
-  them as midnight-to-midnight in the calendar's zone.
-- Each calendar has a zone (Default for new ones: `timezone` in the config,
-  `Europe/Paris`). The web UI shows times in the **family zone** (the
-  config's), not the browser's (Default: one family, one place; a member
-  abroad still sees the family's time).
+- Instants are computed with Go's embedded tz database by `TZID`; an unknown
+  `TZID` (Outlook's Windows names) goes through the CLDR Windows map, then
+  the calendar's zone with a warning. The object's `VTIMEZONE` is kept.
+- Floating times are read in the calendar's zone. All-day events are dates.
+- The web app shows times in the **family zone** (a setting, Default
+  `Europe/Paris`), not the browser's (Default: one family, one place).
 
 ### 4.5 What is accepted
 
-- One `VCALENDAR` with one or more `VEVENT`s that share a `UID`, plus any
-  `VTIMEZONE`s. `VTODO` and `VJOURNAL`: `403 CALDAV:supported-calendar-component`.
-- Size ≤ `max_object_bytes` (Default 256 KiB): `403 CALDAV:max-resource-size`.
-- Must parse; must have `UID`, `DTSTART`; `DTEND` after `DTSTART` if
-  present: otherwise `403 CALDAV:valid-calendar-data`.
-- `RRULE` with neither `COUNT` nor `UNTIL` is fine (stored as open-ended).
-  Expansion is capped at `max_instances` (Default 5000) per query and
-  answers what it has.
-- **No rewriting** of client data on CalDAV `PUT`: the text is stored as
-  received (after the size and validity checks). Clients rely on getting
-  their bytes back; DAVx5 and iOS both compare.
+- One `VCALENDAR` with `VEVENT`s sharing a `UID`, plus `VTIMEZONE`s.
+  `VTODO`, `VJOURNAL`: `403 CALDAV:supported-calendar-component`.
+- At most `max_object_bytes` (setting, Default 256 KiB).
+- Must parse; must have `UID` and `DTSTART`; `DTEND` after `DTSTART`.
+- Open-ended `RRULE` is fine; expansion is capped (Default 5000 instances
+  per query).
+- **No rewriting** of what a CalDAV client `PUT`: stored as received.
 
-### 4.6 Edits from the web UI
+### 4.6 Edits from the web app
 
-The web API takes a simple event shape (CONTRACTS 3.3), not iCalendar.
-`internal/ical` maps it onto the stored object by **patching**: it parses
-the object, changes only the properties the web form owns (`SUMMARY`,
-`DTSTART`, `DTEND`, `LOCATION`, `DESCRIPTION`, `RRULE`, `EXDATE`), bumps
-`SEQUENCE`, sets `DTSTAMP` and `LAST-MODIFIED`, and serialises it. Alarms,
-attendees and `X-` properties set from a phone survive an edit in the
-browser.
+The additional API takes a simple event shape (CONTRACTS 3.3).
+`internal/ical` **patches** the stored object: it changes only the
+properties the form owns (`SUMMARY`, `DTSTART`, `DTEND`, `LOCATION`,
+`DESCRIPTION`, `RRULE`, `EXDATE`), bumps `SEQUENCE`, sets
+`DTSTAMP`/`LAST-MODIFIED`, and keeps the rest (alarms, attendees, `X-`
+properties).
 
-Recurring events from the web UI take a **scope**:
+Recurring events take a **scope**:
 
 | Scope | Effect |
 |---|---|
-| `this` | Change: add or replace an override `VEVENT` with `RECURRENCE-ID`. Delete: add an `EXDATE` (and drop the override if any). |
-| `following` | Split: set `UNTIL` on the master to just before this occurrence; create a new object (new `UID`) from this occurrence on, with the overrides that fall after it. |
-| `all` | Change or delete the master (and all its overrides). |
-
-This is what Google Calendar and iOS do, so the result looks the same on
-every client.
+| `this` | Change: add or replace an override with `RECURRENCE-ID`. Delete: add `EXDATE`. |
+| `following` | Split: `UNTIL` on the master before this occurrence; a new object (new `UID`) from here on. |
+| `all` | Change or delete the master and its overrides. |
 
 ### 4.7 Alarms (Default, open question 1)
 
-A shared calendar means a `VALARM` set by one member's phone reaches
-everyone's phone. v1 keeps `VALARM` as sent (the iCalendar way, and what
-Nextcloud does for a shared calendar). Clients add their own default
-reminders locally anyway.
+A `VALARM` set on a shared calendar reaches everyone who syncs it. v1 keeps
+it as sent.
 
 ---
 
-## 5. CalDAV (the main interface)
+## 5. CalDAV
 
-Full contract in CONTRACTS section 4. The shape:
+Full contract in CONTRACTS section 4. Everything here is standard CalDAV;
+our app gets nothing over it that DAVx5 does not.
 
 ### 5.1 URLs
 
 ```
-/.well-known/caldav                 301 -> /dav/
-/dav/                               PROPFIND: current-user-principal
-/dav/principals/<member>/           the principal
-/dav/calendars/<member>/            calendar-home-set of <member>: the calendars they may read
-/dav/calendars/<member>/<slug>/     a calendar (the same one under every home)
-/dav/calendars/<member>/<slug>/<name>.ics   an object
-/ics/<secret>.ics                   read-only subscription
+/.well-known/caldav                        301 -> /dav/
+/dav/                                      current-user-principal
+/dav/principals/<user>/                    the principal
+/dav/calendars/<user>/                     calendar-home-set: every calendar <user> may read
+/dav/calendars/<user>/<owner>~<slug>/      a calendar, as seen from <user>'s home
+/dav/calendars/<user>/<owner>~<slug>/<name>.ics   an object
+/ics/<secret>.ics                          read-only subscription
 ```
 
-Each member has their own home, listing the calendars their access allows.
-The objects are the same in every home; only the path prefix differs. A
-member reaching into another member's home, or into a calendar they have
-`none` on, gets `404`, not `403`.
+Every calendar a user may read appears in their home under
+`<owner>~<slug>` (`maman~ecole`), their own ones included (`lea~perso`).
+The same calendar has the same objects in every home. A user reaching into
+another user's home, or into a calendar they cannot read, gets `404`.
 
-Object names are what the client chose on `PUT` (DAVx5 uses `<uuid>.ics`,
-iOS `<UID>.ics`); the web UI creates `<uuid>.ics`. They are kept as sent,
-unique in their calendar, `[A-Za-z0-9._@+-]{1,200}\.ics` (Default; others
-`403`). Moving an event to another calendar is a `DELETE` and a `PUT`, as
-clients already do it; the web UI does the same in one transaction.
+Object names are kept as the client chose them, unique in the calendar,
+`[A-Za-z0-9._@+-]{1,200}\.ics` (Default).
 
 ### 5.2 Methods
 
 | Method | Where | Notes |
 |---|---|---|
-| `OPTIONS` | anywhere under `/dav/` | `DAV: 1, 3, calendar-access`, `Allow` list |
-| `PROPFIND` | everything | Depth 0 and 1. `Depth: infinity` is `403 DAV:propfind-finite-depth` |
-| `REPORT calendar-multiget` | calendar | |
-| `REPORT calendar-query` | calendar | `comp-filter` VEVENT with optional `time-range`; `prop-filter`/`text-match` on `UID` and `SUMMARY`. Others: `403 CALDAV:supported-filter` |
-| `REPORT sync-collection` | calendar | RFC 6578, depth 1, `limit` honoured with `507` + a new token |
-| `GET`, `HEAD` | object | `ETag`, `Content-Type: text/calendar; charset=utf-8` |
-| `GET` | calendar | the whole calendar as one `.ics` (export) |
-| `PUT` | object | `If-Match`, `If-None-Match: *`. `201` or `204`, with `ETag` |
-| `DELETE` | object | `If-Match` honoured. `204` |
-| `PROPPATCH` | calendar | `displayname`, `calendar-color`, `calendar-order` stored **per member** (each one's view); others `403` in the multistatus |
-| `MKCALENDAR`, `MKCOL`, `MOVE`, `COPY`, `LOCK` | | `403` / `405`. Calendars are made in the admin UI |
+| `OPTIONS` | anywhere under `/dav/` | `DAV: 1, 3, calendar-access, extended-mkcol` |
+| `PROPFIND` | everything | Depth 0 and 1; `infinity` is `403 propfind-finite-depth` |
+| `REPORT calendar-multiget`, `calendar-query`, `sync-collection` | calendar | `calendar-query`: `comp-filter` VEVENT, `time-range`, `prop-filter` on `UID`/`SUMMARY` |
+| `GET`, `HEAD` | object; calendar (the whole `.ics`) | |
+| `PUT`, `DELETE` | object | `If-Match`, `If-None-Match: *` |
+| `MKCALENDAR`, extended `MKCOL` | `/dav/calendars/<user>/<slug>/` in one's **own** home | Creates a calendar owned by the user (display name from the body). Quota and component checks. It then lives at `<user>~<slug>` |
+| `PROPPATCH` | calendar | Owner: `displayname`, `calendar-color`, `calendar-description`, `calendar-timezone` change the calendar for everyone. Sharee: stored as their own view. `calendar-order` per user |
+| `DELETE` | calendar | Owner: deletes it for everyone. Sharee: `403` (they hide it in the web app) |
+| `MOVE`, `COPY`, `LOCK`, `ACL` | | `403` / `405` |
 
-`calendar-query` with a `time-range` uses the index columns to pick
-candidates, then expands recurrence in Go to decide (RFC 4791 9.9).
-`<C:expand>` and `<C:limit-recurrence-set>` in `calendar-data` are not
-supported (Default; no target client sends them); the full object is
-returned.
+`time-range` queries use the index, then expand recurrence in Go (RFC 4791
+9.9). `<C:expand>` is not supported (Default).
+
+The URL a client `MKCALENDAR`s at (`/dav/calendars/lea/<uuid>/`) and where
+the calendar then lives (`lea~<uuid>`) differ. That is allowed (a `201` with
+`Location`), but it must be checked against our app, DAVx5 and iOS in M2;
+if one of them insists on the URL it asked for, the home also answers on
+the bare `<slug>` for the owner's own calendars (Default fallback).
 
 ### 5.3 Access over CalDAV
 
-On each calendar the principal gets the lower of the device's cap and the
-member's access. With `read`, `PUT` and `DELETE` get `403
-DAV:need-privileges` and `current-user-privilege-set` lists `read` only, so
-clients show that calendar as read-only. The children can read "École"
-while the parents write it, and the user's first idea (read-only CalDAV for
-some devices) is still there as a device cap.
+On each calendar: the lower of the device cap and the user's access. With
+`read`, `PUT`/`DELETE` get `403 DAV:need-privileges`, and
+`current-user-privilege-set` lists `read` only, so clients show it
+read-only.
 
 ### 5.4 Clients to work with (Decided)
 
-The target list, each tested by hand at the end of M2 and M5 (section 15):
+| Client | Notes |
+|---|---|
+| **Our app** (M6, M7) | Its traffic is recorded first |
+| **DAVx5** | Must keep working throughout (Decided, user) |
+| Other Android CalDAV apps (OpenSync, …) | Should work: nothing non-standard is needed to sync |
+| **iOS / macOS Calendar** | Picky about `current-user-privilege-set`, `supported-report-set`, `calendar-color` |
+| **Thunderbird** | ctag + etag |
+| GNOME Calendar / Evolution | Nice to have |
 
-| Client | Discovery | Sync | Notes |
-|---|---|---|---|
-| DAVx5 (Android) | well-known, principal | `sync-collection`, falls back to ctag | Sync adapter into CalendarContract; any calendar app reads and writes it |
-| iOS / macOS Calendar | well-known, principal | ctag + etag PROPFIND, `sync-collection` | Picky about `current-user-privilege-set`, `supported-report-set`, `calendar-color` |
-| Thunderbird | direct calendar URL or well-known | ctag, etag | |
-| GNOME Calendar / Evolution | well-known | ctag | Nice to have |
-
-Captured request bodies from each go in `internal/dav/testdata/clients/`
-and are replayed by tests.
-
----
-
-## 6. Android (Decided: a sync adapter; Default: DAVx5 first)
-
-The user wants a sync adapter on Android and does not want to build
-Kotlin/Java. CalDAV read-write (2.1) makes these one answer: **DAVx5**
-(GPLv3, on F-Droid and Play) *is* a CalDAV sync adapter. It registers an
-account and syncs into Android's `CalendarContract`, so the system calendar,
-Google Calendar, Etar, Fossify Calendar or any other app reads and writes
-the family's calendars. No APK is built here.
-
-What agendouille adds on top:
-
-- **QR pairing (M5).** "Add a device" makes a device password and shows a
-  QR code with `davx5://<member>:<device-password>@<host>/dav/` (the DAVx5
-  manual documents this URI). Scanning it opens DAVx5's login with
-  everything filled in.
-- **Instant sync (M7).** DAVx5 4.5+ supports the WebDAV-Push draft over
-  UnifiedPush. agendouille implements the server side, so a change made on
-  one phone reaches the others in seconds instead of at the next periodic
-  sync.
-
-**M8, a custom app, is optional and decided after M5 is in use.** It would
-only add what DAVx5 lacks: one install instead of two, family-specific
-notifications ("Papa added Judo"). If it is built:
-
-- Kotlin is unavoidable for a sync adapter (`AbstractThreadedSyncAdapter`,
-  `AccountAuthenticator`); the code stays small, and the CalDAV side uses
-  `dav4jvm` and `ical4j` (the libraries DAVx5 itself uses).
-- It is **never built on the editing machine and never needs Android
-  Studio**: a Gradle wrapper builds it in a container on dev-build
-  (`rtk docker run ... ./gradlew assembleRelease`) and in GitHub Actions,
-  which signs it and attaches the APK to the release.
-- It speaks CalDAV, like any other client. No private protocol.
+Captured requests from each go in `internal/dav/testdata/clients/`.
 
 ---
 
-## 7. iPhone, macOS, Thunderbird, read-only links
+## 6. Sharing
 
-- **iOS / macOS**: "Add a device" offers a `.mobileconfig` profile with a
-  CalDAV payload (host, port 443, principal URL, member name, device
-  password). Unsigned (Default), so iOS says "unverified", which is fine for
-  a family. The page also lists the manual settings.
-- **Thunderbird**: the page shows the calendar URL, the member name and the
-  device password, and says which menu to use.
-- **Read-only subscription links**: `/ics/<secret>.ics`, the chosen
-  calendars as one `.ics` with `REFRESH-INTERVAL` and `X-PUBLISHED-TTL` of 15 minutes.
-  The secret is 32 random bytes in base64url. Google Calendar polls these
-  links slowly (hours), which the page says.
+Sharing is part of the additional API (CalDAV has no standard for it): the
+web app, in a browser or in our app, shows it; every CalDAV client sees its
+result.
+
+- In the web app, a calendar's **Share** panel lists its shares and offers
+  the users and groups the owner sees, each with `read` or `read-write`.
+- Sharing, changing or removing a share takes effect at once on the server;
+  clients see the calendar appear, turn read-only or disappear at their next
+  sync (or at once with push, M9).
+- Sharees see "shared by Maman" on the calendar and can **hide** it; hiding
+  removes it from their CalDAV home too (so from their phones), and they can
+  show it again.
+- The owner can **transfer** a calendar to another user they see (Default);
+  the new owner gets it, the old one keeps `readwrite` unless they remove it.
+- Removing a user (admin): their calendars must be **transferred** to a user
+  or **deleted**; the admin UI asks, calendar by calendar (it sees names and
+  sizes, not events). Default: there is no "orphan" calendar.
+- Leaving a group (admin removes a user from it): group shares stop
+  applying; user shares to people they no longer see stay (Default: a share
+  once made is the owner's decision; the admin can see and remove it).
 
 ---
 
-## 8. Members, sign-in, first start
+## 7. The Android app (Decided, user: "a sync app with share capabilities + web QR code login")
 
-### 8.1 Signing in (Decided, user: "qrcode login")
+### 7.1 What it is
 
-There is no email. A member signs in to the family app in one of three
-ways:
+```
+┌──────────────────── agendouille.apk ─────────────────────┐
+│ WebView: the family web app, loaded from the server      │
+│          (same TypeScript as in a browser; uses the      │
+│          additional API for sharing, sign-in, devices)   │
+│      ▲  bridge: WebMessagePort, our origin only (7.4)    │
+│      ▼                                                   │
+│ Java, Android framework APIs only:                       │
+│  • Account authenticator (AccountManager)                │
+│  • Device credential in the Android Keystore             │
+│  • Sync adapter: standard CalDAV <-> CalendarContract    │
+│  • Enrolment by App Link / QR (/api/app/*)               │
+│  • Camera permission for the scanner (the scanner is TS) │
+│  • Notifications (M9, UnifiedPush)                       │
+└──────────────────────────────────────────────────────────┘
+```
 
-1. **A sign-in link from an admin.** The admin UI's "Sign-in QR" on a
-   member makes a one-time link, shown as a QR code (and as text to send by
-   message). Scanning it on the member's phone signs that browser in. This
-   is both the **invitation** of a new member and the **lost password**
-   path. Valid 72 hours (Default), single use, revocable, listed on the
-   member's admin page until used.
-2. **A QR from a device already signed in.** `/signin` on a new device (a
-   laptop) shows a QR code; the member scans it with a phone that is signed
-   in to the family app, which asks "Sign in *Firefox on Linux* as Léa?";
-   on yes, the laptop is signed in. The code lives 2 minutes (Default). The
-   same exists the other way round from `/me` ("Sign in another device"),
-   for a phone that cannot scan.
-3. **A password**, if the member chose one (on `/me`, after a QR sign-in).
-   Optional (Default): a child can live without one.
+- **Sync is the same CalDAV as everyone's.** The app is one CalDAV client
+  among others; DAVx5 or another CalDAV app on the same phone, or on the
+  next one, sees exactly the same calendars.
+- **The extras are the additional API**: the WebView shows the family web
+  app (sharing, devices, sign-ins); the Java side only calls `/api/app/*`
+  to enrol and to open the WebView's session.
+- **The server serves the UI**, so app and server cannot drift. The Java
+  side keeps a small, versioned bridge contract (CONTRACTS 6).
 
-Using a sign-in link from an admin does not touch the member's password or
-devices. A member who forgot their password signs in by QR and sets a new
-one, or removes it.
+### 7.2 Enrolment (first sign-in on the phone)
 
-### 8.2 The admin
+1. The admin makes an enrolment link for Léa: `https://<host>/enrol/<token>`,
+   shown as a QR code in the admin UI (and as text, to send by SMS).
+2. Léa scans it with the phone camera. With the app installed, Android's
+   App Link opens it in the app (the server serves
+   `/.well-known/assetlinks.json` with the APK's signing key fingerprint).
+   Without the app, the browser opens a page that offers the APK download
+   (7.6), "set up DAVx5 instead", and "continue in the browser" (a plain
+   web session; iPhone users take this path).
+3. The app `POST`s the token to `/api/app/enrol` with the phone's model; the
+   server makes a device of kind `app` and returns its credential once.
+4. The app stores it in the Keystore, adds the Android account
+   "agendouille (Léa)", turns sync on, and opens the web app signed in.
 
-The admin UI has its own sign-in (`/admin/signin`), with its own session
-cookie, on whichever listener serves it (9.1). Admins sign in there with
-their **password**, which every admin must have, and nothing else
-(Default). No QR approval there: a family-app session on a phone that
-faces the internet must never be enough to open the admin UI.
+The link is single use, valid 72 hours (setting), revocable, and the admin
+UI shows whether it has been used.
 
-### 8.3 Lifecycle
+### 7.3 Sync adapter (M7)
 
-- **Add** (admin UI or `agendouille member add <name> [--admin]`): name,
-  display name, colour, role, and the access on each calendar (pre-filled
-  from each calendar's default access). Shows the first sign-in QR.
-- **Disable / enable**: a disabled member's sessions, devices and links stop
-  working until enabled; nothing is deleted.
-- **Remove**: keeps their events (the calendars are shared) and shows them
-  as "former member"; revokes devices, sessions and links. The name stays
-  taken.
-- **Make admin / remove admin**: the last admin cannot be demoted, disabled
-  or removed.
-- `agendouille member passwd <name>` sets a password from a shell on the
-  server, no old password needed, and `agendouille member signin <name>`
-  prints a sign-in link: the recovery paths when no admin can sign in.
+- **Scope**: `VEVENT` only, the calendars in the user's CalDAV home. Each
+  becomes an Android calendar (name, colour, read-only flag from
+  `current-user-privilege-set`). The user can untick calendars on the phone
+  (stored locally) or hide them for all devices in the web app.
+- **Protocol**: plain CalDAV with `sync-collection`, then `calendar-multiget`
+  for changed objects; `PUT`/`DELETE` with `If-Match` for local changes;
+  `MKCALENDAR` when the user creates a calendar from the app. Exactly what
+  DAVx5 does; nothing the server offers only to us.
+  `HttpURLConnection` and `XmlPullParser` (both in the framework).
+- **Mapping** iCalendar <-> `CalendarContract` (the hard part, and the part
+  most tests go to):
+  - `Events`: `DTSTART`, `DTEND`/`DURATION`, `EVENT_TIMEZONE`, `ALL_DAY`,
+    `RRULE`, `RDATE`, `EXDATE`, `TITLE`, `EVENT_LOCATION`, `DESCRIPTION`,
+    `STATUS`, `AVAILABILITY`.
+  - Overrides: rows with `ORIGINAL_SYNC_ID` and `ORIGINAL_INSTANCE_TIME`.
+  - `Reminders` from `VALARM` (display alarms, relative triggers).
+  - `Attendees` are read-only on the phone (no scheduling).
+  - **The original iCalendar text is kept** (in a sync column) and patched
+    on upload, so properties the phone does not know survive, the same rule
+    as the web app's (4.6).
+- **iCalendar parsing in Java**: an in-house parser for the subset above
+  (Default; ical4j needs Java 11 APIs, desugaring and several libraries,
+  which the no-Gradle build cannot take). Pure Java, no Android types, so it
+  is unit-tested on the JVM against the same fixtures as `internal/ical`
+  (`testdata/ical/`).
+- **When**: on local change (Android's content-change trigger), every
+  `sync_interval` (Default 30 min, the user can change it), on "Sync now",
+  and on push (M9).
+- **Conflicts**: on `412` the server's version wins; the local change is
+  re-applied on top when it touched different fields, else dropped with a
+  notification (Default).
+- DAVx5's mapping code ("synctools") is GPLv3 and is **not** used, so the
+  app's licence stays the project's choice (open question 6).
 
-### 8.4 First start
+### 7.4 The bridge
 
-With no member at all, `serve` refuses to start on any address and says to
-run `agendouille member add <you> --admin`, which asks for a password (the
-admin needs one, 8.2) and makes the `famille` calendar with read-write
-access for that admin.
+- The WebView loads only the family web app's origin; any other navigation
+  opens the system browser (`shouldOverrideUrlLoading`).
+- The page and Java talk over a `WebMessagePort` the app posts with
+  `postWebMessage` targeted at our origin (framework API, Android 6+), never
+  `addJavascriptInterface`. Messages are JSON (CONTRACTS 6).
+- Calls: `hello` (versions), `scan` (opens the in-page scanner with the
+  camera permission granted), `sync.status`, `sync.now`, `davx5.handoff`,
+  `account.remove`.
+
+### 7.5 Requirements (Default)
+
+`minSdkVersion` 26 (Android 8), `targetSdkVersion` the current one. No
+Google Play services.
+
+### 7.6 Distribution
+
+- CI builds and signs the APK on a `v*` tag and attaches it to the release;
+  the release key is a CI secret and a backup on the home server, never in
+  git.
+- The server embeds the APK of its own version and serves it at
+  `/app/agendouille.apk`, with its SHA-256 on the download page. The app
+  compares its version with the server's at start and offers the update
+  (Android asks the user to allow installs from the app once).
+- F-Droid and Play: not now.
+
+---
+
+## 8. Signing in (Decided, user: no passwords, no email, any platform)
+
+### 8.1 First device: the admin's enrolment link
+
+Section 7.2. Opened in a browser instead of the app, it signs that browser
+in. It is the only step that needs the admin: once per user, and after
+losing every device.
+
+### 8.2 Any browser: approval from a signed-in device
+
+Works in every browser on every system, with nothing installed and nothing
+outside.
+
+1. The browser opens `/signin`. It shows a **QR code**, a **short code**
+   (`KQ4-7XM`) and a **number** (`42`), and waits.
+2. On any device already signed in (usually the phone, in the app) the user
+   taps **Scan**, or opens "Approve a sign-in" in the web app and types the
+   short code (for screens a camera cannot read, and to approve from a
+   computer).
+3. The approving device shows: "Sign in **Firefox on Linux**, from
+   192.168.1.20, as Léa?" and three numbers; the user picks the one the
+   browser shows (`42`). A wrong pick cancels the request.
+4. The waiting browser is signed in within a second.
+
+Codes live **2 minutes**, are single use, and are rate limited per IP.
+Number matching stops an attacker who shows our QR on their own page from
+getting a blind "yes". The scanner is TypeScript (`BarcodeDetector`, else
+`jsqr`), so the same approval works from an iPhone's browser.
+
+### 8.3 The app's WebView
+
+The app trades its device credential for a web session
+(`POST /api/app/session`, CONTRACTS 2.2), so the WebView is always signed
+in while the device is valid. Revoking the device ends that session.
+
+### 8.4 Sync credentials
+
+- One per device, 20 random bytes, `agd_` + base32 in groups, stored as
+  SHA-256. `last_used_at`, `last_ip`, client user agent kept and shown.
+- Never typed: our app receives it at enrolment; DAVx5 gets it through the
+  `davx5://` link (a button in the web app on the phone, or a QR on a
+  computer); iPhones through a `.mobileconfig`; Thunderbird through a copy
+  button.
+- They open CalDAV only (and, for kind `app`, `/api/app/session`).
+
+### 8.5 Sessions and recovery
+
+- Web sessions: 90 days, renewed on use (setting). Each user sees their
+  devices and browsers in the web app ("Signed in") and can revoke any; the
+  admin sees and revokes them in the admin UI.
+- Lost phone, another device still signed in: approve the new phone's
+  browser from it, then enrol the app with a link the user makes for
+  themselves (Default: a signed-in user can make an enrolment link for
+  themselves, 10 minutes, shown as a QR), revoke the old phone.
+- Every device lost: the admin makes a new enrolment link.
+
+### 8.6 Passkeys (optional, M10)
+
+After signing in, a device may add a passkey (fingerprint, Face ID, Windows
+Hello, a security key) to sign in again on that device without approval.
+Optional because Linux browsers and TVs often have no authenticator, and
+because the browsers' own cross-device passkey flow goes through Google's
+or Apple's relays; approval (8.2) is what always works.
+
+### 8.7 The admin
+
+The admin signs in at `/admin/signin` on the admin listener with its
+password (argon2id), nothing else: no approval, so a phone session on the
+internet side can never reach the admin UI. Admin sessions last 12 hours
+(Default).
+
+---
 
 ## 9. Web frontend
 
-### 9.1 Two UIs and three surfaces (Decided, user: the DMZ split)
+### 9.1 Two UIs, three surfaces (Decided, user: the DMZ split)
 
-CalDAV faces the internet from a DMZ, and the admin UI must be able to stay
-off it. agendouille serves three **surfaces**, and each listener in the
-config (section 11) serves some of them:
-
-| Surface | What | Typically |
+| Surface | What | Where (Default layout) |
 |---|---|---|
-| `dav` | `/.well-known/caldav`, `/dav/`, `/ics/` | DMZ, through the proxy |
-| `app` | the **family app**: calendar, my devices, me, sign-in, `/api/*`, `/api/live`, `static/app/` | DMZ, through the proxy |
-| `admin` | the **admin UI**: `/admin/*`, `/api/admin/*`, `static/admin/` | LAN only |
+| `dav` | `/.well-known/caldav`, `/dav/`, `/ics/` | public listener, behind the DMZ proxy |
+| `app` | the family web app and the additional API: pages, `/api/*`, `/api/app/*`, `/api/live`, `/enrol/`, `/app/agendouille.apk`, `/.well-known/assetlinks.json`, `static/app/` | public listener |
+| `admin` | the admin UI: `/admin/*`, `/api/admin/*`, `static/admin/` | admin listener, LAN only |
 
-- A surface is served by **exactly one** listener (its absolute URLs come
-  from that listener's `public_url`). Paths of a surface that a listener
-  does not serve answer `404`, so the proxy can forward a whole port without
-  path rules.
-- With one listener (the default, `127.0.0.1:8791`) all three are on it.
-  `serve` logs a warning when `admin` shares a non-loopback listener with
-  `dav` (Default: allowed, for a LAN-only install).
-- **Two bundles.** Vite builds `src/app/main.ts` into `static/app/app.js` and
-  `src/admin/main.ts` into `static/admin/admin.js`, sharing `src/shared/`.
-  The admin code is never served on the DMZ.
-- **Separate sessions.** The family app's cookie is `agd_app`, the admin
-  UI's `agd_admin`, each bound to its surface and checked against its
-  listener's origin. Being signed in to one never signs in to the other.
-- The admin UI needs the family app's and CalDAV's public URLs (for QR
-  codes and profiles); it reads them from the config, not from the request.
+- Each surface is served by exactly one listener; elsewhere its paths are
+  `404`. `/healthz` is on every listener.
+- **Two bundles** (`app.js`, `admin.js`) sharing `src/shared/`; the admin
+  code is never served on the public listener.
+- **Separate cookies**: `agd_app` and `agd_admin`.
+- Absolute URLs (DAV hrefs, QR codes, profiles, App Links) come from the
+  serving listener's `public_url` (a setting), never from `Host`.
 
 ### 9.2 Principles (Decided, as cafard)
 
-- Plain TypeScript classes on the DOM, no framework. No HTML sinks
-  (`innerHTML` and friends) in `src/`; the CI grep from cafard
-  (`scripts/check-sinks.sh`) runs here too. Event titles come from every
-  family member's phone, so all text goes through `textContent`.
-- Go serves an HTML shell per page (`layout_app.html`, `layout_admin.html`);
-  the bundle renders the rest. Sign-in, choosing a password and the admin's
-  forms work without the bundle; the calendar needs it.
-- The family app is phone first. The admin UI is desktop first but usable
-  on a phone.
+- Plain TypeScript classes on the DOM, no framework. **No HTML sinks** in
+  `src/` (cafard's `scripts/check-sinks.sh` in CI): titles come from every
+  family member's phone.
+- Go serves an HTML shell per page; the bundle renders the rest. Sign-in
+  and the admin's forms work without the bundle.
+- The family web app is **phone first** (it is also the Android app's UI).
+  The admin UI is desktop first.
 
-### 9.3 The family app (surface `app`, every member)
+### 9.3 The family web app (surface `app`)
 
 | Path | Page |
 |---|---|
-| `/signin` | Password form, and the QR to scan from a signed-in phone (8.1) |
-| `/login/<token>` | Landing of a sign-in link: confirm, then signed in |
-| `/approve/<code>` | On the signed-in phone: approve another device's sign-in |
+| `/signin` | The approval screen (8.2) |
+| `/enrol/<token>` | First sign-in (7.2): opens the app, else offers the APK, DAVx5 or the browser |
 | `/` | The calendar: agenda (phone default), week, month |
-| `/devices` | My devices and subscription links; add one (QR, profile, manual settings); revoke |
-| `/me` | Display name, colour, password (set, change, remove), my sessions (sign out others), "sign in another device" |
+| `/calendars` | My calendars and the ones shared with me: create, rename, colour, share, transfer, hide, delete, import, export |
+| `/approve` | Approve a sign-in: scanner and short-code field |
+| `/devices` | Sync devices: add (our app, DAVx5, iPhone, Thunderbird, subscription link), revoke; signed-in browsers: revoke |
+| `/me` | Display name, colour, groups (read only), "Enrol another phone" |
 
-What a member does **not** see: other members' devices, sessions or links;
-calendars they have `none` on; anything about access rules beyond "read
-only" on a calendar they cannot write.
-
-### 9.4 The calendar views (Default)
-
-- **Calendars list** (side panel on wide screens, a sheet on phones): every
-  calendar the member may read, with its colour, a show/hide switch (kept
-  per member, on the server) and a lock on read-only ones.
-- **Agenda**: a scrolling list of days with their events, today on top,
-  infinite scroll both ways. Default on narrow screens.
-- **Week**: seven columns, an all-day strip, hours on the side, the current
-  time line. Default on wide screens.
-- **Month**: a grid with up to three events per day and "+n".
-- Event colour: **its calendar's**; the creator's initial in the creator's
-  colour on the event.
-- Tap an event: a detail sheet (calendar, when, where, notes, recurrence in
-  words, "added by", "changed by"), with Edit and Delete if the calendar is
-  writable.
-- Tap an empty slot (week) or a day (month, agenda's "+"): the editor.
-- **Editor**: calendar (writable ones only; the last used is preselected),
-  title, all-day, start, end, location, notes, repeat (none, daily, weekly
-  on chosen days, monthly by date, yearly; until a date or a count).
-  Recurring events ask for the scope (4.6) on save and delete. Changing the
-  calendar moves the event (all occurrences).
-- **Live**: the bundle listens on `/api/live` (SSE). A `changed` event on a
-  shown calendar reloads the visible range; an `access` event reloads the
+**The calendar views** (Default):
+- **Calendars list** (side panel on wide screens, a sheet on phones): own
+  and shared calendars, colours, show/hide, a lock on read-only ones,
+  "shared by …".
+- **Agenda** (default on phones), **week** (default on wide screens),
+  **month**. Event colour: its calendar's; creator's initial on the event.
+- **Detail sheet**: calendar, when, where, notes, recurrence in words,
+  added by, changed by; Edit and Delete if writable.
+- **Editor**: calendar (writable ones), title, all-day, start, end,
+  location, notes, repeat (none, daily, weekly on days, monthly by date,
+  yearly; until a date or a count); scope dialog for recurring events;
+  changing the calendar moves the event.
+- **Live**: SSE `changed` reloads the visible range; `access` reloads the
   calendars list.
-- **Conflicts**: saves send the etag they started from; a `412` reloads the
-  event and says "changed meanwhile by <member>", and keeps the form.
+- **Conflicts**: `412` reloads the event, says "changed meanwhile by
+  <user>", keeps the form.
 
-### 9.5 The admin UI (surface `admin`, admins only)
+### 9.4 The admin UI (surface `admin`)
 
 | Path | Page |
 |---|---|
-| `/admin/signin` | Password only (8.2) |
-| `/admin` | Overview: members, calendars, devices that have not synced for a week, last backup, version, warnings (an admin without a password, the admin surface on the DMZ) |
-| `/admin/members` | The list: name, role, calendars, devices, last seen; "Add member" |
-| `/admin/members/<name>` | Profile and role; **access on each calendar** (none / read / read-write); devices (revoke); sessions (end); sign-in links (make a QR, revoke); disable, enable, remove |
-| `/admin/calendars` | The list: colour, name, slug, events, members with access; "New calendar" |
-| `/admin/calendars/<slug>` | Name, colour, zone, description, default access; **the access of every member** on it; import an `.ics`; export; archive (hidden from every client, kept) and delete (after archive, typing the slug) |
-| `/admin/activity` | Every change, newest first: when, who, through which device or the web, calendar, event title, created / changed / deleted. Filter by member, calendar, device |
-| `/admin/system` | Backups (list, download, back up now), the effective listeners and URLs, version |
+| `/admin/signin` | Password |
+| `/admin` | Overview: users, groups, calendars, devices not synced for a week, storage used, last backup, version, warnings (no public listener yet, the admin surface on a public listener, a backup older than two days) |
+| `/admin/users` | List: name, groups, calendars owned, devices, last seen. "Add user" |
+| `/admin/users/<name>` | Profile, groups; **enrolment QR** (make, show, revoke, used or not); devices and browsers (revoke); calendars owned and shared with them (names, counts, sizes); disable, enable; remove (with the transfer-or-delete step, 6) |
+| `/admin/groups` | Groups: name, colour, members; add, rename, delete (a group with shares asks first) |
+| `/admin/calendars` | Every calendar: owner, name, events, size, shares. **No events.** The admin can remove a share, transfer a calendar, delete one (typing its name) |
+| `/admin/activity` | Who did what, without event titles: "Léa created an event in maman~ecole from Pixel 8", "Maman shared École with Enfants", admin actions |
+| `/admin/settings` | Every setting of 11.2, grouped: Network, Storage and backups, Limits, Defaults. Applied live |
+| `/admin/backups` | List, download, back up now, restore (13.6) |
 
-The two access editors (by member, by calendar) are two views of the same
-table, so the admin can think "what can Léa do" or "who sees École".
-Every admin action is in the activity log too (`admin` kind rows).
-
-### 9.6 TypeScript layout (Default, as cafard)
+### 9.5 TypeScript layout (Default, as cafard)
 
 ```
 src/
-  shared/
-    core/          Api (fetch, JSON, errors, etag), Live (SSE, reconnect),
-                   Clock, Dates (zone-aware arithmetic in the family zone)
-    render/        DOM helpers (h(), text(); no HTML strings)
-    components/    Dialog, Sheet, QrPanel, ColorPicker, MemberChip, Toast
-    model/         Member, Calendar, Access
-  app/
-    main.ts        boot: read the page id, mount the page class
-    pages/         CalendarPage, DevicesPage, MePage, SigninPage, ApprovePage
-    components/    CalendarList, AgendaView, WeekView, MonthView, EventSheet,
-                   EventEditor, RecurrencePicker, ScopeDialog
-    model/         Event, Occurrence, Range, Recurrence (rule <-> words)
-  admin/
-    main.ts
-    pages/         OverviewPage, MembersPage, MemberPage, CalendarsPage,
-                   CalendarPage, ActivityPage, SystemPage
-    components/    AccessMatrix, ActivityTable, SigninLinkPanel
+  shared/  core/ (Api, Live, Dates, Bridge), render/, components/ (Dialog,
+           Sheet, QrImage, Scanner, ColorPicker, UserChip), model/
+  app/     main.ts, pages/ (Calendar, Calendars, Approve, Devices, Me,
+           Signin, Enrol), components/ (CalendarList, AgendaView, WeekView,
+           MonthView, EventSheet, EventEditor, RecurrencePicker, ScopeDialog,
+           SharePanel), model/ (Event, Occurrence, Recurrence)
+  admin/   main.ts, pages/ (Overview, Users, User, Groups, Calendars,
+           Activity, Settings, Backups), components/
 ```
 
-`src/app` and `src/admin` may import `src/shared`, never each other (a
-vitest test walks the imports). Time arithmetic in the browser is in the
-family zone; `Intl` gives offsets for a named zone and `shared/core/Dates`
-wraps that (no date library, Default). The server sends occurrences already
-expanded (CONTRACTS 3.2), so the browser never expands recurrence; the
-`Recurrence` model only turns a rule into words and the editor's fields
-back into a rule.
+`src/app` and `src/admin` import `src/shared`, never each other (a test
+checks). `shared/core/Bridge` is the page side of CONTRACTS 6: it detects the
+app (a port arrives) and degrades to plain web features without it.
 
-### 9.7 Look (Default)
+### 9.6 Look (Default)
 
-Material 3 roles and the dark block from cafard's `app.css`, shared by both
-UIs; the admin UI has a distinct top bar colour so nobody mistakes it for
-the family app. Member and calendar colours are picked from a fixed palette
-of twelve that read in light and dark (cafard's `scripts/palette.py`
-checks contrast; reuse it).
+Material 3 roles and the dark block from cafard's `app.css`; the admin UI
+has a distinct top bar colour. User, group and calendar colours come from a
+fixed palette of twelve checked for contrast (cafard's
+`scripts/palette.py`).
 
-## 10. Security (Decided: reachable from the internet)
+---
 
-The server sits behind a reverse proxy on the internet, holds a family's
-whereabouts, and has children among its users. Everything here is in v1.
+## 10. Security (Decided: the public side faces the internet)
 
-### Passwords, sign-in links, devices
-
-- Member passwords: argon2id (time 2, memory 64 MiB, threads 1; Default),
-  at least 10 characters, checked against a short embedded list of common
-  passwords. Optional for members, required for admins (8.2). Used only by
-  `/signin` and `/admin/signin`.
-- Sign-in links: 32 random bytes in base64url, stored hashed, single use,
-  72 hours. Approval codes (8.1.2): 32 random bytes, 2 minutes, family app
-  only, and the approving phone is shown the new device's user agent and IP
-  before it says yes.
-- Device passwords: 20 random bytes, shown once as `agd_` + base32 in
-  groups (`agd_xxxx-xxxx-...`), easy to type into Thunderbird. Stored as
-  SHA-256 (enough for a 160-bit random secret; no argon2 on every CalDAV
-  request). `last_used_at` and `last_ip` are kept and shown.
-- CalDAV accepts `Basic <member>:<device password>` only. A member's
-  password on CalDAV is refused with a log line that says to add a device.
-
-### Sessions and CSRF
-
-- Cookies `agd_app` and `agd_admin` (9.1): 32 random bytes, stored hashed
-  with their surface, `HttpOnly`, `Secure` when the listener's `public_url`
-  is https, `SameSite=Lax`. The app's last 30 days sliding, the admin's 12
-  hours (Default). Changing or removing a password ends the member's other
-  sessions.
-- State-changing web requests need `Sec-Fetch-Site: same-origin` or an
-  `Origin` equal to the listener's `public_url` (cafard's check). `/dav/`
-  is exempt (Basic auth, no cookies are accepted there).
-
-### Rate limits and lockout
-
-- Failed sign-ins and failed Basic auths are counted per client IP and per
-  member name: 10 per 15 minutes, then `429` with `Retry-After` (Default).
-  A CalDAV client that keeps retrying a revoked password does not lock out
-  the member's web sign-in: device failures and web failures are counted
-  apart.
-- The client IP is the TCP peer, or the last hop of `X-Forwarded-For` when
-  the peer is in `trusted_proxies`. With no trusted proxies, forwarded
-  headers are ignored.
-
-### Exposure guard
-
-- `serve` refuses a non-loopback listener without `public_url`, and a
-  `public_url` that is not `https://` unless that listener has
-  `allow_insecure: true` (for a LAN-only admin listener).
-- Each surface takes its absolute URLs (DAV hrefs, sync token namespace, QR
-  codes, profiles) from the `public_url` of the listener that serves it.
-
-### Other rules
-
-- Responses carry `Content-Security-Policy: default-src 'self'` (no inline
-  script), `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
-  `frame-ancestors 'none'`.
-- Subscription links and invitation tokens are compared in constant time
-  and logged by id, never by value. Access logs redact `/ics/<secret>`.
-- XML bodies on `/dav/` are capped (Default 1 MiB) and parsed with
-  `encoding/xml`, which does not resolve external entities.
+- **Admin password**: argon2id (time 2, memory 64 MiB), at least 12
+  characters. Set by `agendouille admin passwd` (install.sh runs it with
+  `--random` and prints the password once in the installer's terminal,
+  never in a log). `serve` refuses to start without one.
+- **Secrets** (enrolment tokens, approval codes, device credentials,
+  session ids, subscription secrets): from `crypto/rand`, stored as SHA-256,
+  compared in constant time, logged by id only. Access logs redact
+  `/enrol/…`, `/ics/…` and `/api/app/*` bodies.
+- **Cookies**: `HttpOnly`, `Secure` when the listener's URL is https,
+  `SameSite=Lax`, one per surface.
+- **CSRF**: state-changing web requests need `Sec-Fetch-Site: same-origin`
+  or an `Origin` equal to the listener's `public_url`. `/dav/` and
+  `/api/app/*` (bearer credentials, no cookies) are exempt.
+- **Rate limits** (settings): failed device credentials, approvals,
+  enrolments and admin sign-ins, per client IP and per account, counted
+  apart (a phone retrying a revoked credential does not lock its user out
+  of approvals). `429` with `Retry-After`.
+- **Client IP**: the TCP peer, or the last hop of `X-Forwarded-For` from a
+  peer in `trusted_proxies`.
+- **Exposure guard**: a non-loopback listener needs a `public_url`; an
+  `http://` `public_url` needs `allow_insecure` on that listener (meant for
+  the LAN-only admin listener). `serve` warns when `admin` shares a listener
+  with `dav`.
+- **Privacy from the admin** (Decided, user): no admin route returns
+  `objects.data`, a summary or a location; the activity log keeps event
+  titles only for the users' own history, and the admin's view of it drops
+  them. A test pins every `/api/admin` answer against that. The admin can
+  still read the database file on the server; this is a promise of the UI,
+  not encryption (said in the README).
+- **Headers**: `Content-Security-Policy: default-src 'self'` (no inline
+  script), `nosniff`, `Referrer-Policy: same-origin`, `frame-ancestors
+  'none'`.
+- **XML** on `/dav/`: bodies capped (1 MiB), `encoding/xml` (no external
+  entities).
+- **The app**: the WebView loads only our origin, the bridge is a
+  `WebMessagePort` bound to it, the credential is in the Keystore, cleartext
+  traffic is off.
 
 ---
 
 ## 11. Configuration
 
-YAML at `/etc/agendouille.yaml` (or `-config`, or `AGENDOUILLE_CONFIG`);
-scalar keys also as flags and environment variables, file < env < flag,
-lists are file-only, unknown keys are errors (as cafard).
+### 11.1 Bootstrap file (Decided: only what the server needs before the database)
+
+`/etc/agendouille.yaml` (or `-config`, `AGENDOUILLE_CONFIG`); keys also as
+flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 
 | Key | Default | Notes |
 |---|---|---|
-| `data_dir` | `/var/lib/agendouille` | `agendouille.db`, `backups/` |
-| `listeners` | one: `127.0.0.1:8791`, all surfaces | File only; see below |
-| `trusted_proxies` | `[]` | CIDRs whose `X-Forwarded-For` is believed (file only) |
-| `timezone` | `Europe/Paris` | The family zone; default zone of new calendars |
+| `data_dir` | `/var/lib/agendouille` | database, backups |
+| `admin_listen` | `127.0.0.1:8792` | The admin UI. Never changed from the UI, so a mistake there cannot lock the admin out |
+| `admin_public_url` | `http://<admin_listen>` | |
+| `admin_allow_insecure` | `true` when `admin_public_url` is `http://` on a private address | |
 | `log_level` | `info` | |
-| `max_object_bytes` | `262144` | |
-| `sync_token_retention` | `180d` | |
-| `backup_keep` | `14` | Daily snapshots kept (section 12.5) |
 
-The DMZ layout:
+### 11.2 Settings (in the database, edited in the admin UI, applied live)
 
-```yaml
-listeners:
-  - listen: 0.0.0.0:8791             # the proxy in the DMZ forwards here
-    public_url: https://agenda.example.org
-    serve: [dav, app]
-  - listen: 10.0.50.30:8792          # LAN only, never forwarded
-    public_url: http://agenda.lan:8792
-    allow_insecure: true
-    serve: [admin]
-```
+| Group | Setting | Default |
+|---|---|---|
+| Network | `public_listen` (CalDAV + family web app) | none: the public surfaces are off until set |
+| | `public_url` | none; required with `public_listen` |
+| | `public_allow_insecure` | `false` |
+| | `trusted_proxies` | `[]` |
+| Storage and backups | `backup_schedule` (daily at) | `03:30` |
+| | `backup_keep` | 14 |
+| | `sync_token_retention` | 180 days |
+| | `max_object_bytes` | 256 KiB |
+| Limits | `max_calendars_per_user` | 50 |
+| | `max_events_per_calendar` | 50 000 |
+| | `max_devices_per_user` | 20 |
+| | `rate_limit_failures` (per 15 min) | 10 |
+| Defaults | `family_timezone` | `Europe/Paris` |
+| | `palette` | the twelve colours |
+| | `enrolment_link_ttl` | 72 h |
+| | `session_ttl` | 90 days |
+| | `app_sync_interval` | 30 min |
 
-`http_listen` and `public_url` as flags or environment variables
-(`AGENDOUILLE_HTTP_LISTEN`, `AGENDOUILLE_PUBLIC_URL`) set a single listener
-serving all surfaces, for tests and quick starts; with `listeners` in the
-file they are an error.
-
-## 12. Build, CI, release, deployment (Decided: as cafard)
-
-### 12.1 Where things run
-
-- The editing machine (dev-code) edits, runs `npm` checks, commits and
-  pushes. **It never builds Go binaries or Android apps.**
-- dev-build (`guillaume@10.0.50.21`) runs `go build`, `go vet`,
-  `go test -race`, through `scripts/remote.sh` and `rtk`.
-- CI builds the releases on a `v*` tag.
-
-### 12.2 `scripts/remote.sh`
-
-Copied from cafard, `REMOTE_DIR=agendouille`. With no argument: `gofmt -l`,
-`go build ./...`, `go vet ./...`, `go test -race ./...`.
-
-### 12.3 CI and release
-
-cafard's two workflows, minus the Windows targets: linux amd64, arm64,
-armv7.
-
-### 12.4 Deployment (`deploy/`)
-
-cafard's `install.sh`, hardened systemd unit, OpenRC script and LXC
-drop-in, renamed. Plus:
-
-- `Caddyfile.example` and `nginx.conf.example`. The nginx one must pass
-  `PROPFIND`, `REPORT`, `PROPPATCH`, `OPTIONS` and the `Depth`, `If-Match`,
-  `If-None-Match`, `Authorization` headers, must not buffer `/api/live`,
-  and must answer `/.well-known/caldav` on the bare host. Both forward
-  only the DMZ listener's port; the examples say so in a comment.
-- `deploy/README.md`: proxy, DNS, first member, backups, upgrading.
-
-### 12.5 Backups
-
-`serve` writes `VACUUM INTO data_dir/backups/agendouille-YYYY-MM-DD.db`
-once a day and keeps `backup_keep` of them. `agendouille backup <file>` does
-one now; `agendouille export <calendar> > famille.ics` writes a calendar as one
-`.ics` that any calendar program imports.
-
-### 12.6 `scripts/devdeploy.sh`
-
-cafard's: build on dev-build, copy the binary to the host that runs it,
-restart the service.
+- Changing `public_listen` or `public_url` rebinds the public listener
+  without a restart (the old one drains for 10 s). The page says that
+  phones keep their URL, so changing `public_url` means re-enrolling them
+  (and App Links follow the new host only with an APK that knows it: open
+  question 3).
+- Every change is in the admin activity log with old and new values.
+- `agendouille config` prints the effective bootstrap and settings;
+  `agendouille config set <key> <value>` changes a setting from a shell.
 
 ---
 
-## 13. Reference files to copy from
+## 12. Commands
+
+| Command | Does |
+|---|---|
+| `serve` | Run |
+| `config [set k v]` | Print or change (11) |
+| `admin passwd [--random]` | Set the admin password |
+| `user add <name> [--group g]...`, `user enrol <name>` (prints a link and a QR in the terminal), `user list`, `user disable\|enable\|remove` | |
+| `group add\|list\|remove`, `group member add\|remove` | |
+| `backup [file]`, `restore <file>` (server stopped) | |
+| `import <user>~<slug> <file.ics>`, `export <user>~<slug>` | |
+| `version` | |
+
+---
+
+## 13. Build, CI, release, deployment (Decided: as cafard)
+
+### 13.1 Where things run
+
+- dev-code edits, runs `npm` checks, commits, pushes. **It never builds Go
+  binaries or the APK.**
+- dev-build (`guillaume@10.0.50.21`) runs Go checks through
+  `scripts/remote.sh`, and the Android build through `scripts/android.sh`,
+  both through `rtk`.
+- CI builds releases on `v*` tags.
+
+### 13.2 `scripts/remote.sh`
+
+From cafard, `REMOTE_DIR=agendouille`: `gofmt -l`, `go build`, `go vet`,
+`go test -race`.
+
+### 13.3 CI and release
+
+cafard's workflows minus Windows, plus an `android` job (the same container
+as 13.5) that runs the JVM tests and builds the APK; the release signs it
+with the CI secret key and the Go build embeds it.
+
+### 13.4 Deployment (`deploy/`)
+
+cafard's `install.sh`, hardened systemd unit, OpenRC, LXC drop-in, renamed;
+`install.sh` sets the admin password (`--random`, printed once). Plus:
+
+- `Caddyfile.example`, `nginx.conf.example` for the DMZ proxy: forward only
+  the public listener; pass `PROPFIND`, `REPORT`, `PROPPATCH`, `MKCALENDAR`,
+  `MKCOL`, `OPTIONS` and the `Depth`, `If-Match`, `If-None-Match`,
+  `Authorization` headers; do not buffer `/api/live`; answer
+  `/.well-known/caldav` and `/.well-known/assetlinks.json` on the bare host.
+- `deploy/README.md`: DMZ and LAN layout, DNS, certificates, first start,
+  backups, upgrading, the per-milestone client checklist.
+
+### 13.5 The Android build (Decided: no Gradle, no Kotlin, no Android Studio)
+
+- `android/docker/Dockerfile`: a JDK, Android `build-tools` (`aapt2`, `d8`,
+  `zipalign`, `apksigner`) and one `platforms;android-NN` (`android.jar`),
+  fetched by `sdkmanager` at image build. A few hundred MB, on dev-build
+  and in CI only.
+- `android/Makefile`: `aapt2 compile/link` -> `javac --release 17 -cp
+  android.jar` -> `d8` -> zip -> `zipalign` -> `apksigner`. `make test` runs
+  JUnit on the pure Java packages. Plain `.jar` libraries only, in
+  `android/libs/` with their checksums (JUnit for tests; none at run time,
+  Default).
+- `scripts/android.sh`: rsync `android/` to dev-build and run `rtk docker
+  run … make <target>` there. Debug builds are signed with a debug key kept
+  on dev-build.
+
+### 13.6 Backups
+
+`serve` writes `VACUUM INTO data_dir/backups/agendouille-YYYY-MM-DD.db` on
+`backup_schedule` and keeps `backup_keep`. The admin UI lists, downloads and
+makes backups, and **restores** one: the server stops serving writes,
+swaps the database file, reopens it and resumes (a copy of the current one
+is kept as `before-restore-<time>.db`). `agendouille restore` does the same
+with the server stopped.
+
+### 13.7 `scripts/devdeploy.sh`
+
+cafard's: build on dev-build, copy the binary to the home server, restart.
+
+---
+
+## 14. Reference files to copy from
 
 | Need | Copy from |
 |---|---|
 | `remote.sh`, `rsync-excludes`, `devdeploy.sh` | `~/misc/cafard/scripts/` |
 | `install.sh`, unit, OpenRC, container drop-in | `~/misc/cafard/deploy/` |
+| Password printed once at install, settings in the DB, admin UI tone | `~/misc/claudication/` (`deploy/install.sh`, `internal/service/settings`) |
 | CI, release | `~/misc/cafard/.github/workflows/` (drop Windows) |
-| Vite, tsconfig, vitest, embed placeholder, `bundleBuilt` | `~/misc/cafard/{vite,vitest}.config.ts`, `tsconfig.json`, `internal/web/assets/` |
-| `main.go` shape, config loading (file < env < flag, unknown keys fail) | `~/misc/cafard/cmd/cafard/`, `internal/config/` |
+| Vite, tsconfig, vitest, embed placeholder, `bundleBuilt` | `~/misc/cafard/` |
+| `main.go` shape, bootstrap config loading | `~/misc/cafard/cmd/cafard/`, `internal/config/` |
 | Migrations runner | `~/misc/cafard/internal/store/` |
 | Same-origin check, rate limiter | `~/misc/cafard/internal/auth/`, `internal/ratelimit/` |
-| SSE | `~/misc/cafard/internal/web/` (its SSE handler), `src/core/` |
-| TS class style, `render/` helpers, sinks check | `~/misc/cafard/src/`, `scripts/check-sinks.sh` |
-| CSS (roles, dark block), palette check | `~/misc/cafard/internal/web/assets/static/app.css`, `scripts/palette.py` |
-| AGENTS.md tone | `~/misc/cafard/AGENTS.md` |
+| SSE | `~/misc/cafard/internal/web/`, `src/core/` |
+| Package import rules test | `~/misc/claudication/internal/arch/` |
+| TS class style, `render/`, sinks check | `~/misc/cafard/src/`, `scripts/check-sinks.sh` |
+| CSS, palette check | `~/misc/cafard/internal/web/assets/static/app.css`, `scripts/palette.py` |
 
 ---
 
-## 14. Milestones
+## 15. Milestones
 
-Each milestone ends with code, tests, an updated `README.md` and
-`AGENTS.md`, and its "Done when" check passing on dev-build.
+Each milestone ends with code, tests, updated `README.md` and `AGENTS.md`,
+and its "Done when" passing on dev-build (and in the Android container for
+M6, M7).
 
-**M0. Skeleton and pipeline**
-- `go mod init github.com/nebuloss/agendouille`; `cmd/agendouille` with
-  `serve`, `config`, `version`; config loading; slog; `/healthz`; graceful
-  shutdown; the exposure guard.
-- `package.json`, `tsconfig.json`, Vite and vitest configs, `src/main.ts`,
-  `App.ts`, `core/` with tests, the embed placeholder, `bundleBuilt`.
-- `scripts/remote.sh`, CI and release workflows, `.gitignore`.
+**M0. Skeleton**
+- `cmd/agendouille` (`serve`, `config`, `version`), bootstrap config, slog,
+  `/healthz`, graceful shutdown; `package.json`, Vite with two entries,
+  vitest, `src/shared/core` with tests, embed placeholders, `bundleBuilt`;
+  `remote.sh`, CI, release, `.gitignore`.
 - *Done when:* `scripts/remote.sh` passes, `npm run typecheck && npm test &&
   npm run build` passes, `agendouille version` prints `dev`.
 
-**M1. Store, members, sign-in, surfaces**
-- Store and migrations (CONTRACTS 5), members, argon2id, calendars and
-  access (the `famille` calendar), sessions per surface, sign-in links,
-  approval codes, device passwords, Basic auth, rate limits, trusted
-  proxies, same-origin check.
-- Listeners and surfaces (9.1): `listeners` config, `404` for surfaces a
-  listener does not serve, the warnings and the exposure guard.
-- `member add|passwd|signin|list|disable|enable|remove`,
-  `calendar add|list|access`, `device add|list|revoke` (shell fallbacks).
-- `/signin` (password), `/login/<token>`, `/admin/signin`, sign-out; the
-  "no member" start refusal.
-- *Done when:* a test signs in with a sign-in link, which then fails a
-  second time; locks out after 10 failed passwords; a device password works
-  on a protected test route while a member's password does not; with two
-  listeners, `/admin/` is `404` on the first and `/dav/` is `404` on the
-  second; an `agd_app` cookie does not open `/admin`.
+**M1. Store, settings, surfaces, directory, auth**
+- Migrations (CONTRACTS 5); settings with live apply; listeners and
+  surfaces (the public listener from settings, rebinding); the admin
+  password, admin sessions, `/admin/signin`; users, groups, visibility;
+  enrolment links; approvals; devices and Basic auth; web sessions; rate
+  limits; trusted proxies; same-origin.
+- CLI: `admin passwd`, `user …`, `group …`, `config set`.
+- *Done when:* tests show: an enrolment link works once; an approval with
+  the wrong number fails and the right one signs the waiting browser in;
+  a device credential opens a protected test route and nothing else;
+  setting `public_listen` from a test starts the public listener without a
+  restart; `/admin/` is `404` on it and `/dav/` is `404` on the admin
+  listener; an `agd_app` cookie does not open `/admin`.
 
-**M2. CalDAV, read and write**
-- `internal/ical` (parse, validate, index columns, expansion), `internal/
-  calendar` (the write path, changes, tokens, access), `internal/dav`
-  (section 5, CONTRACTS 4), the hub.
-- `agendouille import <calendar> <file.ics>` (one object per UID, skips UIDs
-  that exist unless `--replace`) and `export <calendar>`.
-- *Done when:* the go-webdav client integration test creates, lists,
-  queries by time range (with a weekly rule and an `EXDATE`), updates with
-  `If-Match`, gets `412` with a stale etag, deletes, and follows the
-  changes through `sync-collection`, on two calendars, one of them
-  read-only for the member; every recorded client request in
-  `testdata/clients/` gets the recorded kind of answer; **and by hand**:
-  DAVx5, iOS and Thunderbird each add, edit and delete an event that the
-  other two see, and show the read-only calendar as read-only.
+**M2. CalDAV, read and write, with ownership and shares**
+- `internal/ical`, `internal/calendar`, `internal/sharing`, `internal/dav`
+  (section 5, CONTRACTS 4), the hub, quotas; import/export.
+- *Done when:* the go-webdav client test makes a calendar with `MKCALENDAR`,
+  shares it read-only with a second user, and checks: the second user sees
+  it and cannot write; time-range queries with a weekly rule and an
+  `EXDATE`; `If-Match` and `412`; `sync-collection` through creates,
+  changes and deletes; recorded client requests answer as recorded; **by
+  hand**: DAVx5, iOS and Thunderbird each add, edit and delete an event the
+  other two see, and DAVx5 and iOS create a calendar (checking 5.2's URL
+  question).
 
 **M3. Admin UI**
-- `/api/admin/*` (CONTRACTS 3.5), the `admin` bundle, every page of 9.5,
-  the activity log, backups from the UI.
-- *Done when:* from the admin UI alone, on the LAN listener, an admin makes
-  a calendar, adds a member with read on it, hands them a sign-in QR that a
-  phone scans to get in, and sees each of those steps in the activity log;
-  a vitest test proves `src/admin` and `src/app` do not import each other.
+- `/api/admin/*`, the admin bundle, every page of 9.4, the activity log,
+  settings with live apply, backups and restore.
+- *Done when:* from the admin UI alone: set the public listener, add a
+  group and two users, make an enrolment QR that a phone's browser opens
+  signed in, see it marked used, restore yesterday's backup; a test proves
+  no `/api/admin` answer carries event data.
 
-**M4. Family app**
-- `/api/*` (CONTRACTS 3.2 to 3.4), SSE, the `app` bundle: the calendar page
-  and its views, the calendars list, the sheet and the editor with
-  recurrence scopes and the calendar picker, `/me` with passwords and the
-  "sign in another device" QR, `/approve/<code>`.
-- *Done when:* the vitest suite covers `Dates` across DST changes,
-  `Recurrence` both ways and each view's renderer; a Go test drives the
-  API through every scope on a recurring event, moves an event between
-  calendars, and checks the stored iCalendar keeps a `VALARM` and an `X-`
-  property it did not set; an event made in the browser appears on a
-  DAVx5 phone, and one made on the phone appears in an open browser
-  without reload; a laptop is signed in by scanning its `/signin` QR with
-  a signed-in phone.
+**M4. Family web app and the additional API**
+- `/api/*`, SSE, the app bundle: calendar views, editor with scopes,
+  calendars page with sharing and transfer, approval page with scanner and
+  short code, devices (DAVx5 link and QR, `.mobileconfig`, Thunderbird,
+  subscription links), signed-in browsers, `/me`.
+- *Done when:* vitest covers `Dates` across DST, `Recurrence` both ways,
+  each view's renderer and the scanner's parsing; a Go test drives every
+  scope and checks a `VALARM` and an `X-` property survive a web edit; a
+  laptop signs in by approval from a phone's browser; a calendar shared in
+  the web app appears on a DAVx5 phone.
 
-**M5. Devices**
-- `/devices`: add (label, read or read-write cap) with the DAVx5 QR, the
-  `.mobileconfig`, the manual settings; subscription links over chosen
-  calendars; revoke; last used. The admin's view of every device (M3)
-  gains last sync and client.
-- *Done when:* a phone is added by scanning the QR alone; an iPhone by the
-  profile alone; a `read` device cannot write (and its client shows every
-  calendar read-only); a revoked device gets `401` at its next sync.
+**M5. Deployment**
+- `deploy/` (13.4), backups schedule (13.6), `devdeploy.sh`, proxy examples.
+- *Done when:* `install.sh` installs and upgrades on Debian and Alpine, and
+  the home server serves the family through its DMZ proxy with the admin UI
+  on the LAN only. From here the family can use the web app and DAVx5.
 
-**M6. Deployment**
-- `deploy/` (12.4), backups (12.5), `devdeploy.sh`, the proxy examples,
-  `deploy/README.md`.
-- *Done when:* `install.sh` installs and upgrades on Debian and Alpine
-  (as cafard's test), and the user's host serves the family through its
-  proxy.
+**M6. Android app: shell and sign-in**
+- First a **spike**: a "hello WebView + WebMessagePort" APK built by the
+  Makefile in the container on dev-build, installed on a phone. Then: the
+  account authenticator, Keystore storage, App Links and `/api/app/enrol`,
+  `/api/app/session`, the bridge (`hello`, `scan`, `davx5.handoff`), the
+  APK served by the server, the update check.
+- *Done when:* a phone with the APK scans the admin's enrolment QR and
+  lands in the web app signed in; "Scan to sign in a browser" signs a
+  laptop in; revoking the device in the web app signs the WebView out; the
+  whole APK builds with `scripts/android.sh` and in CI, with no Gradle.
 
-**M7. Instant sync (optional, Default: yes)**
-- WebDAV-Push server side: the push properties on the calendar, the
-  subscription registration, Web Push (VAPID) delivery on each change from
-  the hub. Read the current draft before starting; it is still moving.
-- *Done when:* with ntfy as UnifiedPush distributor, a change from the web
-  UI reaches a DAVx5 phone in under ten seconds.
+**M7. Android app: sync adapter**
+- The Java iCalendar subset parser, the CalDAV client, the mapping (7.3),
+  local changes, conflicts, calendars appearing and disappearing, creating
+  a calendar, "Sync now" and status over the bridge.
+- *Done when:* the JVM tests run the mapping over the shared fixtures
+  (recurrence, overrides, all-day, DST, alarms, unknown properties kept);
+  on a phone, with Google Calendar, Fossify Calendar and the Samsung
+  calendar app: create, edit one occurrence, delete, all seen on a DAVx5
+  phone and in the web app, and the other way round; a read-only shared
+  calendar cannot be edited on the phone; the app's recorded requests
+  contain nothing DAVx5 does not also send (only standard CalDAV).
 
-**M8. Own Android app (optional, decided after M5 is in use)**
-- Section 6. A separate plan section is written first, with the user.
+**M8. Hardening pass**
+- Fuzzing `internal/ical` and the DAV XML parser, a review of every
+  `/api/admin` answer, load test with 10 years of a busy family's events,
+  the client checklist again.
+
+**M9. Push (optional, Default: yes)**
+- A self-hosted **ntfy** on the home server (documented, not embedded);
+  UnifiedPush in the app (implemented by hand on its intent API, no
+  library); WebDAV-Push for DAVx5; the server pushes on each change. Read
+  the WebDAV-Push draft again before starting.
+- *Done when:* a change in the web app reaches the app and a DAVx5 phone in
+  under ten seconds, with no Google service involved.
+
+**M10. Passkeys (optional)**
+- Section 8.6.
 
 ---
 
-## 15. Testing
+## 16. Testing
 
 ### Go
 
-- **Table tests on `internal/ical`**: recurrence expansion against known
-  outputs (weekly with `BYDAY`, monthly `BYMONTHDAY=31`, yearly 29 Feb,
-  `EXDATE`, overrides moving an instance in and out of a range, DST
-  transitions in `Europe/Paris`, all-day events, floating times, unknown
-  `TZID` with a `VTIMEZONE`).
-- **`internal/dav` against recorded requests**: each file in
-  `testdata/clients/<client>/<step>.http` is a request as captured; its
-  `.want` names the status and the hrefs/props expected. New clients and
-  new bugs add a file.
-- **End to end** with `go-webdav`'s client against a test server over
-  `httptest`, through the real auth.
-- **Write path**: concurrent puts on one object (one wins, the other gets
-  `412`), sync tokens strictly increase, tombstones appear in
-  `sync-collection`, pruning produces `valid-sync-token`.
-- **Security**: CSRF refusal, lockout split between device and web,
-  `X-Forwarded-For` ignored from untrusted peers, a member cannot reach
-  another member's home or a calendar they have `none` on, a `read` device
-  or `read` access cannot write, surfaces answer `404` off their listener,
-  sessions do not cross surfaces, sign-in links are single use, the last
-  admin cannot be demoted.
+- **`internal/ical`**: expansion against known outputs (weekly `BYDAY`,
+  monthly `BYMONTHDAY=31`, yearly 29 Feb, `EXDATE`, overrides in and out of
+  a range, DST in `Europe/Paris`, all-day, floating, unknown `TZID`). The
+  fixtures live in `testdata/ical/` and are **shared with the Android JVM
+  tests**.
+- **`internal/dav`** against recorded client requests.
+- **End to end** with go-webdav's client through the real auth.
+- **Write path**: concurrent puts (one `412`), increasing tokens,
+  tombstones, pruning.
+- **Access**: owner, user share, group share, highest wins, device cap,
+  hidden calendars leave the home, leaving a group, transfer, removal of a
+  user with transfer.
+- **Security**: CSRF, rate limits apart, `X-Forwarded-For` only from
+  trusted proxies, surfaces `404` off their listener, cookies do not cross
+  surfaces, single-use links and codes, number matching, no event data in
+  admin answers.
 
 ### TypeScript
 
-vitest for `shared/core/Dates`, `app/model/Recurrence`, `shared/core/Api`
-(etag, 412), the renderers under happy-dom (both bundles), and the import
-rule between `src/app` and `src/admin`, as cafard.
+vitest for `shared/core/Dates`, `shared/core/Api`, `shared/core/Bridge`,
+`app/model/Recurrence`, the scanner's payload parsing, renderers under
+happy-dom, the import rule between `src/app` and `src/admin`.
 
-### By hand, per milestone
+### Android
 
-A checklist in `deploy/README.md` (M2, M5): the three target clients, each
-step done and seen on the other two.
+JUnit on the JVM for the parser and the mapping (with a fake of the
+`CalendarContract` rows as plain Java objects), the CalDAV XML handling,
+and the bridge's message codec. On-device checks by hand, per the M7
+checklist.
+
+### By hand
+
+The client checklist in `deploy/README.md` (M2, M4, M7): our app, DAVx5,
+iOS, Thunderbird, each step seen on the others.
 
 ---
 
-## 16. Open questions (ask the user, do not guess)
+## 17. Open questions (ask the user, do not guess)
 
-1. **Alarms.** Keep a `VALARM` set by one phone for everyone (v1 default),
-   or strip alarms so each person sets their own reminders locally?
-2. **"Who is it for."** Should an event say which member(s) it concerns
-   ("Dentist, for Léa") beyond its calendar? The interoperable way is
-   `CATEGORIES` with member names (Thunderbird and DAVx5 show it).
-3. **Host.** Which machine and container runs it, and which domain name
-   does the proxy serve? Decides `public_url` and `devdeploy.sh`.
-4. **Holidays and birthdays.** Should the server subscribe a calendar to an
-   outside `.ics` URL (French school holidays for the right zone, public
-   holidays), read-only for everyone? v1 does not; an admin can import an
-   `.ics` into a calendar by hand.
-5. **M8.** Once the family has used DAVx5 for a while, is a custom Android
-   app still wanted, and for what?
+1. **Alarms.** Keep a `VALARM` on a shared calendar for everyone (v1), or
+   strip alarms so each person sets their own?
+2. **"Who is it for."** Should an event name the users it concerns beyond
+   its calendar (`CATEGORIES` with names)?
+3. **Host and domain.** Which machine and container, which domain, and is
+   it fixed? App Links and every phone's URL depend on it.
+4. **Holidays.** Should the server fetch an outside `.ics` (school holidays)
+   into a read-only calendar? That is an outside contact, so off by default.
+5. **Removed users' calendars.** Transfer or delete, asked each time
+   (Default), or a fixed rule?
+6. **The app's identity and licence.** Package name
+   (`io.github.nebuloss.agendouille`?), and the licence of the project
+   (MIT like cafard?).
 
 Until they are answered, implement with the defaults written here.

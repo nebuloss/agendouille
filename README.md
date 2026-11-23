@@ -1,21 +1,24 @@
 # agendouille
 
 > *agendouille*: an *agenda* with the *-ouille* of *andouille*. The
-> family's calendar, not a serious one.
+> family's calendars, not serious ones.
 
-Shared calendars for a family, self-hosted. Every member reads them and
-adds, changes and deletes events (as each calendar allows), from:
+A self-hosted calendar server for a family, at home, with nothing outside.
 
-- **Android**, through [DAVx5](https://www.davx5.com/): events appear
-  read-write in any calendar app. Pair a phone by scanning a QR code.
-- **iPhone and macOS**, natively, with a one-tap configuration profile.
-- **Thunderbird** and other CalDAV clients.
-- **A web app**, good on a phone. Admins have a separate admin UI.
-- **Anything that reads an `.ics` link** (a TV, Google Calendar), read-only.
+- **Users** own calendars and share them with the people of their groups,
+  read-only or read-write.
+- **Android**: the agendouille app syncs into the phone's calendar (any
+  calendar app shows the events) and signs browsers in with a QR code.
+  DAVx5 and other CalDAV apps work too.
+- **iPhone and macOS**, natively over CalDAV; **Thunderbird** too.
+- **A web app**, good on a phone. No passwords and no email: sign in by
+  approving from a device already signed in.
+- **An admin UI** on the LAN only: users, groups, sign-in QR codes, ports,
+  storage, backups, limits. It never shows events (a promise of the UI:
+  whoever runs the server can still read its database).
 
-One Go binary with the family app and the admin UI embedded, SQLite. Meant
-to run at home: CalDAV and the family app behind a reverse proxy in the
-DMZ, the admin UI on the LAN.
+Sync is standard CalDAV for everyone; sharing and sign-in go through an
+additional API. One Go binary, SQLite, behind a reverse proxy in the DMZ.
 
 **Status: planning.** See `PLAN.md` for the design, `CONTRACTS.md` for the
 interfaces and `DECISIONS.md` for what was decided and why.

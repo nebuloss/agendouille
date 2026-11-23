@@ -3,6 +3,60 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: the model, settled
+
+After a long exchange the user settled the model; it replaces the earlier
+entries of today where they disagree (marked below). In the user's words
+and what follows from them:
+
+- **Admin is the operator, as in claudication.** "a single admin ui that
+  allow to create / remove users, manage server storage port use, ... give
+  them one time login qrcode". One admin account with a password, not a
+  family member, LAN only. It manages users, groups, enrolment QR codes and
+  every setting (network, storage and backups, limits, defaults: all four
+  groups the user picked), and sees **metadata only** ("No, metadata
+  only"). Settings live in the database and apply live; a small bootstrap
+  file keeps only `data_dir` and the admin listener, so a mistake in the UI
+  cannot lock the admin out. *Replaces* "admins are members with an admin
+  flag".
+- **Users manage themselves and own their calendars.** "from webui they can
+  create and share calendar to other". Calendars belong to a user, are
+  shared with users or groups (read or read-write), and can be made by any
+  CalDAV client (`MKCALENDAR`; DAVx5 and iOS can). *Replaces* "several
+  shared calendars made by admins with access per member".
+- **Groups decide visibility.** "when creating user we assign them to group
+  of user so each user in same group can see one other". Several groups per
+  user (the user's pick); you see, and share with, anyone in a group of
+  yours.
+- **No passwords, no email, nothing outside.** "the goal is to not rely on
+  external provider and self host at home": email was dropped (home mail
+  servers land in spam; providers are outside). Sign-in is an admin's
+  one-time enrolment QR for the first device, then **approval** of any
+  browser from a signed-in device (QR or short code, with number matching),
+  long sessions, optional passkeys later. *Replaces* "member passwords,
+  optional" and the email-link idea.
+- **Our own Android app: "a sync app with share capabilities + web qr code
+  login".** A Java shell (sync adapter, account, Keystore, App Links,
+  camera) around the family web app in a WebView (TypeScript), which
+  carries sharing, devices and sign-in. Java, not Kotlin; framework APIs
+  only, no AndroidX, **no Gradle**: a Makefile over `aapt2`, `javac`,
+  `d8`, `apksigner` and one `android.jar`, in a container on dev-build and
+  in CI (the user: "i hate kotlin/java because it is a mess to compile
+  apk", "is there a way to compile native android app without having the
+  whole android sdk"). *Replaces* "DAVx5 is the Android client; a custom
+  app is optional".
+- **One protocol, plus an additional API.** "we stay compatible with other
+  android app", "we use same protocol with additional api". Sync is
+  standard CalDAV for every client, our app included; DAVx5 and any other
+  CalDAV app keep working. What CalDAV has no standard for (sign-in,
+  sharing, devices) is the additional JSON API, used by the web app and
+  the app. CONTRACTS states it as a rule: sync never depends on section 3.
+
+Milestones are now M0 skeleton, M1 store/settings/surfaces/directory/auth,
+M2 CalDAV, M3 admin UI, M4 family web app, M5 deployment, M6 app shell and
+sign-in, M7 app sync adapter, M8 hardening, M9 push (ntfy, UnifiedPush,
+WebDAV-Push), M10 passkeys. Entries below use older numbers.
+
 ## 2026-11-23: two UIs on separate surfaces, several calendars, QR sign-in
 
 Asked how the frontend splits the admin UI from the family's, and how
@@ -92,7 +146,12 @@ test-only dependency, an independent implementation to test against.
 Revisit if go-webdav gains sync-collection and the in-house package turns
 out to be the larger cost.
 
-## 2026-11-23: first start needs a member made at the shell (Default)
+## 2026-11-23: first start needs a member made at the shell (Default; replaced)
+
+*Replaced by "the model, settled": the admin is an operator whose password
+`install.sh` sets with `agendouille admin passwd --random`, printed once in
+the installer's terminal, never in a log; `serve` refuses to start without
+it.*
 
 cafard prints a random admin password at first start. Here the first
 member is always the person at the server's shell, and a printed password
