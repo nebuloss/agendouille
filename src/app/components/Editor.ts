@@ -1,11 +1,28 @@
 import { h, type Child } from '@/shared/core/Dom.ts';
-import { dialog, field, swatch } from '@/shared/components/Ui.ts';
+import { check, dialog, styleControl, swatch } from '@/shared/components/Ui.ts';
+import { icon, type IconName } from '@/shared/components/icons.ts';
+import { ui } from '@/shared/components/recipes.ts';
 import { addDays, addMinutes, formatDate, formatLocal, parseLocal, toNaive, type Wall } from '@/shared/core/Dates.ts';
 import { DAYS, dayOf, describe, fromRule, none, toRule, type Repeat } from '@/app/model/Recurrence.ts';
 import { canWrite, type Calendar, type EventInput, type EventView, type Occurrence, type Scope } from '@/app/api.ts';
 import { whenText } from '@/app/components/views.ts';
 
 const DAY_LETTERS: Record<string, string> = { MO: 'L', TU: 'M', WE: 'M', TH: 'J', FR: 'V', SA: 'S', SU: 'D' };
+
+/** A row of the editor or the sheet: an icon, then its content. */
+function row(ic: IconName, ...content: (Node | string | null)[]): HTMLElement {
+  return h('div', { class: 'flex items-start gap-4' }, h('span', { class: 'mt-2.5 text-on-surface-variant' }, icon(ic)),
+    h('div', { class: 'flex min-w-0 flex-1 flex-col gap-2' }, ...content));
+}
+
+/** A day of the week as a round toggle (L M M J V S D). */
+function dayToggle(box: HTMLInputElement, letter: string, name: string): HTMLElement {
+  box.className = 'peer sr-only';
+  return h('label', { title: name, class: 'cursor-pointer' }, box,
+    h('span', { class: 'grid size-9 place-items-center rounded-full border border-outline-variant text-sm font-semibold peer-checked:border-primary peer-checked:bg-primary peer-checked:text-on-primary peer-focus-visible:outline-2 peer-focus-visible:outline-primary' }, letter));
+}
+
+const DAY_NAMES: Record<string, string> = { MO: 'lundi', TU: 'mardi', WE: 'mercredi', TH: 'jeudi', FR: 'vendredi', SA: 'samedi', SU: 'dimanche' };
 
 export interface EditorResult {
   calendar: string;
@@ -23,7 +40,8 @@ export async function editEvent(doc: Document, calendars: Calendar[], initial: {
   const writable = calendars.filter(canWrite);
   if (writable.length === 0) return null;
   const cal = h('select', { name: 'calendar' }, ...writable.map((c) => h('option', { value: c.ref, selected: c.ref === initial.calendar }, c.name)));
-  const title = h('input', { name: 'summary', value: initial.summary, required: true, autocomplete: 'off', placeholder: 'Titre' });
+  const title = h('input', { name: 'summary', value: initial.summary, required: true, autocomplete: 'off', placeholder: 'Ajouter un titre',
+    class: 'w-full border-0 border-b-2 border-outline-variant bg-transparent px-1 pb-2 text-2xl text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary' });
   const allDay = h('input', { type: 'checkbox', name: 'all_day', checked: initial.allDay });
   const startDate = h('input', { type: 'date', value: formatDate(initial.start), required: true });
   const startTime = h('input', { type: 'time', value: formatLocal(initial.start).slice(11, 16) });
@@ -59,16 +77,21 @@ export async function editEvent(doc: Document, calendars: Calendar[], initial: {
   const freq = h('select', {},
     ...([['none', 'Ne se répète pas'], ['daily', 'Chaque jour'], ['weekly', 'Chaque semaine'], ['monthly', 'Chaque mois'], ['yearly', 'Chaque année']] as const)
       .map(([v, l]) => h('option', { value: v, selected: repeat.freq === v }, l)));
-  const interval = h('input', { type: 'number', min: 1, max: 99, value: repeat.interval, class: 'short' });
+  const interval = h('input', { type: 'number', min: 1, max: 99, value: repeat.interval, class: `${ui.input} !w-20` });
   const dayBoxes = DAYS.map((d) => h('input', { type: 'checkbox', value: d, checked: repeat.days.includes(d) || (repeat.days.length === 0 && d === dayOf(initial.start)) }));
   const end = h('select', {}, h('option', { value: 'never', selected: repeat.end === 'never' }, 'Sans fin'),
     h('option', { value: 'until', selected: repeat.end === 'until' }, "Jusqu'au"), h('option', { value: 'count', selected: repeat.end === 'count' }, 'Nombre de fois'));
   const until = h('input', { type: 'date', value: repeat.until });
-  const count = h('input', { type: 'number', min: 1, max: 1000, value: repeat.count, class: 'short' });
-  const weekly = h('div', { class: 'checks days' }, ...DAYS.map((d, i) => h('label', { title: d }, dayBoxes[i]!, DAY_LETTERS[d] ?? d)));
+  const count = h('input', { type: 'number', min: 1, max: 1000, value: repeat.count, class: `${ui.input} !w-24` });
+  const weekly = h('div', { class: 'flex flex-wrap gap-1.5' }, ...DAYS.map((d, i) => dayToggle(dayBoxes[i]!, DAY_LETTERS[d] ?? d, DAY_NAMES[d] ?? d)));
+  for (const el of [cal, startDate, startTime, endDate, endTime, where, notes, freq, end, until]) styleControl(el);
+  for (const el of [startDate, endDate]) el.classList.add('!w-auto', 'flex-1');
+  for (const el of [startTime, endTime]) el.classList.add('!w-36');
   const unit = h('span', {});
   const UNITS: Record<string, string> = { daily: 'jours', weekly: 'semaines', monthly: 'mois', yearly: 'ans' };
-  const details = h('div', { class: 'repeat-details' }, h('div', { class: 'row' }, 'Tous les', interval, unit), weekly, h('div', { class: 'row' }, end, until, count));
+  const details = h('div', { class: 'flex flex-col gap-3' },
+    h('div', { class: 'flex items-center gap-2 text-sm' }, 'Tous les', interval, unit), weekly,
+    h('div', { class: 'flex flex-wrap items-center gap-2' }, end, until, count));
   const syncRepeat = (): void => {
     unit.textContent = UNITS[freq.value] ?? '';
     details.hidden = freq.value === 'none';
@@ -79,18 +102,21 @@ export async function editEvent(doc: Document, calendars: Calendar[], initial: {
   for (const el of [freq, end]) el.addEventListener('change', syncRepeat);
   syncRepeat();
   const repeatBlock: Child = initial.ruleEditable
-    ? h('div', {}, field('Répétition', freq), details)
-    : h('p', { class: 'muted' }, `${describe(initial.rrule)} (gardée telle quelle).`);
+    ? row('repeat', freq, details)
+    : row('repeat', h('p', { class: 'pt-2 text-sm' }, `${describe(initial.rrule)} (gardée telle quelle).`));
+  where.setAttribute('placeholder', 'Ajouter un lieu');
+  notes.setAttribute('placeholder', 'Ajouter des notes');
 
   const body: Child[] = [
-    writable.length > 1 ? field('Calendrier', cal) : null,
     title,
-    h('label', { class: 'checks' }, allDay, 'Toute la journée'),
-    h('div', { class: 'row' }, h('span', { class: 'field-label' }, 'Début'), startDate, startTime),
-    h('div', { class: 'row' }, h('span', { class: 'field-label' }, 'Fin'), endDate, endTime),
-    where,
-    notes,
+    row('clock',
+      h('div', { class: 'pt-2' }, check(allDay, 'Toute la journée')),
+      h('div', { class: 'flex flex-wrap items-center gap-2' }, startDate, startTime),
+      h('div', { class: 'flex flex-wrap items-center gap-2' }, endDate, endTime)),
     repeatBlock,
+    row('pin', where),
+    row('notes', notes),
+    writable.length > 1 ? row('calendar', cal) : null,
   ];
   const v = await dialog(doc, initial.isNew ? 'Nouvel événement' : "Modifier l'événement", body, [
     { label: 'Annuler', value: 'cancel' },
@@ -128,18 +154,21 @@ export async function askScope(doc: Document, verb: 'modify' | 'delete'): Promis
 
 /** The detail sheet of an occurrence. Resolves with "edit", "delete" or "". */
 export async function showEvent(doc: Document, o: Occurrence, ev: EventView, cal: Calendar | undefined): Promise<string> {
+  const line = (ic: IconName, ...content: (Node | string | null)[]): HTMLElement =>
+    h('div', { class: 'flex items-start gap-4 text-on-surface' }, h('span', { class: 'mt-0.5 text-on-surface-variant' }, icon(ic)), h('div', { class: 'min-w-0 flex-1' }, ...content));
   const body: Child[] = [
-    h('p', { class: 'sheet-cal' }, swatch(cal?.color ?? '#888888'), cal?.name ?? o.calendar),
-    h('p', { class: 'sheet-when' }, whenText(o)),
-    o.recurring || ev.rrule !== '' ? h('p', { class: 'muted' }, describe(ev.rrule)) : null,
-    o.location !== '' ? h('p', {}, '📍 ', o.location) : null,
-    ev.description !== '' ? h('p', { class: 'sheet-notes' }, ev.description) : null,
-    ev.has_alarms ? h('p', { class: 'muted' }, 'Avec un rappel') : null,
-    h('p', { class: 'muted' }, `Ajouté par ${ev.created_by || '?'}` + (ev.modified_by !== '' && ev.modified_by !== ev.created_by ? `, modifié par ${ev.modified_by}` : '')),
-    ev.writable ? null : h('p', { class: 'chip' }, 'Lecture seule'),
+    line('clock', h('p', { class: 'font-medium first-letter:uppercase' }, whenText(o)),
+      o.recurring || ev.rrule !== '' ? h('p', { class: 'text-sm text-on-surface-variant' }, describe(ev.rrule)) : null),
+    o.location !== '' ? line('pin', h('p', {}, o.location)) : null,
+    ev.description !== '' ? line('notes', h('p', { class: 'whitespace-pre-wrap' }, ev.description)) : null,
+    ev.has_alarms ? line('bell', h('p', {}, 'Avec un rappel')) : null,
+    line('calendar', h('p', { class: 'flex items-center gap-2' }, swatch(cal?.color ?? '#888888'), cal?.name ?? o.calendar,
+      ev.writable ? null : h('span', { class: ui.pill.muted }, 'lecture seule'))),
+    line('person', h('p', { class: 'text-sm text-on-surface-variant' },
+      `Ajouté par ${ev.created_by || '?'}` + (ev.modified_by !== '' && ev.modified_by !== ev.created_by ? `, modifié par ${ev.modified_by}` : ''))),
   ];
   const buttons = ev.writable
-    ? [{ label: 'Supprimer', value: 'delete', kind: 'danger' as const }, { label: 'Fermer', value: '' }, { label: 'Modifier', value: 'edit', kind: 'filled' as const }]
+    ? [{ label: 'Supprimer', value: 'delete', kind: 'danger-text' as const }, { label: 'Fermer', value: '' }, { label: 'Modifier', value: 'edit', kind: 'filled' as const }]
     : [{ label: 'Fermer', value: '', kind: 'filled' as const }];
   return dialog(doc, o.summary, body, buttons);
 }

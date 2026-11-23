@@ -1,5 +1,6 @@
 // The family web app's bundle (static/app/app.js). It also runs inside the
 // Android app's WebView.
+import './app.css';
 import { ApprovePage } from '@/app/pages/ApprovePage.ts';
 import { CalendarPage } from '@/app/pages/CalendarPage.ts';
 import { CalendarsPage, DevicesPage, MePage } from '@/app/pages/Manage.ts';

@@ -1,4 +1,6 @@
+import { Countdown } from '@/shared/components/Countdown.ts';
 import { Backoff } from '@/shared/core/Backoff.ts';
+import { Dom } from '@/shared/core/Dom.ts';
 import type { Page } from '@/shared/core/Pages.ts';
 
 type WaitStatus = 'approved' | 'pending' | 'cancelled' | 'expired' | 'used' | 'unknown' | 'error';
@@ -23,6 +25,7 @@ export function nextStep(status: WaitStatus): 'home' | 'again' | 'restart' {
  */
 export class SigninPage implements Page {
   private stopped = false;
+  private countdown: Countdown | null = null;
   private readonly backoff = new Backoff({ baseMs: 1000, maxMs: 15000 });
 
   constructor(
@@ -35,11 +38,21 @@ export class SigninPage implements Page {
     const action = form?.getAttribute('action') ?? '';
     if (!action.startsWith('/signin/wait/')) return;
     form?.setAttribute('hidden', '');
+    // The code lives two minutes; at zero a fresh one takes its place.
+    const timer = this.doc.getElementById('signin-timer');
+    const left = timer === null ? null : Dom.number(timer, 'data-remaining-ms');
+    const ttl = timer === null ? null : Dom.number(timer, 'data-ttl-ms');
+    if (timer !== null && left !== null && ttl !== null) {
+      this.countdown = new Countdown(timer, left, ttl, () => {
+        if (!this.stopped) this.doc.location.assign('/signin');
+      });
+    }
     void this.loop(action);
   }
 
   dispose(): void {
     this.stopped = true;
+    this.countdown?.dispose();
   }
 
   private async loop(url: string): Promise<void> {

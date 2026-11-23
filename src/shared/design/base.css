@@ -1,0 +1,31 @@
+/* What both bundles start from, after Tailwind and the shared design: the
+   few rules a utility cannot say. Everything else is a class in the markup,
+   from src/shared/components/recipes.ts where it repeats. */
+@import "./theme.css";
+
+/* The hidden attribute always hides, whatever display a utility gives. */
+[hidden] { display: none !important; }
+
+html, body { min-height: 100%; }
+body { font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, [role="button"], summary { cursor: pointer; }
+
+/* Line icons (src/shared/components/icons.ts and the templates), drawn in
+   the current colour. */
+.ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* Form controls follow the theme (color-scheme does the rest). */
+input[type="date"], input[type="time"], input[type="color"] { accent-color: var(--color-primary); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-primary); width: 18px; height: 18px; }
+input[type="color"] { padding: 2px; }
+
+/* MD3 dialogs are <dialog> elements; the backdrop is the scrim. */
+dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+dialog[open] { animation: pop 200ms cubic-bezier(0.2, 0, 0, 1); }
+
+@keyframes pop { from { transform: translateY(16px); opacity: 0; } }
+
+/* A QR code stays sharp, on white whatever the theme. */
+.qr { image-rendering: pixelated; background: #fff; }

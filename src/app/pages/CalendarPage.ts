@@ -2,7 +2,9 @@ import { ApiError, seg, type Api } from '@/shared/core/Api.ts';
 import { h } from '@/shared/core/Dom.ts';
 import { DisposableBag } from '@/shared/core/Disposable.ts';
 import type { Page } from '@/shared/core/Pages.ts';
-import { Toasts, confirmDialog, dialog, swatch } from '@/shared/components/Ui.ts';
+import { Toasts, check, confirmDialog, dialog, iconButton, swatch } from '@/shared/components/Ui.ts';
+import { icon } from '@/shared/components/icons.ts';
+import { ui } from '@/shared/components/recipes.ts';
 import {
   addDays, addMinutes, addMonths, formatDate, formatLocal, labelDay, labelMonth, nowIn, parseLocal, startOfMonth, startOfWeek, toNaive, day,
   type Wall,
@@ -22,8 +24,8 @@ export class CalendarPage implements Page {
   private view: View;
   private anchor: Wall;
   private calendars: Calendar[] = [];
-  private body = h('div', { class: 'cal-body' });
-  private title = h('h2', { class: 'cal-title' });
+  private body = h('div', { class: 'cal-body flex flex-col gap-3' });
+  private title = h('h2', { class: 'cal-title mr-auto min-w-0 truncate text-xl font-normal first-letter:uppercase' });
   private reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -49,7 +51,7 @@ export class CalendarPage implements Page {
   }
 
   start(): void {
-    this.root.replaceChildren(this.toolbar(), this.title, this.body);
+    this.root.replaceChildren(this.toolbar(), this.body);
     void this.load();
     this.live();
   }
@@ -59,12 +61,12 @@ export class CalendarPage implements Page {
   }
 
   private toolbar(): HTMLElement {
-    const btn = (label: string, run: () => void, cls = 'btn text', aria?: string): HTMLButtonElement => {
-      const b = h('button', { class: cls, type: 'button', 'aria-label': aria ?? label }, label);
+    const btn = (label: string, run: () => void, cls: string): HTMLButtonElement => {
+      const b = h('button', { class: cls, type: 'button' }, label);
       b.addEventListener('click', run);
       return b;
     };
-    const seg_ = h('div', { class: 'segmented', role: 'group', 'aria-label': 'Vue' });
+    const seg_ = h('div', { class: ui.seg, role: 'group', 'aria-label': 'Vue' });
     for (const [v, l] of [['agenda', 'Agenda'], ['week', 'Semaine'], ['month', 'Mois']] as const) {
       const b = btn(l, () => {
         this.view = v;
@@ -74,20 +76,25 @@ export class CalendarPage implements Page {
           /* private mode */
         }
         void this.load();
-      }, 'seg');
+      }, `seg ${ui.segBtn}`);
       b.dataset['view'] = v;
       seg_.append(b);
     }
-    return h('div', { class: 'cal-toolbar' },
+    const fab = h('button', { class: ui.fab, type: 'button' }, icon('plus'), 'Événement');
+    fab.addEventListener('click', () => void this.create(this.anchorStart(), false));
+    return h('div', { class: 'cal-toolbar mb-3 flex flex-wrap items-center gap-x-2 gap-y-3' },
       btn("Aujourd'hui", () => {
         this.anchor = day(nowIn(this.zone));
         void this.load();
-      }, 'btn tonal'),
-      btn('‹', () => this.step(-1), 'btn text icon', 'Précédent'),
-      btn('›', () => this.step(1), 'btn text icon', 'Suivant'),
-      seg_,
-      btn('Calendriers', () => void this.pickCalendars(), 'btn text'),
-      btn('+ Événement', () => void this.create(this.anchorStart(), false), 'btn filled'),
+      }, ui.btn('outlined', 'sm')),
+      iconButton('left', 'Précédent', () => this.step(-1)),
+      iconButton('right', 'Suivant', () => this.step(1)),
+      this.title,
+      h('div', { class: 'flex w-full items-center gap-2 sm:w-auto' },
+        seg_,
+        iconButton('calendars', 'Calendriers affichés', () => void this.pickCalendars()),
+        h('span', { class: 'ml-auto' }),
+        fab),
     );
   }
 
@@ -141,11 +148,11 @@ export class CalendarPage implements Page {
       else content = agenda(occ.occurrences, from, days, ctx);
       const notes: HTMLElement[] = [];
       if (this.calendars.length === 0) {
-        notes.push(h('p', { class: 'banner' }, "Vous n'avez pas encore de calendrier. ", h('a', { href: '/calendars' }, 'En créer un')));
+        notes.push(h('p', { class: ui.info }, icon('info'), h('span', {}, "Vous n'avez pas encore de calendrier. ", h('a', { href: '/calendars', class: ui.link }, 'En créer un'))));
       }
       this.body.replaceChildren(...notes, content);
     } catch (e) {
-      this.body.replaceChildren(h('p', { class: 'banner error' }, e instanceof Error ? e.message : String(e)));
+      this.body.replaceChildren(h('p', { class: ui.error }, e instanceof Error ? e.message : String(e)));
     }
   }
 
@@ -166,9 +173,9 @@ export class CalendarPage implements Page {
   private async pickCalendars(): Promise<void> {
     const boxes = this.calendars.filter((c) => !c.hidden).map((c) => ({ c, box: h('input', { type: 'checkbox', checked: c.shown }) }));
     const v = await dialog(this.doc, 'Calendriers affichés', [
-      h('div', { class: 'cal-picker' }, ...boxes.map(({ c, box }) => h('label', { class: 'checks' }, box, swatch(c.color), c.name,
-        canWrite(c) ? null : h('span', { class: 'chip' }, 'lecture'),
-        c.access !== 'owner' ? h('span', { class: 'muted' }, ` · ${c.owner}`) : null))),
+      h('div', { class: 'flex flex-col gap-3' }, ...boxes.map(({ c, box }) => check(box, swatch(c.color), h('span', { class: 'text-on-surface' }, c.name),
+        c.access !== 'owner' ? h('span', { class: 'text-xs text-on-surface-variant' }, c.owner) : null,
+        canWrite(c) ? null : h('span', { class: ui.pill.muted }, 'lecture')))),
     ], [{ label: 'Annuler', value: '' }, { label: 'Afficher', value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
     for (const { c, box } of boxes) {

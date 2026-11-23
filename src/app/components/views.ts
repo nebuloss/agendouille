@@ -1,4 +1,6 @@
 import { h } from '@/shared/core/Dom.ts';
+import { icon } from '@/shared/components/icons.ts';
+import { ui } from '@/shared/components/recipes.ts';
 import {
   addDays, compare, day, daysBetween, formatDate, formatTime, labelDay, labelShortDay, minuteOfDay, parseLocal, sameDay, weekdayNames,
   type Wall,
@@ -59,7 +61,7 @@ const byStart = (a: Placed, b: Placed): number =>
 /** Agenda: a list of days with their events, empty days left out. */
 export function agenda(occ: Occurrence[], from: Wall, days: number, ctx: ViewContext): HTMLElement {
   const placed = place(occ).sort(byStart);
-  const root = h('div', { class: 'agenda' });
+  const root = h('div', { class: 'agenda flex flex-col gap-3' });
   let any = false;
   for (let i = 0; i < days; i++) {
     const d = addDays(from, i);
@@ -67,14 +69,17 @@ export function agenda(occ: Occurrence[], from: Wall, days: number, ctx: ViewCon
     const isToday = sameDay(d, ctx.today);
     if (todays.length === 0 && !isToday) continue;
     any = true;
-    const head = h('h2', { class: 'agenda-day' + (isToday ? ' today' : '') }, labelDay(d));
-    const list = h('div', { class: 'agenda-list' }, ...todays.map((p) => chip(p, ctx, true)));
-    if (todays.length === 0) list.append(h('p', { class: 'muted' }, "Rien aujourd'hui."));
-    const add = h('button', { class: 'btn text add-here', type: 'button', 'aria-label': `Nouvel événement le ${labelDay(d)}` }, '+');
+    const head = h('h2', { class: 'flex items-baseline gap-2 first-letter:uppercase' },
+      h('span', { class: isToday ? 'grid size-10 place-items-center rounded-full bg-primary text-lg font-semibold text-on-primary' : 'grid size-10 place-items-center rounded-full bg-surface-container text-lg font-semibold' }, String(d.d)),
+      h('span', { class: isToday ? 'text-sm font-semibold text-primary first-letter:uppercase' : 'text-sm font-semibold text-on-surface-variant first-letter:uppercase' }, labelDay(d)));
+    const list = h('div', { class: 'agenda-list flex min-w-0 flex-1 flex-col gap-1.5' }, ...todays.map((p) => chip(p, ctx, true)));
+    if (todays.length === 0) list.append(h('p', { class: 'py-2 text-sm text-on-surface-variant' }, "Rien aujourd'hui."));
+    const add = h('button', { class: ui.iconBtn, type: 'button', 'aria-label': `Nouvel événement le ${labelDay(d)}`, title: 'Nouvel événement' }, icon('plus'));
     add.addEventListener('click', () => ctx.onNew({ ...d, h: 9 }, false));
-    root.append(h('section', { class: 'agenda-section', 'data-date': formatDate(d) }, h('div', { class: 'agenda-head' }, head, add), list));
+    root.append(h('section', { class: 'agenda-section flex flex-col gap-2 rounded-md3-xl bg-surface-container p-3 sm:p-4', 'data-date': formatDate(d) },
+      h('div', { class: 'flex items-center justify-between gap-2' }, head, add), list));
   }
-  if (!any) root.append(h('p', { class: 'empty' }, 'Rien sur cette période.'));
+  if (!any) root.append(h('p', { class: ui.empty }, 'Rien sur cette période.'));
   return root;
 }
 
@@ -116,9 +121,10 @@ export function week(occ: Occurrence[], monday: Wall, ctx: ViewContext): HTMLEle
   const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(monday, i));
   const names = weekdayNames();
   const head = h('div', { class: 'week-head' }, h('div', { class: 'week-gutter' }),
-    ...days.map((d, i) => h('div', { class: 'week-day-name' + (sameDay(d, ctx.today) ? ' today' : '') },
-      h('span', {}, names[i] ?? ''), h('strong', {}, String(d.d)))));
-  const strip = h('div', { class: 'week-allday' }, h('div', { class: 'week-gutter' }, 'jour'),
+    ...days.map((d, i) => h('div', { class: 'flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold tracking-wide text-on-surface-variant uppercase' },
+      h('span', {}, names[i] ?? ''),
+      h('strong', { class: sameDay(d, ctx.today) ? 'grid size-8 place-items-center rounded-full bg-primary text-base font-semibold text-on-primary normal-case' : 'grid size-8 place-items-center rounded-full text-base font-semibold text-on-surface normal-case' }, String(d.d)))));
+  const strip = h('div', { class: 'week-allday' }, h('div', { class: 'week-gutter px-1 pt-1.5 text-right text-[10px] text-on-surface-variant' }, 'jour'),
     ...days.map((d) => h('div', { class: 'week-allday-cell' }, ...placed.filter((p) => p.o.all_day && onDay(p, d)).map((p) => chip(p, ctx, false)))));
   const hours = h('div', { class: 'week-hours' });
   for (let hr = 0; hr < 24; hr++) hours.append(h('div', { class: 'week-hour' }, `${String(hr).padStart(2, '0')}:00`));
@@ -153,25 +159,26 @@ export function week(occ: Occurrence[], monday: Wall, ctx: ViewContext): HTMLEle
     return col;
   });
   const grid = h('div', { class: 'week-grid' }, hours, ...cols);
-  const scroller = h('div', { class: 'week-scroll' }, grid);
+  const scroller = h('div', { class: 'week-scroll max-h-[68vh] overflow-y-auto' }, grid);
   queueMicrotask(() => {
     scroller.scrollTop = 7.5 * HOUR;
   });
-  return h('div', { class: 'week' }, head, strip, scroller);
+  return h('div', { class: 'week overflow-hidden rounded-md3-xl bg-surface-lowest' }, head, strip, scroller);
 }
 
 /** Month: a grid of six weeks, three events a day and "+n". */
 export function month(occ: Occurrence[], first: Wall, gridStart: Wall, ctx: ViewContext): HTMLElement {
   const placed = place(occ).sort(byStart);
   const names = weekdayNames();
-  const root = h('div', { class: 'month' }, ...names.map((n) => h('div', { class: 'month-name' }, n)));
+  const root = h('div', { class: 'month overflow-hidden rounded-md3-xl bg-surface-lowest' },
+    ...names.map((n) => h('div', { class: 'py-2 text-center text-[11px] font-semibold tracking-wide text-on-surface-variant uppercase' }, n)));
   for (let i = 0; i < 42; i++) {
     const d = addDays(gridStart, i);
     const todays = placed.filter((p) => onDay(p, d));
     const cell = h('div', { class: 'month-cell' + (d.m !== first.m ? ' other' : '') + (sameDay(d, ctx.today) ? ' today' : ''), 'data-date': formatDate(d) },
       h('span', { class: 'month-num' }, String(d.d)),
       ...todays.slice(0, 3).map((p) => chip(p, ctx, false)),
-      todays.length > 3 ? h('span', { class: 'more' }, `+${todays.length - 3}`) : null);
+      todays.length > 3 ? h('span', { class: 'more px-1 text-[11px] font-semibold text-on-surface-variant' }, `+${todays.length - 3}`) : null);
     cell.addEventListener('click', () => ctx.onNew({ ...d, h: 9 }, false));
     root.append(cell);
   }

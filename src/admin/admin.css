@@ -1,0 +1,9 @@
+/* The admin UI's stylesheet (static/admin/admin.css): Tailwind, the design
+   shared with claudication and cafard, and nothing of its own. Tailwind
+   reads the classes in this bundle's code and in the admin templates. */
+@import "tailwindcss" source(none);
+@import "../shared/design/base.css";
+@source ".";
+@source "../shared";
+@source "../../internal/web/assets/templates/layout.html";
+@source "../../internal/web/assets/templates/admin";

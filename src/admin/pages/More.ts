@@ -1,3 +1,4 @@
+import { ui } from '@/shared/components/recipes.ts';
 import { ApiError, seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { action, confirmDialog, dialog, field, section, swatch, table } from '@/shared/components/Ui.ts';
@@ -25,13 +26,13 @@ export class GroupsPage extends AdminPage {
       this.api.get<{ users: UserLite[] }>('/users'),
     ]);
     return [
-      h('p', { class: 'muted' }, "Les membres d'un groupe se voient et peuvent partager leurs calendriers entre eux."),
+      h('p', { class: 'text-sm text-on-surface-variant' }, "Les membres d'un groupe se voient et peuvent partager leurs calendriers entre eux."),
       table(['Groupe', 'Membres', 'Partages', ''],
         groups.map((g) => [
-          h('span', {}, swatch(g.color), g.display_name, ' ', h('span', { class: 'muted' }, `(${g.name})`)),
-          h('span', {}, ...g.members.map((m) => h('span', { class: 'chip' }, m))),
+          h('span', {}, swatch(g.color), g.display_name, ' ', h('span', { class: 'text-sm text-on-surface-variant' }, `(${g.name})`)),
+          h('span', {}, ...g.members.map((m) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, m))),
           String(g.shares),
-          h('span', { class: 'row' },
+          h('span', { class: 'flex flex-wrap items-center gap-2' },
             action('Membres…', () => this.members(g, users), 'text'),
             action('Supprimer', () => this.remove(g), 'text')),
         ]), 'Aucun groupe.'),
@@ -42,8 +43,8 @@ export class GroupsPage extends AdminPage {
   private addForm(): HTMLElement {
     const name = h('input', { required: true, pattern: '[a-z][a-z0-9-]{0,31}', placeholder: 'famille', autocomplete: 'off' });
     const display = h('input', { placeholder: 'Famille' });
-    const form = h('form', {}, h('div', { class: 'form-grid' }, field('Identifiant', name), field('Nom affiché', display)),
-      h('button', { class: 'btn filled', type: 'submit' }, 'Créer'));
+    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' }, h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field('Identifiant', name), field('Nom affiché', display)),
+      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Créer'));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       void this.act(() => this.api.post('/groups', { name: name.value.trim(), display_name: display.value.trim() }), 'Groupe créé.');
@@ -54,7 +55,7 @@ export class GroupsPage extends AdminPage {
   private async members(g: Group, users: UserLite[]): Promise<void> {
     const checks = users.map((u) => h('input', { type: 'checkbox', value: u.name, checked: g.members.includes(u.name) }));
     const v = await dialog(this.doc, `Membres de ${g.display_name}`,
-      [h('div', { class: 'checks' }, ...users.map((u, i) => h('label', {}, checks[i]!, u.display_name)))],
+      [h('div', { class: 'flex flex-wrap gap-x-5 gap-y-2' }, ...users.map((u, i) => h('label', { class: ui.check }, checks[i]!, u.display_name)))],
       [{ label: 'Annuler', value: 'no' }, { label: 'Enregistrer', value: 'yes', kind: 'filled' }]);
     if (v !== 'yes') return;
     await this.act(() => this.api.patch(`/groups/${seg(g.name)}`, { members: checks.filter((c) => c.checked).map((c) => c.value) }), 'Membres enregistrés.');
@@ -88,16 +89,16 @@ export class CalendarsPage extends AdminPage {
       this.api.get<{ users: UserLite[] }>('/users'),
     ]);
     return [
-      h('p', { class: 'muted' }, "L'administration voit les calendriers, jamais leurs événements."),
+      h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements."),
       table(['Calendrier', 'Propriétaire', 'Événements', 'Taille', 'Partages', ''],
         calendars.map((c) => [
-          h('span', {}, swatch(c.color), c.name, ' ', h('span', { class: 'muted mono' }, c.ref)),
+          h('span', {}, swatch(c.color), c.name, ' ', h('span', { class: 'font-mono text-xs text-on-surface-variant' }, c.ref)),
           h('a', { href: `/admin/users/${seg(c.owner)}` }, c.owner),
           String(c.events),
           bytes(c.bytes),
-          h('span', {}, ...c.shares.map((s) => h('span', { class: 'chip' }, `${s.target} · ${accessLabel(s.access)} `,
+          h('span', {}, ...c.shares.map((s) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, `${s.target} · ${accessLabel(s.access)} `,
             action('×', () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(s.target)}`), 'Partage retiré.'), 'text')))),
-          h('span', { class: 'row' },
+          h('span', { class: 'flex flex-wrap items-center gap-2' },
             action('Donner…', () => this.transfer(c, users), 'text'),
             action('Supprimer…', () => this.remove(c), 'text')),
         ]), 'Aucun calendrier. Les utilisateurs les créent depuis leur téléphone ou l’application.'),
@@ -107,7 +108,7 @@ export class CalendarsPage extends AdminPage {
   private async transfer(c: CalendarMeta, users: UserLite[]): Promise<void> {
     const select = h('select', {}, ...users.filter((u) => u.name !== c.owner).map((u) => h('option', { value: u.name }, u.display_name)));
     const keep = h('input', { type: 'checkbox', checked: true });
-    const v = await dialog(this.doc, `Donner ${c.name}`, [field('À', select), h('label', { class: 'checks' }, keep, `${c.owner} garde lecture et écriture`)],
+    const v = await dialog(this.doc, `Donner ${c.name}`, [field('À', select), h('label', { class: ui.check }, keep, `${c.owner} garde lecture et écriture`)],
       [{ label: 'Annuler', value: 'no' }, { label: 'Donner', value: 'yes', kind: 'filled' }]);
     if (v !== 'yes' || select.value === '') return;
     await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: select.value, keep: keep.checked }), 'Calendrier donné.');
@@ -165,8 +166,8 @@ export class ActivityPage extends AdminPage {
     const calendar = h('input', { value: this.filters.calendar, placeholder: 'maman~ecole' });
     const kind = h('select', {}, h('option', { value: '' }, 'Tout'),
       ...Object.entries(kinds).map(([k, l]) => h('option', { value: k, selected: k === this.filters.kind }, l)));
-    const form = h('form', { class: 'form-grid' }, field('Utilisateur', user), field('Calendrier', calendar), field('Quoi', kind),
-      h('div', {}, h('button', { class: 'btn tonal', type: 'submit' }, 'Filtrer')));
+    const form = h('form', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field('Utilisateur', user), field('Calendrier', calendar), field('Quoi', kind),
+      h('div', {}, h('button', { class: ui.btn('tonal'), type: 'submit' }, 'Filtrer')));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       this.filters = { user: user.value.trim(), calendar: calendar.value.trim(), kind: kind.value };
@@ -256,9 +257,9 @@ export class SettingsPage extends AdminPage {
       groups.set(s.group, list);
     }
     const initial = new Map(settings.map((s) => [s.key, JSON.stringify(s.value)]));
-    const form = h('form', { class: 'settings' },
-      ...['network', 'storage', 'limits', 'defaults'].map((g) => section(groupNames[g] ?? g, ...(groups.get(g) ?? []))),
-      h('button', { class: 'btn filled', type: 'submit' }, 'Appliquer'));
+    const form = h('form', { class: 'flex flex-col gap-4' },
+      h('div', { class: ui.cards }, ...['network', 'storage', 'limits', 'defaults'].map((g) => section(groupNames[g] ?? g, ...(groups.get(g) ?? [])))),
+      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Appliquer'));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       const changes: Record<string, unknown> = {};
@@ -272,7 +273,7 @@ export class SettingsPage extends AdminPage {
       }
       void this.act(() => this.api.patch('/settings', changes), 'Réglages appliqués.');
     });
-    return [h('p', { class: 'muted' }, "Appliqués tout de suite, sans redémarrer. L'adresse de l'administration reste celle du fichier de démarrage."), form];
+    return [h('p', { class: 'text-sm text-on-surface-variant' }, "Appliqués tout de suite, sans redémarrer. L'adresse de l'administration reste celle du fichier de démarrage."), form];
   }
 }
 
@@ -288,14 +289,14 @@ export class BackupsPage extends AdminPage {
   protected async render(): Promise<Child[]> {
     const { backups } = await this.api.get<{ backups: Backup[] }>('/backups');
     return [
-      h('div', { class: 'row' }, action('Sauvegarder maintenant', () => this.act(() => this.api.post('/backups'), 'Sauvegarde faite.'), 'filled')),
+      h('div', { class: 'flex flex-wrap items-center gap-2' }, action('Sauvegarder maintenant', () => this.act(() => this.api.post('/backups'), 'Sauvegarde faite.'), 'filled')),
       table(['Sauvegarde', 'Faite', 'Taille', ''],
         backups.map((b) => [
-          h('span', { class: 'mono' }, b.name, b.before_restore ? h('span', { class: 'chip' }, 'avant restauration') : null),
+          h('span', { class: 'font-mono text-[13px]' }, b.name, b.before_restore ? h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, 'avant restauration') : null),
           when(b.made),
           bytes(b.size),
-          h('span', { class: 'row' },
-            h('a', { class: 'btn text', href: this.api.url(`/backups/${seg(b.name)}`), download: b.name }, 'Télécharger'),
+          h('span', { class: 'flex flex-wrap items-center gap-2' },
+            h('a', { class: ui.btn('text'), href: this.api.url(`/backups/${seg(b.name)}`), download: b.name }, 'Télécharger'),
             action('Restaurer…', () => this.restore(b), 'text')),
         ]), 'Aucune sauvegarde pour le moment.'),
     ];

@@ -23,7 +23,9 @@ applied at once.
 At home today: container 408 `dmz-agendouille` (Alpine, 10.0.60.8) on the
 Proxmox host, behind HAProxy (10.0.60.1) and Nginx Proxy Manager
 (10.0.60.2, proxy host 7), at https://agendouille.patapouf.club; the admin
-UI at http://10.0.60.8:8792/admin from the LAN.
+UI at https://agendouille.dmz.patapouf.club/admin, through the LAN's Nginx
+Proxy Manager (`srv-npm`, 10.0.10.1, proxy host 26), which is also in
+`trusted_proxies`.
 
 ## Install
 

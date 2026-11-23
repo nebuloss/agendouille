@@ -2,12 +2,14 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="same-origin">
+<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141312" media="(prefers-color-scheme: dark)">
 <title>{{.Title}} · agendouille</title>
 <link rel="icon" type="image/svg+xml" href="/static/shared/icon.svg">
 <link rel="apple-touch-icon" href="/static/shared/icon.svg">
-<link rel="stylesheet" href="/static/shared/app.css">
+{{with .Stylesheet}}<link rel="stylesheet" href="{{.}}">{{end}}
 {{with .Script}}<script type="module" src="{{.}}"></script>{{end}}
 </head>
 <body data-page="{{.Page}}" data-bundle="{{.Bundle}}">

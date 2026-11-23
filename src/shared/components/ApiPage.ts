@@ -3,6 +3,7 @@ import { DisposableBag } from '@/shared/core/Disposable.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import type { Page } from '@/shared/core/Pages.ts';
 import { Toasts } from '@/shared/components/Ui.ts';
+import { ui } from '@/shared/components/recipes.ts';
 
 /**
  * A page the server rendered as a shell (navigation, title, a mount
@@ -39,7 +40,7 @@ export abstract class ApiPage implements Page {
       const nodes = await this.render();
       this.show(nodes);
     } catch (e) {
-      this.show([h('p', { class: 'banner error' }, e instanceof Error ? e.message : String(e))]);
+      this.show([h('p', { class: ui.error, role: 'alert' }, e instanceof Error ? e.message : String(e))]);
     }
   }
 

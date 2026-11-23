@@ -115,7 +115,8 @@ func (h *handlers) basic(next withPrincipal) http.Handler {
 func (h *handlers) shell(page, title string) withPrincipal {
 	return func(w http.ResponseWriter, _ *http.Request, p *auth.Principal) {
 		webx.Render(w, h.d.Log, http.StatusOK, "app/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.App,
-			Data: map[string]any{"Page": page, "Title": title, "User": p.User, "Zone": h.d.Settings.Get().FamilyTimezone}})
+			Data: map[string]any{"Page": page, "Title": title, "User": p.User, "Initial": initial(p.User.DisplayName, p.User.Name),
+				"Zone": h.d.Settings.Get().FamilyTimezone}})
 	}
 }
 
@@ -138,7 +139,10 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.d.Log.Error("drawing a QR code", "err", err)
 	}
-	h.render(w, http.StatusOK, "app/signin.html", "Se connecter", map[string]any{"Approval": a, "QR": qr})
+	// What is left, not when: the page counts it down on its own clock, so
+	// a phone whose clock is wrong still refreshes the code on time.
+	h.render(w, http.StatusOK, "app/signin.html", "Se connecter", map[string]any{"Approval": a, "QR": qr,
+		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()})
 }
 
 // wait long-polls an approval. Approved, it sets the session cookie; the
@@ -358,4 +362,15 @@ func (h *handlers) appSession(w http.ResponseWriter, r *http.Request, p *auth.Pr
 func (h *handlers) appConfig(w http.ResponseWriter, _ *http.Request, _ *auth.Principal) {
 	webx.JSON(w, http.StatusOK, map[string]any{"server_version": h.d.Version, "min_app_version": "0.0.0",
 		"apk_sha256": "", "bridge": 1, "sync_interval_s": h.d.Settings.Get().AppSyncIntervalMinutes * 60})
+}
+
+// initial is the letter on a user's avatar: the first of the display name,
+// a whole character ("É", not half of it).
+func initial(display, name string) string {
+	for _, s := range []string{display, name} {
+		for _, r := range s {
+			return strings.ToUpper(string(r))
+		}
+	}
+	return "?"
 }

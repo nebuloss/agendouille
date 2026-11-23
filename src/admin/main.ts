@@ -1,5 +1,6 @@
 // The admin UI's bundle (static/admin/admin.js), served on the admin
 // listener only. Each page fills the shell the server rendered.
+import './admin.css';
 import { adminApi } from '@/admin/pages/base.ts';
 import { ActivityPage, BackupsPage, CalendarsPage, GroupsPage, SettingsPage } from '@/admin/pages/More.ts';
 import { OverviewPage } from '@/admin/pages/Overview.ts';

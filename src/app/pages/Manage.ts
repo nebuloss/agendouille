@@ -1,7 +1,10 @@
 import { seg, type Api } from '@/shared/core/Api.ts';
-import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
+import { h, setAttributes, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
+import { Countdown } from '@/shared/components/Countdown.ts';
+import { icon } from '@/shared/components/icons.ts';
+import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
-import { action, confirmDialog, dialog, field, section, swatch, table } from '@/shared/components/Ui.ts';
+import { action, card, check, confirmDialog, dialog, field, section, styleControl, swatch, table } from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
 
@@ -27,14 +30,13 @@ export class CalendarsPage extends AppPage {
     const me = this.doc.querySelector<HTMLElement>('.app')?.dataset['user'] ?? '';
     const mine = cals.calendars.filter((c) => c.owner === me);
     const others = cals.calendars.filter((c) => c.owner !== me);
-    const newBtn = action('+ Nouveau calendrier', () => this.create(), 'filled');
+    const newBtn = action('Nouveau calendrier', () => this.create(), 'filled', 'plus');
     return [
-      section('Mes calendriers',
-        h('div', { class: 'card-actions' }, newBtn),
-        mine.length === 0 ? h('p', { class: 'empty' }, "Vous n'avez pas encore de calendrier.") : null,
+      card('Mes calendriers', [newBtn],
+        mine.length === 0 ? h('p', { class: ui.empty }, "Vous n'avez pas encore de calendrier.") : null,
         ...mine.map((c) => this.ownedCard(c, people))),
       section('Partagés avec moi',
-        others.length === 0 ? h('p', { class: 'empty' }, 'Personne ne vous a encore partagé de calendrier.') : null,
+        others.length === 0 ? h('p', { class: ui.empty }, 'Personne ne vous a encore partagé de calendrier.') : null,
         ...others.map((c) => this.sharedCard(c))),
     ];
   }
@@ -52,31 +54,37 @@ export class CalendarsPage extends AppPage {
     const shareRows = shares.map((s: Share) => [
       this.nameOf(people, s.target),
       ACCESS[s.access] ?? s.access,
-      action('Retirer', () => this.act(() => this.api.delete(`${path}/shares/${seg(s.target)}`), 'Partage retiré.'), 'text'),
+      action('Retirer', () => this.act(() => this.api.delete(`${path}/shares/${seg(s.target)}`), 'Partage retiré.'), 'text', 'close', 'sm'),
     ]);
-    return h('div', { class: 'cal-card' },
-      h('div', { class: 'cal-card-head' }, swatch(c.color), h('strong', {}, c.name), c.hidden ? h('span', { class: 'chip' }, 'masqué') : null),
-      c.description !== '' ? h('p', { class: 'muted' }, c.description) : null,
-      shares.length > 0 ? table(['Partagé avec', 'Accès', ''], shareRows) : h('p', { class: 'muted' }, 'Partagé avec personne.'),
-      h('div', { class: 'card-actions' },
-        action('Partager', () => this.share(c, people)),
-        action('Modifier', () => this.editProps(c), 'text'),
-        h('a', { class: 'btn text', href: this.api.url(`${path}/export`), download: `${c.ref}.ics` }, 'Exporter'),
-        action('Importer', () => this.importInto(c), 'text'),
-        action('Donner', () => this.transfer(c, people), 'text'),
-        action('Supprimer', () => this.remove(c), 'danger')));
+    return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
+      h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
+        h('div', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate text-base' }, c.name),
+          h('span', { class: 'text-xs text-on-surface-variant' }, shares.length === 0 ? 'À moi, partagé avec personne' : `À moi, partagé ${shares.length === 1 ? 'une fois' : `${shares.length} fois`}`)),
+        c.hidden ? h('span', { class: ui.pill.muted }, 'masqué') : null),
+      c.description !== '' ? h('p', { class: 'text-sm text-on-surface-variant' }, c.description) : null,
+      shares.length > 0 ? table(['Partagé avec', 'Accès', ''], shareRows) : null,
+      h('div', { class: 'flex flex-wrap items-center gap-1' },
+        action('Partager', () => this.share(c, people), 'tonal', 'share', 'sm'),
+        action('Modifier', () => this.editProps(c), 'text', 'edit', 'sm'),
+        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`${path}/export`), download: `${c.ref}.ics` }, icon('download'), 'Exporter'),
+        action('Importer', () => this.importInto(c), 'text', 'upload', 'sm'),
+        action('Donner', () => this.transfer(c, people), 'text', 'give', 'sm'),
+        h('span', { class: 'ml-auto' }),
+        action('Supprimer', () => this.remove(c), 'danger-text', 'trash', 'sm')));
   }
 
   private sharedCard(c: Calendar): HTMLElement {
     const path = `/calendars/${seg(c.ref)}`;
-    return h('div', { class: 'cal-card' },
-      h('div', { class: 'cal-card-head' }, swatch(c.color), h('strong', {}, c.name), h('span', { class: 'muted' }, ` · ${c.owner}`),
-        h('span', { class: 'chip' }, ACCESS[c.access] ?? c.access)),
-      h('div', { class: 'card-actions' },
+    return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
+      h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
+        h('div', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate text-base' }, c.name),
+          h('span', { class: 'text-xs text-on-surface-variant' }, `De ${c.owner}`)),
+        h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, ACCESS[c.access] ?? c.access)),
+      h('div', { class: 'flex flex-wrap items-center gap-1' },
         c.hidden
-          ? action('Ne plus masquer', () => this.act(() => this.api.patch(path, { hidden: false }), 'Il revient sur vos appareils.'))
-          : action('Masquer', () => this.act(() => this.api.patch(path, { hidden: true }), 'Masqué, ici et sur vos appareils.'), 'text'),
-        action('Ma couleur', () => this.editProps(c), 'text')));
+          ? action('Ne plus masquer', () => this.act(() => this.api.patch(path, { hidden: false }), 'Il revient sur vos appareils.'), 'tonal', 'show', 'sm')
+          : action('Masquer', () => this.act(() => this.api.patch(path, { hidden: true }), 'Masqué, ici et sur vos appareils.'), 'text', 'hide', 'sm'),
+        action('Ma couleur', () => this.editProps(c), 'text', 'palette', 'sm')));
   }
 
   private colorPicker(current: string): HTMLInputElement {
@@ -139,7 +147,7 @@ export class CalendarsPage extends AppPage {
     const file = h('input', { type: 'file', accept: '.ics,text/calendar' });
     const replace = h('input', { type: 'checkbox' });
     const v = await dialog(this.doc, `Importer dans « ${c.name} »`, [
-      file, h('label', { class: 'checks' }, replace, 'Remplacer les événements déjà là (même UID)'),
+      styleControl(file), check(replace, 'Remplacer les événements déjà là (même UID)'),
     ], [{ label: 'Annuler', value: '' }, { label: 'Importer', value: 'ok', kind: 'filled' }]);
     const f = file.files?.[0];
     if (v !== 'ok' || f === undefined) return;
@@ -207,30 +215,29 @@ export class DevicesPage extends AppPage {
     const name = (ref: string): string => cals.calendars.find((c) => c.ref === ref)?.name ?? ref;
     return [
       section('Synchroniser un appareil',
-        h('p', {}, 'Chaque appareil a son propre mot de passe, que vous pouvez retirer seul.'),
-        h('div', { class: 'card-actions' },
-          action('Android (DAVx5)', () => this.add('davx5'), 'filled'),
-          action('iPhone, iPad, Mac', () => this.add('ios')),
-          action('Thunderbird', () => this.add('thunderbird')),
-          action('Autre', () => this.add('other'), 'text')),
+        h('p', { class: 'text-sm text-on-surface-variant' }, 'Chaque appareil a son propre mot de passe, que vous pouvez retirer seul.'),
+        h('div', { class: 'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap' },
+          action('Android (DAVx5)', () => this.add('davx5'), 'filled', 'phone'),
+          action('iPhone, iPad, Mac', () => this.add('ios'), 'tonal', 'phone'),
+          action('Thunderbird', () => this.add('thunderbird'), 'tonal', 'laptop'),
+          action('Autre', () => this.add('other'), 'outlined', 'devices')),
         table(['Appareil', 'Accès', 'Dernière synchro', ''], devices.devices.map((d) => [
-          h('span', {}, h('strong', {}, d.label), h('br', {}), h('span', { class: 'muted' }, KINDS[d.kind] ?? d.kind)),
+          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' }, KINDS[d.kind] ?? d.kind)),
           d.cap === 'read' ? 'lecture seule' : 'lecture et écriture',
           d.last_used_at ? ago(d.last_used_at) : 'jamais',
-          action('Retirer', () => this.revoke(`/devices/${d.id}`, `Retirer « ${d.label} » ?`, 'Il ne pourra plus synchroniser.'), 'danger'),
+          action('Retirer', () => this.revoke(`/devices/${d.id}`, `Retirer « ${d.label} » ?`, 'Il ne pourra plus synchroniser.'), 'danger-text', 'trash', 'sm'),
         ]), "Aucun appareil pour l'instant.")),
-      section("Liens d'abonnement",
-        h('p', {}, 'Une adresse .ics en lecture seule, pour une télé ou un agenda qui ne sait pas CalDAV. Qui a le lien voit les calendriers choisis.'),
-        h('div', { class: 'card-actions' }, action('+ Nouveau lien', () => this.addLink(cals.calendars))),
+      card("Liens d'abonnement", [action('Nouveau lien', () => this.addLink(cals.calendars), 'tonal', 'link', 'sm')],
+        h('p', { class: 'text-sm text-on-surface-variant' }, 'Une adresse .ics en lecture seule, pour une télé ou un agenda qui ne sait pas CalDAV. Qui a le lien voit les calendriers choisis.'),
         table(['Lien', 'Calendriers', 'Dernière lecture', ''], links.links.map((l) => [
           l.label, l.calendars.map(name).join(', '), l.last_used_at ? ago(l.last_used_at) : 'jamais',
-          action('Retirer', () => this.revoke(`/links/${l.id}`, `Retirer le lien « ${l.label} » ?`, "L'adresse cesse de marcher."), 'danger'),
+          action('Retirer', () => this.revoke(`/links/${l.id}`, `Retirer le lien « ${l.label} » ?`, "L'adresse cesse de marcher."), 'danger-text', 'trash', 'sm'),
         ]), 'Aucun lien.')),
       section('Navigateurs connectés',
         table(['Navigateur', 'Vu', ''], sessions.sessions.map((s) => [
-          h('span', {}, s.app ? "L'app agendouille" : browserName(s.user_agent), s.current ? h('span', { class: 'chip' }, 'celui-ci') : null),
+          h('span', {}, s.app ? "L'app agendouille" : browserName(s.user_agent), s.current ? h('span', { class: `${ui.pill.ok} ml-2` }, 'celui-ci') : null),
           ago(s.seen_at),
-          s.current ? null : action('Déconnecter', () => this.revoke(`/sessions/${s.id}`, 'Déconnecter ce navigateur ?', 'Il faudra le reconnecter.'), 'danger'),
+          s.current ? null : action('Déconnecter', () => this.revoke(`/sessions/${s.id}`, 'Déconnecter ce navigateur ?', 'Il faudra le reconnecter.'), 'danger-text', 'logout', 'sm'),
         ]))),
     ];
   }
@@ -253,22 +260,22 @@ export class DevicesPage extends AppPage {
       this.toasts.error(e);
       return;
     }
-    const manual = h('dl', { class: 'manual' },
+    const manual = h('dl', { class: ui.kv },
       h('dt', {}, 'Serveur'), h('dd', {}, h('code', {}, d.manual.server)),
       h('dt', {}, 'Utilisateur'), h('dd', {}, h('code', {}, d.username)),
-      h('dt', {}, 'Mot de passe'), h('dd', {}, h('code', { class: 'secret' }, d.secret)));
+      h('dt', {}, 'Mot de passe'), h('dd', {}, h('code', { class: ui.secret }, d.secret)));
     const body: Child[] = [];
     if (d.davx5_uri !== undefined) {
       body.push(h('p', {}, 'Sur le téléphone, installez DAVx5, puis scannez ce code avec l’appareil photo, ou touchez le lien depuis le téléphone.'));
-      if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr', src: svgDataUrl(d.qr_svg), alt: 'QR code pour DAVx5', width: 240, height: 240 }));
+      if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(d.qr_svg), alt: 'QR code pour DAVx5', width: 240, height: 240 }));
       body.push(h('p', {}, h('a', { href: d.davx5_uri }, 'Ouvrir dans DAVx5')));
     }
     if (d.mobileconfig_url !== undefined) {
       body.push(h('p', {}, 'Ouvrez cette page sur l’iPhone, touchez le bouton, puis Réglages, Profil téléchargé, Installer. Le lien ne marche qu’une fois, dix minutes.'),
-        h('p', {}, h('a', { class: 'btn filled', href: d.mobileconfig_url }, 'Installer le profil')));
+        h('p', {}, h('a', { class: ui.btn('filled'), href: d.mobileconfig_url }, 'Installer le profil')));
     }
-    body.push(h('p', { class: 'muted' }, 'Ou à la main, dans un compte CalDAV :'), manual,
-      h('p', { class: 'banner' }, 'Le mot de passe ne sera plus affiché. Retirez l’appareil pour en refaire un.'));
+    body.push(h('p', { class: 'text-sm' }, 'Ou à la main, dans un compte CalDAV :'), manual,
+      h('p', { class: ui.notice }, icon('warn'), 'Le mot de passe ne sera plus affiché. Retirez l’appareil pour en refaire un.'));
     await dialog(this.doc, `« ${d.label} » ajouté`, body, [{ label: "C'est fait", value: 'ok', kind: 'filled' }]);
     await this.refresh();
   }
@@ -277,13 +284,13 @@ export class DevicesPage extends AppPage {
     const label = h('input', { required: true, value: 'Télé du salon' });
     const boxes = cals.map((c) => ({ c, box: h('input', { type: 'checkbox', checked: c.shown }) }));
     const v = await dialog(this.doc, "Nouveau lien d'abonnement", [field('Nom', label),
-      h('div', { class: 'cal-picker' }, ...boxes.map(({ c, box }) => h('label', { class: 'checks' }, box, swatch(c.color), c.name)))],
+      h('div', { class: 'flex flex-col gap-3' }, ...boxes.map(({ c, box }) => check(box, swatch(c.color), h('span', { class: 'text-on-surface' }, c.name))))],
     [{ label: 'Annuler', value: '' }, { label: 'Créer', value: 'ok', kind: 'filled' }]);
     const chosen = boxes.filter((b) => b.box.checked).map((b) => b.c.ref);
     if (v !== 'ok' || chosen.length === 0) return;
     try {
       const l = await this.api.post<Link>('/links', { label: label.value.trim(), calendars: chosen });
-      await dialog(this.doc, 'Lien créé', [h('p', {}, "Copiez l'adresse maintenant : elle ne sera plus affichée."), h('p', {}, h('code', { class: 'secret' }, l.url ?? ''))],
+      await dialog(this.doc, 'Lien créé', [h('p', {}, "Copiez l'adresse maintenant : elle ne sera plus affichée."), h('code', { class: ui.secret }, l.url ?? '')],
         [{ label: "C'est copié", value: 'ok', kind: 'filled' }]);
       await this.refresh();
     } catch (e) {
@@ -308,25 +315,48 @@ export class MePage extends AppPage {
     return [
       section('Moi',
         field('Nom affiché', name), field('Couleur', color),
-        h('div', { class: 'card-actions' }, action('Enregistrer', () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), 'Enregistré.'), 'filled'))),
+        h('div', { class: 'flex justify-end' }, action('Enregistrer', () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), 'Enregistré.'), 'filled'))),
       section('Mes groupes',
-        me.groups.length === 0 ? h('p', { class: 'empty' }, "Aucun groupe : l'administrateur vous en ajoute.") : h('p', {}, me.groups.map((g) => g.display_name || g.name).join(', ')),
-        h('p', { class: 'muted' }, 'Vous voyez les gens de vos groupes, et pouvez partager vos calendriers avec eux.')),
+        me.groups.length === 0 ? h('p', { class: ui.empty }, "Aucun groupe : l'administrateur vous en ajoute.")
+          : h('div', { class: 'flex flex-wrap gap-2' }, ...me.groups.map((g) => h('span', { class: ui.chip }, icon('group'), g.display_name || g.name))),
+        h('p', { class: 'text-sm text-on-surface-variant' }, 'Vous voyez les gens de vos groupes, et pouvez partager vos calendriers avec eux.')),
       section('Connecter un autre téléphone',
         h('p', {}, "Un code valable dix minutes, à scanner avec l'appareil photo du nouveau téléphone."),
-        action('Afficher le code', () => this.enrol())),
+        h('div', {}, action('Afficher le code', () => this.enrol(), 'tonal', 'qr'))),
     ];
   }
 
+  /**
+   * "Connecter un autre téléphone": a QR code that lives ten minutes, with
+   * a bar that drains, and a fresh code in its place at zero while the
+   * dialog stays open.
+   */
   private async enrol(): Promise<void> {
+    const img = h('img', { class: 'qr mx-auto rounded-md3-l p-2', alt: 'QR code de connexion', width: 240, height: 240 });
+    const timer = h('div', {});
+    let countdown: Countdown | null = null;
+    let open = true;
+    const refresh = async (): Promise<void> => {
+      const e = await this.api.post<{ qr_svg: string; expires_in_ms: number; ttl_ms: number }>('/me/enrolment');
+      setAttributes(img, { src: svgDataUrl(e.qr_svg) });
+      countdown?.dispose();
+      countdown = new Countdown(timer, e.expires_in_ms, e.ttl_ms, () => {
+        if (open) refresh().catch((err: unknown) => this.toasts.error(err));
+      });
+    };
     try {
-      const e = await this.api.post<{ url: string; qr_svg: string }>('/me/enrolment');
-      await dialog(this.doc, 'Scannez avec le nouveau téléphone', [
-        h('img', { class: 'qr', src: svgDataUrl(e.qr_svg), alt: 'QR code de connexion', width: 240, height: 240 }),
-        h('p', { class: 'muted' }, 'Valable dix minutes, une seule fois.'),
-      ], [{ label: 'Fermer', value: '', kind: 'filled' }]);
+      await refresh();
     } catch (e) {
       this.toasts.error(e);
+      return;
     }
+    await dialog(this.doc, 'Scannez avec le nouveau téléphone', [
+      img,
+      timer,
+      h('p', { class: 'text-center text-sm' }, "Avec l'appareil photo du nouveau téléphone. Chaque code ne sert qu'une fois."),
+    ], [{ label: 'Fermer', value: '', kind: 'filled' }]);
+    open = false;
+    (countdown as Countdown | null)?.dispose();
   }
+
 }

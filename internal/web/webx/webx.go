@@ -24,6 +24,14 @@ type Page struct {
 	Data   any
 }
 
+// Stylesheet is the bundle's stylesheet, or "" without the bundle.
+func (p Page) Stylesheet() string {
+	if assets.Built(p.Bundle) {
+		return strings.TrimSuffix(p.Bundle.URL(), ".js") + ".css"
+	}
+	return ""
+}
+
 // Script is the bundle's URL, or "" when this binary was built without it.
 func (p Page) Script() string {
 	if assets.Built(p.Bundle) {

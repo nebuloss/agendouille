@@ -164,7 +164,8 @@ func (h *handlers) selfEnrolment(w http.ResponseWriter, r *http.Request, p *auth
 		h.fail(w, err)
 		return
 	}
-	webx.JSON(w, http.StatusCreated, map[string]any{"url": link, "qr_svg": qr, "expires_at": e.ExpiresAt})
+	webx.JSON(w, http.StatusCreated, map[string]any{"url": link, "qr_svg": qr, "expires_at": e.ExpiresAt,
+		"expires_in_ms": e.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "ttl_ms": (10 * time.Minute).Milliseconds()})
 }
 
 type personView struct {

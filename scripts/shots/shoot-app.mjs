@@ -13,6 +13,11 @@ const page = await browser.newPage();
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 page.on('pageerror', (e) => errors.push(`page: ${e.message}`));
 await page.emulateTimezone('America/New_York'); // the family zone wins over the browser's
+// Signed out first: the sign-in page, its QR and its countdown.
+await page.setViewport({ width: 390, height: 844, isMobile: true });
+await page.goto(base + '/signin', { waitUntil: 'networkidle2' });
+await new Promise((r) => setTimeout(r, 1200));
+await page.screenshot({ path: `${out}/app-signin.png` });
 await page.setViewport({ width: 1280, height: 860 });
 await page.goto(enrol, { waitUntil: 'networkidle2' });
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
@@ -61,6 +66,10 @@ if (judo) {
     await close();
   } else errors.push('no Modifier on the Judo sheet (is the shared calendar writable?)');
 } else errors.push('no Judo in the week');
+await page.goto(base + '/me', { waitUntil: 'networkidle2' });
+await (await page.$('xpath/.//button[contains(., "Afficher le code")]')).click();
+await shot('me-enrol');
+await close();
 await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
 const add = await page.$('xpath/.//button[contains(., "Android (DAVx5)")]');
 await add.click();

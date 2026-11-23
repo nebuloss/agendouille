@@ -1,0 +1,85 @@
+/* The family web app's stylesheet (static/app/app.css): Tailwind, the
+   design shared with claudication and cafard, and the calendar grids, which
+   are positioned by script and easier to say as rules than as utilities.
+   Tailwind reads the classes in this bundle's code and the app templates. */
+@import "tailwindcss" source(none);
+@import "../shared/design/base.css";
+@source ".";
+@source "../shared";
+@source "../../internal/web/assets/templates/layout.html";
+@source "../../internal/web/assets/templates/app";
+
+/* An event wears its calendar's colour (--cal, set from script): a tint of
+   it on the surface, its full colour as the leading edge. */
+.event {
+  --cal: var(--color-outline);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-md3-s);
+  border-left: 4px solid var(--cal);
+  background: color-mix(in srgb, var(--cal) 16%, var(--color-surface-lowest));
+  color: var(--color-on-surface);
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+}
+.event:hover { background: color-mix(in srgb, var(--cal) 26%, var(--color-surface-lowest)); }
+.event.all-day { background: var(--cal); color: #fff; border-left: 0; }
+.event-time { flex: none; font-variant-numeric: tabular-nums; color: var(--color-on-surface-variant); }
+.event.all-day .event-time { color: inherit; }
+.event-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-place { color: var(--color-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-who {
+  margin-left: auto; flex: none; display: inline-grid; place-items: center;
+  width: 20px; height: 20px; border-radius: 9999px; font-size: 11px; font-weight: 700;
+  background: var(--color-surface-high); color: var(--color-on-surface-variant);
+}
+.event.all-day .event-who { background: rgb(255 255 255 / 0.3); color: #fff; }
+
+/* Agenda */
+.agenda-list .event { padding: 10px 12px; font-size: 14px; border-radius: var(--radius-md3-m); }
+
+/* Week: a gutter of hours and seven columns; events placed by script. */
+.week-head, .week-allday, .week-grid { display: grid; grid-template-columns: 52px repeat(7, minmax(0, 1fr)); }
+.week-head { border-bottom: 1px solid var(--color-outline-variant); }
+.week-allday { border-bottom: 1px solid var(--color-outline-variant); }
+.week-allday-cell { border-left: 1px solid color-mix(in srgb, var(--color-outline-variant) 50%, transparent); padding: 3px; display: flex; flex-direction: column; gap: 2px; min-height: 28px; min-width: 0; }
+.week-hour { height: 48px; font-size: 11px; color: var(--color-on-surface-variant); text-align: right; padding-right: 8px; transform: translateY(-0.55em); }
+.week-col {
+  position: relative; height: calc(24 * 48px); cursor: cell;
+  border-left: 1px solid color-mix(in srgb, var(--color-outline-variant) 50%, transparent);
+  background-image: linear-gradient(color-mix(in srgb, var(--color-outline-variant) 45%, transparent) 1px, transparent 1px);
+  background-size: 100% 48px;
+}
+.week-col.today { background-color: color-mix(in srgb, var(--color-primary) 5%, transparent); }
+.event.timed { position: absolute; flex-direction: column; gap: 0; padding: 3px 6px; font-size: 12px; border: 1px solid var(--color-surface-lowest); border-left: 3px solid var(--cal); }
+.event.timed .event-who, .week-allday .event-who { display: none; }
+.now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--color-error); z-index: 2; pointer-events: none; }
+.now-line::before { content: ""; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 9999px; background: var(--color-error); }
+
+/* Month: six weeks. */
+.month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.month-cell {
+  min-height: 104px; min-width: 0; padding: 4px; display: flex; flex-direction: column; gap: 2px; cursor: cell;
+  border-top: 1px solid color-mix(in srgb, var(--color-outline-variant) 50%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--color-outline-variant) 50%, transparent);
+}
+.month-cell:nth-child(7n + 1) { border-left: 0; }
+.month-cell.other { background: var(--color-surface-low); color: var(--color-on-surface-variant); }
+.month-num { align-self: flex-start; min-width: 24px; height: 24px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+.month-cell.today .month-num { background: var(--color-primary); color: var(--color-on-primary); }
+.month .event { font-size: 11.5px; padding: 1px 5px; border-left-width: 3px; }
+.month .event .event-place, .month .event .event-who { display: none; }
+
+@media (width < 52.5rem) {
+  .week-head, .week-allday, .week-grid { grid-template-columns: 34px repeat(7, minmax(0, 1fr)); }
+  .week-hour { padding-right: 4px; font-size: 10px; }
+  .event.timed { padding: 2px 3px; font-size: 10.5px; }
+  .event.timed .event-time { display: none; }
+  .month-cell { min-height: 64px; padding: 2px; }
+  .month .event { font-size: 10px; padding: 0 3px; }
+}

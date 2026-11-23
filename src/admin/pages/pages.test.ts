@@ -66,7 +66,7 @@ describe('admin pages', () => {
     const page = new CalendarsPage(document, fakeApi({}));
     page.start();
     await settle();
-    expect(document.querySelector('.banner.error')?.textContent).toContain('no /calendars');
+    expect(document.querySelector('#admin-content [role="alert"]')?.textContent).toContain('no /calendars');
   });
 });
 

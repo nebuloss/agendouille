@@ -3,6 +3,36 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: Tailwind and Material 3, like claudication and cafard
+
+The user: "ui is ugly use typescript with tailwind like claudication and
+cafard so we can have material you design".
+
+- **Tailwind 4** (`@tailwindcss/vite`), one stylesheet per bundle
+  (`static/app/app.css`, `static/admin/admin.css`), each reading its own
+  code and its templates. The hand-written `static/shared/app.css` is gone.
+- **The design is claudication's**, as cafard's rewrite carries it:
+  `src/shared/design/theme.css` is copied as it is (MD3 tokens on a clay
+  primary, light and dark, state layers, elevation, the stacking table),
+  and `src/shared/components/recipes.ts` holds cafard's class recipes
+  (buttons, cards, tables, fields, segmented buttons, chips, dialogs) plus
+  a navigation rail and bar, a FAB and list items.
+- **Not cafard's `html` template strings**: agendouille keeps `h()` and
+  its no-HTML-sinks rule; the recipes are only class strings, so nothing
+  else had to change. Icons are SVG elements (`icons.ts`).
+- **The family app** is laid out as Material You: a navigation rail on
+  wide screens, a bottom navigation bar on phones, a top app bar with the
+  avatar, an extended FAB for a new event, an editor of icon-led rows,
+  and day toggles for a weekly repeat. The calendar grids keep a few rules
+  of their own (`src/app/app.css`), on the same tokens.
+- **QR codes that expire refresh themselves** (the user: "it must auto
+  refresh qr code, we must see a loading bar like totp"): the sign-in QR
+  (two minutes) and "connect another phone" (ten minutes) show a bar that
+  drains and "Nouveau code dans 1:23", red for the last fifth, and a new
+  code at zero (`Countdown.ts`). The server sends what is left, not when,
+  so a wrong clock on the phone does not matter. The DAVx5 QR does not
+  refresh: it holds a device password shown once.
+
 ## 2026-11-23: M5 notes
 
 - **The home server is container 408 `dmz-agendouille`** (Alpine,
@@ -24,6 +54,15 @@ Each entry gives the date, the decision and the reason.
   `trusted_proxies` 10.0.60.2. Checked through the proxy: discovery,
   PROPFIND, PUT, REPORT, a stale PUT refused (412), DELETE, a web sign-in
   and a live event, with a throwaway user removed afterwards.
+- **The admin UI at `https://agendouille.dmz.patapouf.club`** (the
+  user), like claudication's: the LAN's Nginx Proxy Manager (`srv-npm`,
+  CT 201, 10.0.10.1) has proxy host 26 to 10.0.60.8:8792 with the wildcard
+  `*.dmz.patapouf.club` certificate (22), added like host 7 (database saved
+  as `database.sqlite.bak-avant-agendouille` there). The bootstrap file
+  says `admin_public_url: https://agendouille.dmz.patapouf.club` (the
+  same-origin check and the cookie follow it; the old file is
+  `/etc/agendouille.yaml.bak-avant-dmz`), and `trusted_proxies` holds both
+  proxies. Checked: sign-in, the overview and a write through it.
 - **No Debian test container** (the user): M5's "installs and upgrades on
   Debian" is checked by reading only. install.sh's systemd branch is
   cafard's, which runs on Debian; agendouille's own runs are on Alpine.

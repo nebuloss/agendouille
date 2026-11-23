@@ -1,8 +1,10 @@
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
 // Two bundles, built one after the other (`npm run build`): the family web
-// app and the admin UI. Each is self-contained, with its own copy of
+// app and the admin UI, each with its stylesheet (Tailwind and the design
+// shared with claudication and cafard: <bundle>/<bundle>.css). Each is self-contained, with its own copy of
 // src/shared, so the admin code never sits in a chunk the public listener
 // serves (PLAN.md 9.1). Each lands where Go's embed picks it up; the file
 // names are fixed because the layouts name them, and the server
@@ -16,6 +18,7 @@ export default defineConfig(({ mode }) => {
   }
   const bundle = mode as Bundle;
   return {
+    plugins: [tailwindcss()],
     resolve: { alias: { '@': resolve(import.meta.dirname, './src') } },
     build: {
       outDir: resolve(import.meta.dirname, `internal/web/assets/static/${bundle}`),
@@ -28,6 +31,7 @@ export default defineConfig(({ mode }) => {
         entry: resolve(import.meta.dirname, `src/${bundle}/main.ts`),
         formats: ['es'],
         fileName: () => `${bundle}.js`,
+        cssFileName: bundle,
       },
     },
   };

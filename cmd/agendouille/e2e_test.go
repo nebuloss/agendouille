@@ -360,8 +360,8 @@ func TestM1(t *testing.T) {
 }
 
 var (
-	shortCodeRe = regexp.MustCompile(`id="signin-short-code">([^<]+)<`)
-	numberRe    = regexp.MustCompile(`id="signin-number">([0-9]+)<`)
+	shortCodeRe = regexp.MustCompile(`id="signin-short-code"[^>]*>([^<]+)<`)
+	numberRe    = regexp.MustCompile(`id="signin-number"[^>]*>([0-9]+)<`)
 	waitRe      = regexp.MustCompile(`action="(/signin/wait/[0-9a-f]+)"`)
 )
 

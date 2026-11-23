@@ -68,8 +68,8 @@ M0 and M1 are done. What exists:
   nginx and Caddy examples, README with the client checklist),
   `scripts/devdeploy.sh`, `admin passwd --if-unset`, the andouille icon.
   Deployed to CT 408 `dmz-agendouille`, public at
-  https://agendouille.patapouf.club (NPM proxy host 7), admin UI on the
-  LAN at http://10.0.60.8:8792/admin:
+  https://agendouille.patapouf.club (DMZ NPM, proxy host 7), admin UI at
+  https://agendouille.dmz.patapouf.club/admin (LAN NPM `srv-npm`, host 26):
   `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
@@ -160,6 +160,11 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **The rsync in `remote.sh` deletes `scripts/shots/node_modules`** (the
   link to puppeteer): `ln -sfn $HOME/shots/node_modules scripts/shots/node_modules`
   in the same remote command before any `node scripts/shots/*.mjs`.
+- **Styles are Tailwind classes** with the shared design's tokens
+  (`bg-surface-container`, `text-on-surface-variant`, `rounded-md3-xl`):
+  repeated ones come from `src/shared/components/recipes.ts`, written out
+  whole (Tailwind reads the files; a class assembled from pieces is never
+  generated). `theme.css` is claudication's, copied: change it there.
 - **Screenshots before saying a page works:** `scripts/remote.sh 'bash
   scripts/shots/run.sh'`, then look at them. Happy-dom tests do not catch
   layout. The app pages hold `/api/live` open: wait for `networkidle2`,

@@ -1,10 +1,18 @@
-<h1>Bienvenue</h1>
-{{if .Error}}
-<p role="alert">{{.Error}}</p>
-<p>Demandez un nouveau lien à la personne qui gère agendouille.</p>
-{{else}}
-<p>Ce lien connecte cet appareil à agendouille. Il ne marche qu'une fois.</p>
-<form method="post" action="/enrol/{{.Token}}">
-  <button type="submit">Continuer</button>
-</form>
-{{end}}
+<div class="flex min-h-screen items-start justify-center px-4 py-10 sm:items-center">
+<div class="flex w-full max-w-[440px] flex-col gap-5 rounded-md3-xl bg-surface-container p-6 sm:p-8">
+  <div class="flex items-center gap-3">
+    <img src="/static/shared/icon.svg" alt="" width="44" height="44" class="rounded-md3-m">
+    <div><p class="text-xs font-semibold tracking-wider text-on-surface-variant uppercase">agendouille</p>
+    <h1 class="text-2xl font-normal">Bienvenue</h1></div>
+  </div>
+  {{if .Error}}
+  <p role="alert" class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">{{.Error}}</p>
+  <p class="text-on-surface-variant">Demandez un nouveau lien à la personne qui gère agendouille.</p>
+  {{else}}
+  <p class="text-on-surface-variant">Ce lien connecte cet appareil aux calendriers de la famille. Il ne marche qu'une fois.</p>
+  <form method="post" action="/enrol/{{.Token}}" class="flex justify-end">
+    <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-6 text-sm font-medium text-on-primary">Continuer</button>
+  </form>
+  {{end}}
+</div>
+</div>

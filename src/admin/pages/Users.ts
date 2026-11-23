@@ -1,3 +1,4 @@
+import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
 import { action, confirmDialog, dialog, field, section, swatch, table } from '@/shared/components/Ui.ts';
@@ -78,9 +79,9 @@ const userLink = (name: string): HTMLElement => h('a', { href: `/admin/users/${s
 export async function showEnrolment(doc: Document, who: string, e: Enrolment): Promise<void> {
   const body: Child[] = [
     h('p', {}, `${who} scanne ce code avec l'appareil photo de son téléphone. Il ne marche qu'une fois, jusqu'au ${when(e.expires_at)}.`),
-    e.qr_svg !== undefined ? h('img', { class: 'qr', src: svgDataUrl(e.qr_svg), alt: 'QR code de connexion', width: 240, height: 240 }) : null,
-    h('p', { class: 'field-hint' }, 'Ou envoyez-lui ce lien par message :'),
-    h('p', { class: 'link-box' }, e.url ?? ''),
+    e.qr_svg !== undefined ? h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(e.qr_svg), alt: 'QR code de connexion', width: 240, height: 240 }) : null,
+    h('p', { class: 'text-xs text-on-surface-variant' }, 'Ou envoyez-lui ce lien par message :'),
+    h('p', { class: ui.secret }, e.url ?? ''),
   ];
   await dialog(doc, 'Première connexion', body, [{ label: 'Fermer', value: 'close', kind: 'filled' }]);
 }
@@ -98,11 +99,11 @@ export class UsersPage extends AdminPage {
         users.map((u) => [
           userLink(u.name),
           h('span', {}, swatch(u.color), u.display_name),
-          h('span', {}, ...u.groups.map((g) => h('span', { class: 'chip' }, g))),
+          h('span', {}, ...u.groups.map((g) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, g))),
           String(u.devices),
           String(u.calendars_owned),
           ago(u.last_seen_at),
-          u.disabled ? h('span', { class: 'chip warn' }, 'désactivé') : '',
+          u.disabled ? h('span', { class: ui.pill.err }, 'désactivé') : '',
         ]),
         'Aucun utilisateur pour le moment.',
       ),
@@ -114,15 +115,15 @@ export class UsersPage extends AdminPage {
     const name = h('input', { name: 'name', required: true, autocomplete: 'off', pattern: '[a-z][a-z0-9-]{0,31}', placeholder: 'lea' });
     const display = h('input', { name: 'display_name', placeholder: 'Léa' });
     const checks = groups.map((g) => h('input', { type: 'checkbox', value: g.name }));
-    const form = h('form', { class: 'add-user' },
-      h('div', { class: 'form-grid' },
+    const form = h('form', { class: 'add-user flex flex-col items-start gap-4 [&>div]:w-full' },
+      h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' },
         field('Identifiant', name, 'Minuscules, chiffres et tirets ; ne change plus.'),
         field("Nom affiché", display),
       ),
       groups.length > 0
-        ? h('div', {}, h('span', { class: 'field-label' }, 'Groupes'), h('div', { class: 'checks' }, ...groups.map((g, i) => h('label', {}, checks[i]!, g.display_name))))
-        : h('p', { class: 'muted' }, "Aucun groupe : créez-en un pour que les gens se voient et partagent."),
-      h('button', { class: 'btn filled', type: 'submit' }, 'Ajouter et afficher le QR de connexion'),
+        ? h('div', {}, h('span', { class: ui.label }, 'Groupes'), h('div', { class: 'flex flex-wrap gap-x-5 gap-y-2' }, ...groups.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))))
+        : h('p', { class: 'text-sm text-on-surface-variant' }, "Aucun groupe : créez-en un pour que les gens se voient et partagent."),
+      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Ajouter et afficher le QR de connexion'),
     );
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
@@ -155,8 +156,8 @@ export class UserPage extends AdminPage {
     ]);
     const u = d.user;
     return [
-      h('p', { class: 'muted' }, `Identifiant ${u.name} · créé le ${day(u.created_at)} · vu ${ago(u.last_seen_at)}`),
-      u.disabled ? h('p', { class: 'banner error' }, 'Désactivé : ses appareils et ses navigateurs ne marchent plus.') : null,
+      h('p', { class: 'text-sm text-on-surface-variant' }, `Identifiant ${u.name} · créé le ${day(u.created_at)} · vu ${ago(u.last_seen_at)}`),
+      u.disabled ? h('p', { class: ui.error }, 'Désactivé : ses appareils et ses navigateurs ne marchent plus.') : null,
       this.profile(u),
       this.groupsCard(d.groups, groups),
       this.signin(u, d.enrolments),
@@ -174,12 +175,12 @@ export class UserPage extends AdminPage {
         h('h3', {}, 'Les siens'),
         table(['Calendrier', 'Événements', 'Taille', 'Partagé avec'],
           d.calendars_owned.map((c) => [h('span', {}, swatch(c.color), c.name), String(c.events), bytes(c.bytes),
-            h('span', {}, ...c.shares.map((s) => h('span', { class: 'chip' }, `${s.target} · ${accessLabel(s.access)}`)))]), 'Aucun.'),
+            h('span', {}, ...c.shares.map((s) => h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, `${s.target} · ${accessLabel(s.access)}`)))]), 'Aucun.'),
         h('h3', {}, 'Partagés avec lui ou elle'),
         table(['Calendrier', 'Accès', 'Par'], d.calendars_shared.map((c) => [c.name, accessLabel(c.access), c.via]), 'Aucun.'),
       ),
       section('Compte',
-        h('div', { class: 'row' },
+        h('div', { class: 'flex flex-wrap items-center gap-2' },
           u.disabled
             ? action('Réactiver', () => this.act(() => this.api.patch(this.path(), { disabled: false }), 'Réactivé.'))
             : action('Désactiver', () => this.act(() => this.api.patch(this.path(), { disabled: true }), 'Désactivé.')),
@@ -191,8 +192,8 @@ export class UserPage extends AdminPage {
   private profile(u: User): HTMLElement {
     const display = h('input', { value: u.display_name });
     const color = h('input', { type: 'color', value: u.color });
-    const form = h('form', {}, h('div', { class: 'form-grid' }, field('Nom affiché', display), field('Couleur', color)),
-      h('button', { class: 'btn tonal', type: 'submit' }, 'Enregistrer'));
+    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' }, h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field('Nom affiché', display), field('Couleur', color)),
+      h('button', { class: ui.btn('tonal'), type: 'submit' }, 'Enregistrer'));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       void this.act(() => this.api.patch(this.path(), { display_name: display.value.trim(), color: color.value }), 'Enregistré.');
@@ -202,15 +203,15 @@ export class UserPage extends AdminPage {
 
   private groupsCard(mine: string[], all: Group[]): HTMLElement {
     const checks = all.map((g) => h('input', { type: 'checkbox', value: g.name, checked: mine.includes(g.name) }));
-    const form = h('form', {},
-      h('div', { class: 'checks' }, ...all.map((g, i) => h('label', {}, checks[i]!, g.display_name))),
-      h('p', { class: 'field-hint' }, "On voit les gens de ses groupes, et on ne partage qu'avec eux."),
-      h('button', { class: 'btn tonal', type: 'submit' }, 'Enregistrer les groupes'));
+    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' },
+      h('div', { class: 'flex flex-wrap gap-x-5 gap-y-2' }, ...all.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))),
+      h('p', { class: 'text-xs text-on-surface-variant' }, "On voit les gens de ses groupes, et on ne partage qu'avec eux."),
+      h('button', { class: ui.btn('tonal'), type: 'submit' }, 'Enregistrer les groupes'));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       void this.act(() => this.api.patch(this.path(), { groups: checks.filter((c) => c.checked).map((c) => c.value) }), 'Groupes enregistrés.');
     });
-    return section('Groupes', all.length > 0 ? form : h('p', { class: 'muted' }, 'Aucun groupe.'));
+    return section('Groupes', all.length > 0 ? form : h('p', { class: 'text-sm text-on-surface-variant' }, 'Aucun groupe.'));
   }
 
   private signin(u: User, enrolments: Enrolment[]): HTMLElement {

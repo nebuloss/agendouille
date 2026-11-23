@@ -1,21 +1,27 @@
-<div class="admin">
-<header class="topbar admin-bar">
-  <a class="brand" href="/admin"><img src="/static/shared/icon.svg" alt="" width="28" height="28">agendouille · administration</a>
-  <form method="post" action="/admin/signout"><button class="btn text" type="submit">Se déconnecter</button></form>
+{{define "adminnav"}}
+<a href="/admin" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if eq .Page "overview"}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7 M6 9.5V20h4.5v-5h3v5H18V9.5"/></svg>Vue d'ensemble</a>
+<a href="/admin/users" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if or (eq .Page "users") (eq .Page "user")}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5 M16 5.5a3 3 0 010 5.8 M18 14c1.7.6 2.7 2.4 3 5"/></svg>Utilisateurs</a>
+<a href="/admin/groups" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if eq .Page "groups"}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10a3 3 0 100-6 3 3 0 000 6z M6 20c.5-3 2.8-5 6-5s5.5 2 6 5 M5 9.5a2.2 2.2 0 100-4.4 M19 9.5a2.2 2.2 0 110-4.4"/></svg>Groupes</a>
+<a href="/admin/calendars" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if eq .Page "calendars"}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2z M4 10h16 M8 3v4 M16 3v4"/></svg>Calendriers</a>
+<a href="/admin/activity" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if eq .Page "activity"}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01"/></svg>Activité</a>
+<a href="/admin/settings" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if eq .Page "settings"}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z M12 2v3 M12 19v3 M4.2 4.2l2.1 2.1 M17.7 17.7l2.1 2.1 M2 12h3 M19 12h3 M4.2 19.8l2.1-2.1 M17.7 6.3l2.1-2.1"/></svg>Réglages</a>
+<a href="/admin/backups" class="state-layer flex shrink-0 items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if eq .Page "backups"}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6 M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Sauvegardes</a>
+{{end}}
+<div class="admin min-h-screen">
+<header class="flex h-16 items-center gap-3 px-4">
+  <a href="/admin" class="flex items-center gap-2.5 text-on-surface no-underline"><img src="/static/shared/icon.svg" alt="" width="32" height="32" class="rounded-md3-s">
+    <span class="text-lg font-semibold">agendouille</span><span class="hidden text-xs font-semibold text-on-surface-variant sm:inline">administration</span></a>
+  <form method="post" action="/admin/signout" class="ml-auto"><button class="state-layer inline-flex h-10 items-center rounded-md3-full px-4 text-sm font-medium whitespace-nowrap text-primary" type="submit">Se déconnecter</button></form>
 </header>
-<nav class="sidenav" aria-label="Administration">
-  <a href="/admin" {{if eq .Page "overview"}}aria-current="page"{{end}}>Vue d'ensemble</a>
-  <a href="/admin/users" {{if or (eq .Page "users") (eq .Page "user")}}aria-current="page"{{end}}>Utilisateurs</a>
-  <a href="/admin/groups" {{if eq .Page "groups"}}aria-current="page"{{end}}>Groupes</a>
-  <a href="/admin/calendars" {{if eq .Page "calendars"}}aria-current="page"{{end}}>Calendriers</a>
-  <a href="/admin/activity" {{if eq .Page "activity"}}aria-current="page"{{end}}>Activité</a>
-  <a href="/admin/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>Réglages</a>
-  <a href="/admin/backups" {{if eq .Page "backups"}}aria-current="page"{{end}}>Sauvegardes</a>
-</nav>
-<section class="content" id="admin-content" data-name="{{.Name}}">
-  <h1>{{.Title}}</h1>
-  <noscript><p class="banner error">L'interface d'administration a besoin de JavaScript.</p></noscript>
-  <p class="loading" id="admin-loading">Chargement…</p>
-</section>
-<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="flex flex-col gap-4 px-3 pb-10 sm:px-4 lg:flex-row lg:items-start">
+  <nav class="flex gap-1 overflow-x-auto rounded-md3-xl bg-surface-container p-2 lg:sticky lg:top-4 lg:w-60 lg:shrink-0 lg:flex-col" aria-label="Administration">
+    {{template "adminnav" .}}
+  </nav>
+  <section class="flex min-w-0 flex-1 flex-col gap-4" id="admin-content" data-name="{{.Name}}">
+    <h1 class="px-1 text-[28px] font-normal">{{.Title}}</h1>
+    <noscript><p class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">L'interface d'administration a besoin de JavaScript.</p></noscript>
+    <p class="px-1 text-on-surface-variant" id="admin-loading">Chargement…</p>
+  </section>
+</div>
+<div class="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4" id="toasts" aria-live="polite"></div>
 </div>
