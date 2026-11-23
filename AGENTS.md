@@ -65,6 +65,9 @@ scripts/android.sh apk   # the debug APK, same place
   admin UI; the admin listener only from the bootstrap file.
 - **`src/app` and `src/admin` never import each other.** Shared code goes
   in `src/shared`; the admin bundle is never served on the public listener.
+- **DAVx5's code is GPLv3; we are MIT.** Read `synctools` and
+  `davx5-ose` for rules and quirks, write them down as tests, never copy or
+  translate their code (PLAN 7.3).
 - **iCalendar fixtures are shared** between Go and the Android JVM tests
   (`testdata/ical/`). Change one side, run both.
 - **Templates and static files live under `internal/web/assets/`**:

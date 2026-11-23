@@ -217,7 +217,8 @@ agendouille/
   README.md AGENTS.md CLAUDE.md PLAN.md CONTRACTS.md DECISIONS.md
 ```
 
-Module path `github.com/nebuloss/agendouille`, remote
+The project is **MIT** (Decided, user), server, web app and Android app
+alike (`LICENSE`). Module path `github.com/nebuloss/agendouille`, remote
 `git@github.com:nebuloss/agendouille.git` (Default). The Android package is
 `io.github.nebuloss.agendouille` (Default, open question 6).
 
@@ -525,8 +526,20 @@ UI shows whether it has been used.
 - **Conflicts**: on `412` the server's version wins; the local change is
   re-applied on top when it touched different fields, else dropped with a
   notification (Default).
-- DAVx5's mapping code ("synctools") is GPLv3 and is **not** used, so the
-  app's licence stays the project's choice (open question 6).
+- **DAVx5 is the reference, read but not copied** (Decided, user). Before
+  M7 starts, read `bitfireAT/synctools` (the iCalendar <-> CalendarContract
+  mapping) and `bitfireAT/davx5-ose` (the sync adapter and its sync logic),
+  and write down every rule and quirk they handle (recurrence exceptions,
+  all-day, time zones, reminders, vendor calendar apps' oddities) in
+  `android/docs/mapping-notes.md`, each as a case in `testdata/ical/` with
+  the expected Android rows. Then our own Java is written against those
+  tests. Their code is GPLv3 and the project is MIT, so **no code is copied
+  or translated line by line** from them; ideas, rules and test cases are
+  fine, and each note cites the file it came from. Their code is Kotlin on
+  AndroidX and ical4j anyway, which the no-Gradle build cannot take.
+- The sync-adapter boilerplate (account, authenticator, service, XML
+  metadata) starts from Google's `SampleSyncAdapter` (Apache-2.0), with its
+  notice kept.
 
 ### 7.4 The bridge
 
@@ -994,6 +1007,8 @@ M6, M7).
   whole APK builds with `scripts/android.sh` and in CI, with no Gradle.
 
 **M7. Android app: sync adapter**
+- First: the reading of synctools and davx5-ose (7.3) into
+  `android/docs/mapping-notes.md` and test cases in `testdata/ical/`.
 - The Java iCalendar subset parser, the CalDAV client, the mapping (7.3),
   local changes, conflicts, calendars appearing and disappearing, creating
   a calendar, "Sync now" and status over the bridge.
@@ -1076,8 +1091,7 @@ iOS, Thunderbird, each step seen on the others.
    into a read-only calendar? That is an outside contact, so off by default.
 5. **Removed users' calendars.** Transfer or delete, asked each time
    (Default), or a fixed rule?
-6. **The app's identity and licence.** Package name
-   (`io.github.nebuloss.agendouille`?), and the licence of the project
-   (MIT like cafard?).
+6. **The app's identity.** Package name
+   (`io.github.nebuloss.agendouille`?). The licence is decided: MIT.
 
 Until they are answered, implement with the defaults written here.

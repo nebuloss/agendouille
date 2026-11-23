@@ -3,6 +3,15 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: MIT, and DAVx5 read but not copied
+
+The user chose MIT for the whole project, and agreed to the way DAVx5 is
+used: its sync code (`synctools`, `davx5-ose`) is GPLv3, so it is read to
+learn the mapping rules and quirks, which become notes and test cases, and
+our Java is written against those tests without copying or translating
+their code (PLAN 7.3). Google's `SampleSyncAdapter` (Apache-2.0) is the
+starting point for the sync-adapter boilerplate, its notice kept.
+
 ## 2026-11-23: the model, settled
 
 After a long exchange the user settled the model; it replaces the earlier
