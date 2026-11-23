@@ -3,7 +3,7 @@ import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
-import { action, card, confirmDialog, dialog, field, formDialog, section } from '@/shared/components/Ui.ts';
+import { action, card, confirmDialog, dialog, field, formDialog, section, secretField, styleControl } from '@/shared/components/Ui.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel, tileLink } from '@/admin/pages/More.ts';
@@ -53,6 +53,23 @@ interface Device {
   created_at: string;
   last_used_at?: string;
   last_ip?: string;
+  has_certificate?: boolean;
+}
+
+/** What the server hands over once: a certificate to download (DECISIONS: device keys). */
+interface CertificateHandover {
+  certificate_url?: string;
+  certificate_password?: string;
+}
+
+interface AddedDevice extends CertificateHandover {
+  id: number;
+  label: string;
+  kind: string;
+  server: string;
+  username: string;
+  secret: string;
+  dav_auth: string;
 }
 
 interface Session {
@@ -179,7 +196,7 @@ export class UserPage extends AdminPage {
         // device in, the devices that sync, the browsers signed in.
         return [
           this.signin(u, d.enrollments),
-          card(t('syncedDevices', { count: d.devices.length }), [],
+          card(t('syncedDevices', { count: d.devices.length }), [action(t('addDevice'), () => this.addDevice(u), 'tonal', 'plus', 'sm')],
             h('p', { class: 'text-sm text-on-surface-variant' }, t('devicesHelp')),
             entries(d.devices.map((x) => ({
               lead: iconMark(x.kind === 'thunderbird' ? 'laptop' : 'phone'),
@@ -188,7 +205,10 @@ export class UserPage extends AdminPage {
                 ...(x.last_used_at !== undefined ? [t('syncedAgo', { ago: ago(x.last_used_at) })] : []),
                 ...(x.client ? [x.client] : [])].join(' · '),
               tags: x.last_used_at === undefined ? [h('span', { class: ui.pill.muted }, t('neverSynced'))] : [],
-              actions: [action(t('revoke'), () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), t('deviceRevoked')), 'danger-text', 'trash', 'sm')],
+              actions: [
+                action(t('certificate'), () => this.newCertificate(x), 'text', 'lock', 'sm'),
+                action(t('revoke'), () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), t('deviceRevoked')), 'danger-text', 'trash', 'sm'),
+              ],
             })), t('noDevices'))),
           card(t('browsers', { count: d.sessions.length }), [],
             entries(d.sessions.map((x) => ({
@@ -353,6 +373,58 @@ export class UserPage extends AdminPage {
     }), t('noLinks')));
   }
 
+
+  /** A certificate to download once, with its password and what to do with it. */
+  private certificateBlock(c: CertificateHandover): Child[] {
+    if (c.certificate_url === undefined) return [];
+    return [
+      h('h3', { class: 'text-base font-semibold text-on-surface' }, t('certTitle')),
+      h('p', { class: 'flex justify-center' }, h('a', { class: ui.btn('filled'), href: c.certificate_url, download: '' }, icon('download'), t('certDownload'))),
+      h('p', { class: 'text-sm' }, t('certPassword')),
+      secretField(c.certificate_password ?? '', t('certPassword')),
+      h('p', { class: 'text-sm text-on-surface-variant' }, t('certHelp')),
+    ];
+  }
+
+  /** A new device for this user, its manual settings shown once. */
+  private async addDevice(u: User): Promise<void> {
+    const kind = styleControl(h('select', {},
+      ...(['davx5', 'thunderbird', 'ios', 'app', 'other'] as const).map((k) => h('option', { value: k }, deviceKind(k)))));
+    const label = h('input', { required: true, maxlength: 100, placeholder: t('deviceLabelHint') });
+    const cap = styleControl(h('select', {}, h('option', { value: 'readwrite' }, t('readWrite')), h('option', { value: 'read' }, t('readOnly'))));
+    let added: AddedDevice | null = null;
+    const ok = await formDialog(this.doc, t('addDeviceTitle', { name: u.display_name }),
+      [field(t('deviceKind'), kind), field(t('deviceLabel'), label), field(t('deviceAccess'), cap)], t('addDevice'), async () => {
+        added = await this.api.post<AddedDevice>(`${this.path()}/devices`, { kind: kind.value, label: label.value.trim(), cap: cap.value });
+      });
+    if (!ok || added === null) return;
+    const d: AddedDevice = added;
+    const keysOnly = d.dav_auth === 'keys';
+    await dialog(this.doc, t('deviceAdded', { name: d.label }), [
+      h('p', {}, keysOnly ? t('manualKeys') : t('manualIntro')),
+      h('dl', { class: ui.kv },
+        h('dt', {}, t('manualServer')), h('dd', {}, h('code', {}, d.server)),
+        ...(keysOnly ? [] : [
+          h('dt', {}, t('manualUser')), h('dd', {}, h('code', {}, d.username)),
+          h('dt', {}, t('manualPassword')), h('dd', {}, secretField(d.secret, t('manualPassword')))])),
+      ...this.certificateBlock(d),
+      h('p', { class: ui.notice }, icon('warn'), t('shownOnce')),
+    ], [{ label: t('done'), value: 'ok', kind: 'filled' }]);
+    this.doc.dispatchEvent(new Event('agd:changed'));
+    await this.refresh();
+  }
+
+  /** A new client certificate for a device; the one it had stops working. */
+  private async newCertificate(x: Device): Promise<void> {
+    if (!(await confirmDialog(this.doc, t('certConfirmTitle', { name: x.label }), t('certConfirmBody'), t('certCreate'), true))) return;
+    try {
+      const c = await this.api.post<CertificateHandover>(`${this.path()}/devices/${x.id}/certificate`);
+      await dialog(this.doc, t('certFor', { name: x.label }), [...this.certificateBlock(c),
+        h('p', { class: ui.notice }, icon('warn'), t('shownOnce'))], [{ label: t('done'), value: 'ok', kind: 'filled' }]);
+    } catch (e) {
+      this.toasts.error(e);
+    }
+  }
 
   /** Removing asks, calendar by calendar, whom to give it to or to delete it (PLAN.md 6). */
   private async remove(u: User, owned: CalendarMeta[], users: UserRow[]): Promise<void> {

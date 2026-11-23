@@ -67,6 +67,19 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
       await page.screenshot({ path: `${out}/desktop-picker-search.png` });
       await page.keyboard.press('Escape');
     } else errors.push('no "Ajouter un membre" button');
+    // The admin adds a device for someone: its manual settings.
+    await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle2' });
+    await new Promise((r) => setTimeout(r, 500));
+    const addd = await page.$('xpath/.//button[contains(., "Ajouter un appareil")]');
+    if (addd) {
+      await addd.click();
+      await new Promise((r) => setTimeout(r, 300));
+      await page.type('dialog input[required]', 'Portable de Léa');
+      await (await page.$('xpath/.//dialog//button[@type="submit"]')).click();
+      await new Promise((r) => setTimeout(r, 700));
+      await page.screenshot({ path: `${out}/desktop-device-added.png` });
+      await page.keyboard.press('Escape');
+    } else errors.push('no "Ajouter un appareil" button');
     // Deleting a user who owns a calendar: its new owner is chosen.
     await page.goto(base + '/users/lea', { waitUntil: 'networkidle2' });
     await new Promise((r) => setTimeout(r, 500));
