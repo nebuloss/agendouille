@@ -323,6 +323,10 @@ export class MePage extends AppPage {
       section('Connecter un autre téléphone',
         h('p', {}, "Un code valable dix minutes, à scanner avec l'appareil photo du nouveau téléphone."),
         h('div', {}, action('Afficher le code', () => this.enrol(), 'tonal', 'qr'))),
+      section('Ce navigateur',
+        h('p', { class: 'text-sm text-on-surface-variant' }, "Se déconnecter ici ne touche pas aux téléphones qui synchronisent avec leur propre mot de passe (Appareils)."),
+        h('form', { method: 'post', action: '/signout' },
+          h('button', { type: 'submit', class: ui.btn('danger-text') }, icon('logout'), 'Se déconnecter'))),
     ];
   }
 

@@ -3,7 +3,7 @@ import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
 import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
-import { action, card, confirmDialog, dialog, field, formDialog, section, table } from '@/shared/components/Ui.ts';
+import { action, card, confirmDialog, dialog, field, formDialog, section } from '@/shared/components/Ui.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel, tileLink } from '@/admin/pages/More.ts';
@@ -168,21 +168,28 @@ export class UserPage extends AdminPage {
     const u = d.user;
     for (const el of this.doc.querySelectorAll<HTMLElement>('[data-item-name] span')) el.textContent = u.display_name || u.name;
     switch (this.sub) {
-      case 'signin':
+      case 'devices':
+        // How this person gets in, on one page: the links that sign a
+        // device in, the devices that sync, the browsers signed in.
         return [
           this.signin(u, d.enrolments),
-          section('Navigateurs connectés',
-            table(['Navigateur', 'Vu', ''],
-              d.sessions.map((x) => [x.app ? `Application · ${x.user_agent}` : x.user_agent, ago(x.seen_at),
-                action('Déconnecter', () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), 'Déconnecté.'), 'text', 'logout', 'sm')]),
-              'Aucun navigateur.')),
+          card(`Appareils de synchronisation (${d.devices.length})`, [],
+            h('p', { class: 'text-sm text-on-surface-variant' }, "Chaque téléphone, tablette ou ordinateur qui synchronise ses calendriers, avec son propre mot de passe. La personne en ajoute depuis Appareils, dans l'application."),
+            entries(d.devices.map((x) => ({
+              lead: iconMark(x.kind === 'thunderbird' ? 'laptop' : 'phone'),
+              title: x.label,
+              sub: `${KIND[x.kind] ?? x.kind} · ${x.cap === 'read' ? 'lecture seule' : 'lecture et écriture'} · synchronisé ${ago(x.last_used_at)}${x.client ? ` · ${x.client}` : ''}`,
+              tags: x.last_used_at === undefined ? [h('span', { class: ui.pill.muted }, 'jamais synchronisé')] : [],
+              actions: [action('Révoquer', () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), 'Appareil révoqué.'), 'danger-text', 'trash', 'sm')],
+            })), 'Aucun appareil.')),
+          card(`Navigateurs connectés (${d.sessions.length})`, [],
+            entries(d.sessions.map((x) => ({
+              lead: iconMark(x.app ? 'phone' : 'laptop'),
+              title: x.app ? "L'app agendouille" : browserOf(x.user_agent),
+              sub: `vu ${ago(x.seen_at)} · ${x.user_agent}`,
+              actions: [action('Déconnecter', () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), 'Déconnecté.'), 'danger-text', 'logout', 'sm')],
+            })), 'Aucun navigateur.')),
         ];
-      case 'devices':
-        return [section('Appareils de synchronisation',
-          table(['Appareil', 'Type', 'Accès', 'Dernière synchro', 'Client', ''],
-            d.devices.map((x) => [x.label, x.kind, x.cap === 'read' ? 'lecture' : 'lecture et écriture', ago(x.last_used_at), x.client,
-              action('Révoquer', () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), 'Appareil révoqué.'), 'danger-text', 'trash', 'sm')]),
-            'Aucun appareil. La personne en ajoute depuis Appareils, dans l’application.'))];
       case 'calendars':
         return [this.calendarsCard(d)];
       case 'groups':
@@ -218,7 +225,7 @@ export class UserPage extends AdminPage {
         tileLink(String(d.devices.length), 'appareils', `${base}/devices`),
         tileLink(String(d.calendars_owned.length), 'calendriers à lui ou elle', `${base}/calendars`),
         tileLink(String(d.calendars_shared.length), 'calendriers partagés avec lui ou elle', `${base}/calendars`),
-        tileLink(String(d.sessions.length), 'navigateurs connectés', `${base}/signin`)),
+        tileLink(String(d.sessions.length), 'navigateurs connectés', `${base}/devices`)),
       this.profile(u),
       section('Compte',
         h('div', { class: 'flex flex-wrap items-center gap-2' },
@@ -318,7 +325,7 @@ export class UserPage extends AdminPage {
       }
     };
     const STATE: Record<string, [string, string]> = { pending: ['en attente', ui.pill.ok], used: ['utilisé', ui.pill.muted], expired: ['expiré', ui.pill.muted] };
-    return card('Connexion', [
+    return card('Liens de connexion', [
       action('QR pour un téléphone', () => make('phone'), 'filled', 'qr'),
       action('Lien pour un navigateur', () => make('browser'), 'tonal', 'laptop'),
     ],
@@ -374,4 +381,13 @@ export function iconButtonSm(ic: 'close', label: string, run: () => Promise<void
   const b = h('button', { type: 'button', class: 'state-layer grid size-7 place-items-center rounded-full [&_.ic]:size-4', 'aria-label': label, title: label }, icon(ic));
   b.addEventListener('click', () => void run());
   return b;
+}
+
+const KIND: Record<string, string> = { davx5: 'DAVx5', ios: 'iPhone, iPad, Mac', thunderbird: 'Thunderbird', app: "l'app agendouille", other: 'CalDAV' };
+
+/** A browser's name from its user agent, roughly. */
+function browserOf(ua: string): string {
+  const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navigateur';
+  return os === '' ? b : `${b}, ${os}`;
 }

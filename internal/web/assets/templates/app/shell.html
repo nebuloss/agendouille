@@ -17,6 +17,9 @@
   <img src="/static/shared/icon.svg" alt="" width="32" height="32" class="rounded-md3-s md:hidden">
   <h1 class="mr-auto truncate text-[22px] font-normal">{{.Title}}</h1>
   <a href="/me" class="grid size-9 place-items-center rounded-full bg-primary-container text-sm font-bold text-on-primary-container no-underline" title="{{.User.DisplayName}}">{{.Initial}}</a>
+  <form method="post" action="/signout" class="contents">
+    <button type="submit" class="state-layer grid size-10 shrink-0 place-items-center rounded-full text-on-surface-variant sm:inline-flex sm:h-9 sm:w-auto sm:gap-2 sm:px-3 sm:text-sm sm:font-medium sm:text-primary" title="Se déconnecter" aria-label="Se déconnecter"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4 M10 8l-4 4 4 4 M6 12h11"/></svg><span class="hidden sm:inline">Se déconnecter</span></button>
+  </form>
 </header>
 <section class="mx-auto flex w-full max-w-[1240px] flex-col gap-4 px-3 pb-28 sm:px-4 md:px-6 md:pb-10" id="app-content">
   <noscript><p class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">agendouille a besoin de JavaScript pour afficher le calendrier.</p></noscript>

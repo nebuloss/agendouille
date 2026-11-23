@@ -58,6 +58,10 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 func (h *handlers) shell(page, section, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name, sub := r.PathValue("name"), r.PathValue("sub")
+		if to, ok := moved[section+"/"+sub]; ok && name != "" {
+			http.Redirect(w, r, "/"+section+"/"+url.PathEscape(name)+"/"+to, http.StatusMovedPermanently)
+			return
+		}
 		if name != "" && !knownPage(section, sub) {
 			http.Redirect(w, r, "/"+section+"/"+url.PathEscape(name), http.StatusSeeOther)
 			return

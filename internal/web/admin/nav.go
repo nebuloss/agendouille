@@ -8,7 +8,7 @@ import "net/url"
 //	/                          the overview
 //	/users                     the users
 //	/users/<name>              one user's overview
-//	/users/<name>/<page>       one of its pages (signin, devices, ...)
+//	/users/<name>/<page>       one of its pages (devices, calendars, ...)
 //	/groups, /groups/<name>[/<page>]   the same for a group
 //	/activity /backups /settings       the other sections
 //
@@ -38,7 +38,6 @@ const (
 	icActivity = "M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01"
 	icBackups  = "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6 M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"
 	icSettings = "M12 15a3 3 0 100-6 3 3 0 000 6z M12 2v3 M12 19v3 M4.2 4.2l2.1 2.1 M17.7 17.7l2.1 2.1 M2 12h3 M19 12h3 M4.2 19.8l2.1-2.1 M17.7 6.3l2.1-2.1"
-	icQR       = "M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 18h2v2h-2z M18 14h2 M14 18v2"
 	icDevices  = "M4 6a2 2 0 012-2h10a2 2 0 012 2v2 M2 18h11 M4 6v9 M15 10a1 1 0 011-1h5a1 1 0 011 1v10a1 1 0 01-1 1h-5a1 1 0 01-1-1z M18 18h1"
 	icCalendar = "M4 7a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2z M4 10h16 M8 3v4 M16 3v4"
 	icPerson   = "M12 11.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"
@@ -58,7 +57,6 @@ var sections = []navPage{
 // itemPages are an item's pages beside its overview, in rail order.
 var itemPages = map[string][]navPage{
 	"users": {
-		{"signin", "Connexion", icQR},
 		{"devices", "Appareils", icDevices},
 		{"calendars", "Calendriers", icCalendar},
 		{"groups", "Groupes", icGroups},
@@ -75,6 +73,9 @@ var itemPages = map[string][]navPage{
 		{"activity", "Activité", icActivity},
 	},
 }
+
+// moved are item pages that became part of another: the old path lands on it.
+var moved = map[string]string{"users/signin": "devices"}
 
 // knownPage reports whether sub is one of a section's item pages ("" is the overview).
 func knownPage(section, sub string) bool {

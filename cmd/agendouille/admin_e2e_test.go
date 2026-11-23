@@ -156,7 +156,7 @@ func TestM3AdminUI(t *testing.T) {
 	A.json("POST", "/users", map[string]any{"name": "maman", "groups": []string{"famille"}}, 201)
 	// Per user and per group views: an item's overview and its pages, the
 	// rail of its level with the way back, the trail down to the page.
-	for _, p := range []string{"/users/lea", "/users/lea/signin", "/users/lea/devices", "/users/lea/calendars", "/users/lea/groups",
+	for _, p := range []string{"/users/lea", "/users/lea/devices", "/users/lea/calendars", "/users/lea/groups",
 		"/users/lea/activity", "/groups/famille", "/groups/famille/members", "/groups/famille/calendars"} {
 		a := x.do("GET", x.admin+p, nil, cookie(auth.AdminCookie, A.session))
 		if a.status != 200 || !strings.Contains(a.body, `aria-label="Pages"`) || !strings.Contains(a.body, `data-item-name`) {
@@ -194,6 +194,9 @@ func TestM3AdminUI(t *testing.T) {
 	_ = x.svc.store.DB().QueryRow(`SELECT count(*) FROM enrolments WHERE token IS NOT NULL AND used_at IS NOT NULL`).Scan(&kept)
 	if kept != 0 {
 		t.Error("a used link's token is still kept")
+	}
+	if a := x.do("GET", x.admin+"/users/lea/signin", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusMovedPermanently || a.header.Get("Location") != "/users/lea/devices" {
+		t.Errorf("the old Connexion page: %d %s", a.status, a.header.Get("Location"))
 	}
 	if a := x.do("GET", x.admin+"/users/lea/nonsense", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/users/lea" {
 		t.Errorf("an unknown page of a user: %d %s", a.status, a.header.Get("Location"))

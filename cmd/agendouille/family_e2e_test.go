@@ -84,9 +84,9 @@ func TestM4FamilyAPI(t *testing.T) {
 	mamanPhone, _ := x.svc.auth.NewDevice(ctx, maman.ID, "davx5", "Pixel", "readwrite")
 	LD, MD := davClient{x, "lea", leaPhone.Secret}, davClient{x, "maman", mamanPhone.Secret}
 
-	// The pages are there.
+	// The pages are there, each with a way to sign out.
 	for _, p := range []string{"/", "/calendars", "/devices", "/me"} {
-		if a := L.call("GET", p, nil); a.status != 200 || !strings.Contains(a.body, "app-content") {
+		if a := L.call("GET", p, nil); a.status != 200 || !strings.Contains(a.body, "app-content") || !strings.Contains(a.body, `action="/signout"`) {
 			t.Errorf("page %s: %d", p, a.status)
 		}
 	}
@@ -276,6 +276,19 @@ func TestM4FamilyAPI(t *testing.T) {
 	if !strings.Contains(en["url"].(string), "/enrol/") {
 		t.Errorf("self enrolment: %v", en)
 	}
+
+	// Signing out ends this browser's session, and only it.
+	out := L.call("POST", "/signout", nil)
+	if out.status != http.StatusSeeOther || out.header.Get("Location") != "/signin" {
+		t.Errorf("sign out: %d %s", out.status, out.header.Get("Location"))
+	}
+	if a := L.call("GET", "/api/me", nil); a.status != http.StatusUnauthorized {
+		t.Errorf("after signing out: %d", a.status)
+	}
+	if a := M.call("GET", "/api/me", nil); a.status != 200 {
+		t.Errorf("another browser was signed out too: %d", a.status)
+	}
+
 }
 
 func fmtID(v any) string {
