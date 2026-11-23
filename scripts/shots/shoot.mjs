@@ -32,16 +32,16 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
   await page.keyboard.press('Escape');
   // Creating a user is a modal.
   await page.goto(base + '/users', { waitUntil: 'networkidle0' });
-  const add = await page.$('xpath/.//button[contains(., "Nouvel utilisateur")]');
+  const add = await page.$('xpath/.//button[contains(., "Ajouter un utilisateur")]');
   if (add) {
     await add.click();
     await new Promise((r) => setTimeout(r, 400));
     await page.screenshot({ path: `${out}/${label}-new-user.png` });
     await page.keyboard.press('Escape');
-  } else errors.push(`${label}: no "Nouvel utilisateur" button`);
+  } else errors.push(`${label}: no "Ajouter un utilisateur" button`);
   if (label === 'desktop') {
     await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle0' });
-    for (const [label2, file] of [['QR pour un téléphone', 'enrolment-dialog'], ['Lien pour un navigateur', 'browser-link-dialog']]) {
+    for (const [label2, file] of [['Créer un QR code', 'enrolment-dialog'], ['Créer un lien pour navigateur', 'browser-link-dialog']]) {
       const [button] = await page.$$(`xpath/.//button[contains(., "${label2}")]`);
       if (!button) {
         errors.push(`no "${label2}" button`);
