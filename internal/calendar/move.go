@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/nebuloss/agendouille/internal/store"
 )
@@ -57,7 +56,7 @@ func (s *Service) Move(ctx context.Context, a Actor, from Ref, name string, to R
 			return err
 		}
 		if limit := s.settings.Get().MaxEventsPerCalendar; n >= limit {
-			return fmt.Errorf("%w: %d events (max_events_per_calendar)", ErrQuota, limit)
+			return &QuotaError{Setting: "max_events_per_calendar", Limit: limit}
 		}
 		var dev any
 		if a.DeviceID != 0 {

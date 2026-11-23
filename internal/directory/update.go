@@ -24,7 +24,7 @@ func (s *Service) UpdateUser(ctx context.Context, actor, name, displayName, colo
 	}
 	if color != "" {
 		if !colorRule.MatchString(color) {
-			return fmt.Errorf("%w: %q is not a colour like #3b6ea5", ErrBadName, color)
+			return badColor(color)
 		}
 		sets, args = append(sets, "color = ?"), append(args, color)
 	}
@@ -80,7 +80,7 @@ func (s *Service) UpdateGroup(ctx context.Context, actor, name, displayName, col
 	}
 	if color != "" {
 		if !colorRule.MatchString(color) {
-			return fmt.Errorf("%w: %q is not a colour like #3b6ea5", ErrBadName, color)
+			return badColor(color)
 		}
 		sets, args = append(sets, "color = ?"), append(args, color)
 	}

@@ -130,6 +130,9 @@ func TestM3AdminUI(t *testing.T) {
 	for _, it := range sp["settings"].([]any) {
 		m := it.(map[string]any)
 		origin[m["key"].(string)] = m["origin"].(string)
+		if help, _ := m["help"].(string); help == "" {
+			t.Errorf("setting %v has no help text", m["key"])
+		}
 	}
 	if sp["path"] != x.configPath || origin["public_url"] != "file" || origin["backup_keep"] != "default" {
 		t.Errorf("settings page: %v %v", sp["path"], origin)
@@ -167,9 +170,20 @@ func TestM3AdminUI(t *testing.T) {
 		!strings.Contains(a.body, `<span>Appareils</span></a>`) || !strings.Contains(a.body, `href="/users"`) {
 		t.Errorf("the rail of a user's page: %s", a.body)
 	}
+	// The same page in English, the reader's choice: the rail, the trail
+	// and the title follow it.
+	english := func(r *http.Request) {
+		r.AddCookie(&http.Cookie{Name: auth.AdminCookie, Value: A.session})
+		r.AddCookie(&http.Cookie{Name: "agd_lang", Value: "en"})
+	}
+	if a := x.do("GET", x.admin+"/users/lea/devices", nil, english); !strings.Contains(a.body, `<span>Devices</span></a>`) ||
+		!strings.Contains(a.body, `<span>Users</span>`) || !strings.Contains(a.body, `aria-label="Overview"`) ||
+		!strings.Contains(a.body, "Sign out") || !strings.Contains(a.body, "Devices · lea") {
+		t.Errorf("a user's page in English: %s", a.body)
+	}
 	// The activity log's CSV: the table's filter, a header, the rows.
 	if a := A.call("GET", "/activity/export?user=lea", nil); a.status != 200 || !strings.HasPrefix(a.header.Get("Content-Type"), "text/csv") ||
-		!strings.HasPrefix(a.body, "at,by,kind,action,calendar,via,device,detail\n") || !strings.Contains(a.body, ",user,") {
+		!strings.HasPrefix(a.body, "date,auteur,type,action,calendrier,via,appareil,détail\n") || !strings.Contains(a.body, ",user,") {
 		t.Errorf("activity export: %d %q", a.status, a.body)
 	}
 	// A pending sign-in link shows again; a browser link lasts an hour;

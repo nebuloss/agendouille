@@ -183,7 +183,7 @@ func checkInput(in EventInput, family *time.Location) (input, error) {
 		in.Summary = "(sans titre)"
 	}
 	if len(in.Summary) > 500 || len(in.Location) > 500 || len(in.Description) > 20000 {
-		return input{}, invalid("a field is too long")
+		return input{}, ErrFieldTooLong
 	}
 	start, err := ParseLocal(in.Start, in.AllDay, family)
 	if err != nil {
@@ -203,7 +203,7 @@ func checkInput(in EventInput, family *time.Location) (input, error) {
 		end = start.AddDate(0, 0, 1) // a one-day event whose end the form left on the same day
 	}
 	if end.Before(start) {
-		return input{}, invalid("the event ends before it starts")
+		return input{}, ErrEndsBeforeStart
 	}
 	if in.RRule != nil && *in.RRule != "" {
 		rule := untilOf(*in.RRule, in.AllDay, family)

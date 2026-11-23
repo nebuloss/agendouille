@@ -130,12 +130,12 @@ func (h *handlers) marks(ctx context.Context, current []notice) (map[string]bool
 func (h *handlers) notices(w http.ResponseWriter, r *http.Request) {
 	ns, err := h.currentNotices(r)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	read, err := h.marks(r.Context(), ns)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	for i := range ns {
@@ -153,7 +153,7 @@ func (h *handlers) readNotices(w http.ResponseWriter, r *http.Request) {
 	}
 	ns, err := h.currentNotices(r)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	live := map[string]bool{}
@@ -167,7 +167,7 @@ func (h *handlers) readNotices(w http.ResponseWriter, r *http.Request) {
 		}
 		if _, err := h.d.Store.DB().ExecContext(r.Context(), `INSERT INTO notice_reads (id, read_at) VALUES (?, ?)
 			ON CONFLICT (id) DO UPDATE SET read_at = excluded.read_at`, id, now); err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 	}

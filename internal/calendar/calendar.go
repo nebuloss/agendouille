@@ -42,6 +42,22 @@ var (
 	ErrNotOwner        = errors.New("only the owner can do") //
 )
 
+// QuotaError is an ErrQuota that says which limit setting was reached and
+// its value, so a web answer can explain it in the reader's language.
+type QuotaError struct {
+	Setting string // max_calendars_per_user, max_events_per_calendar
+	Limit   int
+}
+
+func (e *QuotaError) Error() string {
+	what := "events"
+	if e.Setting == "max_calendars_per_user" {
+		what = "calendars"
+	}
+	return fmt.Sprintf("%s: %d %s (%s)", ErrQuota, e.Limit, what, e.Setting)
+}
+func (e *QuotaError) Unwrap() error { return ErrQuota }
+
 // UIDConflict carries the name of the object that holds the UID.
 type UIDConflict struct{ Name string }
 
@@ -371,7 +387,7 @@ func (s *Service) Create(ctx context.Context, a Actor, owner, slug string, p Pro
 			return err
 		}
 		if n >= set.MaxCalendarsPerUser {
-			return fmt.Errorf("%w: %d calendars (max_calendars_per_user)", ErrQuota, set.MaxCalendarsPerUser)
+			return &QuotaError{Setting: "max_calendars_per_user", Limit: set.MaxCalendarsPerUser}
 		}
 		if color == "" {
 			color = set.Palette[n%len(set.Palette)]
@@ -806,7 +822,7 @@ func (s *Service) Put(ctx context.Context, a Actor, r Ref, name string, data []b
 				return err
 			}
 			if n >= set.MaxEventsPerCalendar {
-				return fmt.Errorf("%w: %d events (max_events_per_calendar)", ErrQuota, set.MaxEventsPerCalendar)
+				return &QuotaError{Setting: "max_events_per_calendar", Limit: set.MaxEventsPerCalendar}
 			}
 			action, created = "created", true
 			_, err = tx.ExecContext(ctx, `INSERT INTO objects(calendar_id, name, uid, etag, data, summary, start_utc, end_utc, recurring, all_day,

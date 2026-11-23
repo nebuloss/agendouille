@@ -83,6 +83,8 @@ var (
 	ErrNotFound   = errors.New("not found")
 	ErrNotVisible = errors.New("the owner does not see this user or group")
 	ErrNotOwner   = errors.New("only the calendar's owner can do this")
+	// ErrIsOwner is a share with the calendar's own owner.
+	ErrIsOwner = errors.New("the owner has the calendar already")
 )
 
 // Share is one row of a calendar's shares.
@@ -206,7 +208,7 @@ func (s *Service) ShareWith(ctx context.Context, actor string, ownerID int64, by
 				return fmt.Errorf("user %q: %w", t.User, ErrNotFound)
 			}
 			if u.ID == ownerID {
-				return fmt.Errorf("the owner has the calendar already")
+				return ErrIsOwner
 			}
 			if byOwner {
 				if ok, err := s.dir.Sees(ctx, ownerID, u.ID); err != nil {

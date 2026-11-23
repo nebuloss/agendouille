@@ -50,6 +50,23 @@ var (
 	ErrBadName   = errors.New("bad name")
 )
 
+// Invalid is an ErrBadName that says which field is wrong ("name",
+// "display_name" or "color"), so a web answer can explain it in the
+// reader's language; its text is for logs and the CLI.
+type Invalid struct {
+	Field string
+	msg   string
+}
+
+func (e Invalid) Error() string        { return ErrBadName.Error() + ": " + e.msg }
+func (e Invalid) Is(target error) bool { return target == ErrBadName }
+
+func invalid(field, format string, args ...any) error {
+	return Invalid{Field: field, msg: fmt.Sprintf(format, args...)}
+}
+
+func badColor(color string) error { return invalid("color", "%q is not a colour like #3b6ea5", color) }
+
 var nameRule = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 // reserved names would read as someone else in the audit log, or in a
@@ -59,10 +76,10 @@ var reserved = map[string]bool{"admin": true, "cli": true, "system": true, "root
 // CheckName validates a user or group name.
 func CheckName(name string) error {
 	if !nameRule.MatchString(name) {
-		return fmt.Errorf("%w: %q must be a lowercase letter, then up to 31 lowercase letters, digits or dashes", ErrBadName, name)
+		return invalid("name", "%q must be a lowercase letter, then up to 31 lowercase letters, digits or dashes", name)
 	}
 	if reserved[name] {
-		return fmt.Errorf("%w: %q is reserved", ErrBadName, name)
+		return invalid("name", "%q is reserved", name)
 	}
 	return nil
 }
@@ -70,7 +87,7 @@ func CheckName(name string) error {
 func checkDisplay(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" || utf8.RuneCountInString(s) > 64 || strings.ContainsAny(s, "\x00\r\n\t") {
-		return "", fmt.Errorf("%w: a display name is 1 to 64 characters on one line", ErrBadName)
+		return "", invalid("display_name", "a display name is 1 to 64 characters on one line")
 	}
 	return s, nil
 }
@@ -93,7 +110,7 @@ func New(db *sql.DB, now func() time.Time, palette func() []string) *Service {
 func (s *Service) pickColor(ctx context.Context, tx *sql.Tx, table, color string) (string, error) {
 	if color != "" {
 		if !colorRule.MatchString(color) {
-			return "", fmt.Errorf("%w: %q is not a colour like #3b6ea5", ErrBadName, color)
+			return "", badColor(color)
 		}
 		return color, nil
 	}

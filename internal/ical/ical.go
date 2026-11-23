@@ -27,6 +27,11 @@ var (
 	ErrUnsupported = errors.New("only events (VEVENT) are supported")
 	// ErrTooLarge is over the size limit (CALDAV:max-resource-size).
 	ErrTooLarge = errors.New("calendar object too large")
+
+	// ErrEndsBeforeStart and ErrFieldTooLong are ErrInvalid in a web
+	// edit, kept apart so the answer can say what to fix.
+	ErrEndsBeforeStart = fmt.Errorf("%w: the event ends before it starts", ErrInvalid)
+	ErrFieldTooLong    = fmt.Errorf("%w: a field is too long", ErrInvalid)
 )
 
 func invalid(format string, args ...any) error {

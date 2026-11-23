@@ -17,6 +17,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
+	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/sharing"
 	"github.com/nebuloss/agendouille/internal/store"
@@ -75,39 +76,90 @@ func (h *handlers) apiAuth(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, err := h.d.Auth.Session(r, auth.SurfaceAdmin)
 		if err != nil || !p.Admin {
-			webx.Fail(w, http.StatusUnauthorized, "unauthenticated", "connectez-vous à l'administration")
+			webx.FailT(w, r, http.StatusUnauthorized, "unauthenticated", "error.admin.signinRequired")
 			return
 		}
 		next(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
 	})
 }
 
-// fail maps the services' errors onto CONTRACTS.md 3.1.
-func (h *handlers) fail(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, directory.ErrNotFound), errors.Is(err, calendar.ErrNotFound), errors.Is(err, sharing.ErrNotFound),
-		errors.Is(err, backup.ErrNotFound), errors.Is(err, auth.ErrInvalid):
-		webx.Fail(w, http.StatusNotFound, "not_found", err.Error())
-	case errors.Is(err, directory.ErrNameTaken), errors.Is(err, calendar.ErrExists):
-		webx.Fail(w, http.StatusConflict, "name_taken", err.Error())
-	case errors.Is(err, directory.ErrBadName), errors.Is(err, calendar.ErrBadSlug), errors.Is(err, settings.ErrUnknownKey):
-		webx.Fail(w, http.StatusBadRequest, "bad_request", err.Error())
-	case errors.Is(err, calendar.ErrQuota), errors.Is(err, auth.ErrTooMany):
-		webx.Fail(w, http.StatusInsufficientStorage, "quota", err.Error())
-	default:
-		var verr validation
-		if errors.As(err, &verr) {
-			webx.Fail(w, http.StatusBadRequest, "bad_request", err.Error())
-			return
-		}
+// fail is failIn in the default language, for a caller without the
+// request.
+func (h *handlers) fail(w http.ResponseWriter, err error) { h.failIn(w, nil, err) }
+
+// failIn maps the services' errors onto CONTRACTS.md 3.1. The code is for
+// programs and never changes; the message is for the administrator, in the
+// request's language (internal/i18n, the error. keys). The services' own
+// texts stay in the log and the CLI.
+func (h *handlers) failIn(w http.ResponseWriter, r *http.Request, err error) {
+	status, code, key, args := h.explain(err)
+	if status == http.StatusInternalServerError {
 		h.d.Log.Error("admin api", "err", err)
-		webx.Fail(w, http.StatusInternalServerError, "error", "")
 	}
+	lang := i18n.Default
+	if r != nil {
+		lang = i18n.FromRequest(r)
+	}
+	webx.Fail(w, status, code, i18n.T(lang, key, args...))
 }
 
-type validation struct{ msg string }
+func (h *handlers) explain(err error) (status int, code, key string, args []string) {
+	var verr validation
+	var bad directory.Invalid
+	var quota *calendar.QuotaError
+	switch {
+	case errors.As(err, &verr):
+		return http.StatusBadRequest, "bad_request", verr.key, verr.args
+	case errors.Is(err, backup.ErrNotFound):
+		return http.StatusNotFound, "not_found", "error.backup.notFound", nil
+	case errors.Is(err, directory.ErrNotFound), errors.Is(err, sharing.ErrNotFound):
+		return http.StatusNotFound, "not_found", "error.admin.nobody", nil
+	case errors.Is(err, calendar.ErrNotFound), errors.Is(err, auth.ErrInvalid):
+		return http.StatusNotFound, "not_found", "error.notFound", nil
+	case errors.Is(err, directory.ErrNameTaken):
+		return http.StatusConflict, "name_taken", "error.name.taken", nil
+	case errors.Is(err, calendar.ErrExists):
+		return http.StatusConflict, "name_taken", "error.calendar.exists", nil
+	case errors.As(err, &bad):
+		return http.StatusBadRequest, "bad_request", invalidKey(bad), nil
+	case errors.Is(err, calendar.ErrBadSlug):
+		return http.StatusBadRequest, "bad_request", "error.calendar.badName", nil
+	case errors.Is(err, settings.ErrUnknownKey):
+		return http.StatusBadRequest, "bad_request", "error.setting.unknown", nil
+	case errors.Is(err, directory.ErrBadName):
+		return http.StatusBadRequest, "bad_request", "error.name.invalid", nil
+	case errors.As(err, &quota):
+		key := "error.quota.events"
+		if quota.Setting == "max_calendars_per_user" {
+			key = "error.quota.calendars"
+		}
+		return http.StatusInsufficientStorage, "quota", key, []string{"max", strconv.Itoa(quota.Limit)}
+	case errors.Is(err, auth.ErrTooMany):
+		return http.StatusInsufficientStorage, "quota", "error.quota.devices", []string{"max", strconv.Itoa(h.d.Settings.Get().MaxDevicesPerUser)}
+	case errors.Is(err, calendar.ErrQuota):
+		return http.StatusInsufficientStorage, "quota", "error.quota", nil
+	}
+	return http.StatusInternalServerError, "error", "error.internal", nil
+}
 
-func (v validation) Error() string { return v.msg }
+// invalidKey is the message of a bad name, display name or colour.
+func invalidKey(e directory.Invalid) string {
+	switch e.Field {
+	case "display_name":
+		return "error.displayName.invalid"
+	case "color":
+		return "error.color.invalid"
+	}
+	return "error.name.invalid"
+}
+
+// validation is a 400 whose message is the catalog's key.
+type validation struct {
+	key  string
+	args []string
+}
+
+func (v validation) Error() string { return "invalid: " + v.key }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool { return webx.DecodeJSON(w, r, v) }
 
@@ -125,23 +177,27 @@ type warning struct {
 
 func (h *handlers) warnings(r *http.Request) []warning {
 	out := []warning{}
+	lang := i18n.FromRequest(r)
+	add := func(code, key string, args ...string) {
+		out = append(out, warning{code, i18n.T(lang, key, args...)})
+	}
 	set := h.d.Settings.Get()
 	if set.PublicListen == "" {
-		out = append(out, warning{"no_public_listener", "CalDAV et l'application familiale sont arrêtés : renseignez public_listen et public_url dans le fichier de configuration."})
+		add("no_public_listener", "error.warning.noPublicListener")
 	} else if h.d.PublicStatus != nil {
 		if addr, err := h.d.PublicStatus(); err != "" {
-			out = append(out, warning{"public_listener_down", "L'accès public n'a pas pu démarrer sur " + set.PublicListen + " : " + err})
+			add("public_listener_down", "error.warning.publicDown", "address", set.PublicListen, "error", err)
 		} else if addr == "" {
-			out = append(out, warning{"public_listener_down", "L'accès public ne tourne pas."})
+			add("public_listener_down", "error.warning.publicStopped")
 		}
 	}
 	if strings.HasPrefix(h.d.Config.AdminURL(), "http://") && !strings.HasPrefix(h.d.Config.AdminListen, "127.") &&
 		!strings.HasPrefix(h.d.Config.AdminListen, "localhost") {
-		out = append(out, warning{"admin_insecure", "L'administration est servie en http hors de cette machine : gardez-la sur le réseau local."})
+		add("admin_insecure", "error.warning.adminInsecure")
 	}
 	if h.d.Backup != nil {
 		if last := h.d.Backup.Last(); last.IsZero() || time.Since(last) > 48*time.Hour {
-			out = append(out, warning{"backup_old", "Aucune sauvegarde depuis deux jours."})
+			add("backup_old", "error.warning.backupOld")
 		}
 	}
 	return out
@@ -162,27 +218,27 @@ func (h *handlers) overview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	users, err := h.d.Directory.Users(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	groups, err := h.d.Directory.Groups(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	counts, err := h.d.Calendar.AdminCounts(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	devices, err := h.d.Auth.CountDevices(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	stale, err := h.d.Auth.StaleDevices(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	var last *time.Time
@@ -231,7 +287,7 @@ func (h *handlers) users(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	users, err := h.d.Directory.Users(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	out := make([]userView, 0, len(users))
@@ -239,7 +295,7 @@ func (h *handlers) users(w http.ResponseWriter, r *http.Request) {
 		v := userView{User: u, Groups: []string{}}
 		gs, err := h.d.Directory.GroupsOf(ctx, u.ID)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		for _, g := range gs {
@@ -247,13 +303,13 @@ func (h *handlers) users(w http.ResponseWriter, r *http.Request) {
 		}
 		ds, err := h.d.Auth.Devices(ctx, u.ID)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		v.Devices = len(ds)
 		owned, err := h.d.Calendar.Owned(ctx, u.ID)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		v.Owned = len(owned)
@@ -266,7 +322,7 @@ func (h *handlers) users(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) enrolmentView(e auth.Enrolment) (map[string]any, error) {
 	base := h.d.PublicURL()
 	if base == "" {
-		return nil, validation{"public_url n'est pas renseignée : il n'y a pas d'adresse pour le lien de connexion. Renseignez-la dans les réglages."}
+		return nil, validation{key: "error.admin.noPublicURL"}
 	}
 	link := base + "/enrol/" + e.Token
 	qr, err := webx.QRSVG(link)
@@ -289,18 +345,18 @@ func (h *handlers) addUser(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.d.Directory.AddUser(r.Context(), "admin", body.Name, body.DisplayName, body.Color, body.Groups)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	out := map[string]any{"user": u}
 	if body.Enrol && h.d.PublicURL() != "" {
 		e, err := h.d.Auth.NewEnrolment(r.Context(), "admin", u.ID, 0)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		if out["enrolment"], err = h.enrolmentView(e); err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 	}
@@ -310,7 +366,7 @@ func (h *handlers) addUser(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) lookupUser(w http.ResponseWriter, r *http.Request) (directory.User, bool) {
 	u, err := h.d.Directory.User(r.Context(), r.PathValue("name"))
 	if err != nil || u.RemovedAt != nil {
-		webx.Fail(w, http.StatusNotFound, "not_found", "no such user")
+		webx.FailT(w, r, http.StatusNotFound, "not_found", "error.admin.noUser")
 		return directory.User{}, false
 	}
 	return u, true
@@ -324,7 +380,7 @@ func (h *handlers) user(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gs, err := h.d.Directory.GroupsOf(ctx, u.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	groups := []string{}
@@ -333,27 +389,27 @@ func (h *handlers) user(w http.ResponseWriter, r *http.Request) {
 	}
 	enrolments, err := h.d.Auth.Enrolments(ctx, u.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	devices, err := h.d.Auth.Devices(ctx, u.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	sessions, err := h.d.Auth.Sessions(ctx, u.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	owned, err := h.d.Calendar.AdminCalendars(ctx, u.Name)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	shared, err := h.d.Calendar.AdminSharedWith(ctx, u.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"user": u, "groups": groups, "enrolments": enrolments, "devices": devices,
@@ -383,18 +439,18 @@ func (h *handlers) patchUser(w http.ResponseWriter, r *http.Request) {
 		c = *body.Color
 	}
 	if err := h.d.Directory.UpdateUser(ctx, "admin", u.Name, d, c); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	if body.Groups != nil {
 		if err := h.d.Directory.SetGroups(ctx, "admin", u.Name, *body.Groups); err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 	}
 	if body.Disabled != nil {
 		if err := h.d.Directory.SetDisabled(ctx, "admin", u.Name, *body.Disabled); err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 	}
@@ -420,14 +476,14 @@ func (h *handlers) removeUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	owned, err := h.d.Calendar.Owned(ctx, u.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	for _, i := range owned {
 		choice, ok := body.Calendars[i.Ref.String()]
 		if !ok || (choice.TransferTo == "") == !choice.Delete {
 			webx.JSON(w, http.StatusConflict, map[string]any{"error": "owns_calendars",
-				"message": "dites, pour chaque calendrier, à qui le donner ou qu'il est supprimé", "calendars": refsOf(owned)})
+				"message": i18n.T(i18n.FromRequest(r), "error.admin.ownsCalendars"), "calendars": refsOf(owned)})
 			return
 		}
 	}
@@ -440,12 +496,12 @@ func (h *handlers) removeUser(w http.ResponseWriter, r *http.Request) {
 			_, err = h.d.Calendar.Transfer(ctx, op, i.Ref, choice.TransferTo, false)
 		}
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 	}
 	if err := h.d.Directory.Remove(ctx, "admin", u.Name); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -465,7 +521,7 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.d.PublicURL() == "" {
-		h.fail(w, validation{"public_url n'est pas renseignée : il n'y a pas d'adresse pour le lien de connexion. Renseignez-la dans les réglages."})
+		h.failIn(w, r, validation{key: "error.admin.noPublicURL"})
 		return
 	}
 	// {"kind": "phone"} (the default: a QR for the phone's camera, the
@@ -482,12 +538,12 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 	}
 	e, err := h.d.Auth.NewEnrolmentKind(r.Context(), "admin", u.ID, 0, body.Kind)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	view, err := h.enrolmentView(e)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusCreated, view)
@@ -502,24 +558,24 @@ func (h *handlers) showEnrolment(w http.ResponseWriter, r *http.Request) {
 	}
 	id, ok := pathID(r, "id")
 	if !ok {
-		h.fail(w, auth.ErrInvalid)
+		h.failIn(w, r, auth.ErrInvalid)
 		return
 	}
 	e, err := h.d.Auth.PendingEnrolment(r.Context(), u.ID, id)
 	switch {
 	case errors.Is(err, auth.ErrUsed):
-		webx.Fail(w, http.StatusGone, "used", "Ce lien a déjà servi.")
+		webx.FailT(w, r, http.StatusGone, "used", "error.admin.enrolmentUsed")
 		return
 	case errors.Is(err, auth.ErrExpired):
-		webx.Fail(w, http.StatusGone, "expired", "Ce lien a expiré : créez-en un autre.")
+		webx.FailT(w, r, http.StatusGone, "expired", "error.admin.enrolmentExpired")
 		return
 	case err != nil:
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	view, err := h.enrolmentView(e)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, view)
@@ -532,7 +588,7 @@ func (h *handlers) revokeEnrolment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.d.Auth.RevokeEnrolment(r.Context(), u.ID, id); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -545,7 +601,7 @@ func (h *handlers) revokeDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.d.Auth.RevokeDevice(r.Context(), "admin", u.ID, id); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -558,7 +614,7 @@ func (h *handlers) revokeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.d.Auth.RevokeSession(r.Context(), u.ID, id); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -570,7 +626,7 @@ func (h *handlers) groups(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gs, err := h.d.Directory.Groups(ctx)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	type view struct {
@@ -582,7 +638,7 @@ func (h *handlers) groups(w http.ResponseWriter, r *http.Request) {
 	for _, g := range gs {
 		ms, err := h.d.Directory.Members(ctx, g.Name)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		v := view{Group: g, Members: []string{}}
@@ -590,7 +646,7 @@ func (h *handlers) groups(w http.ResponseWriter, r *http.Request) {
 			v.Members = append(v.Members, m.Name)
 		}
 		if v.Shares, err = h.d.Directory.GroupShares(ctx, g.Name); err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		out = append(out, v)
@@ -609,7 +665,7 @@ func (h *handlers) addGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	g, err := h.d.Directory.AddGroup(r.Context(), "admin", body.Name, body.DisplayName, body.Color)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusCreated, g)
@@ -627,13 +683,13 @@ func (h *handlers) patchGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	name := r.PathValue("name")
 	if err := h.d.Directory.UpdateGroup(ctx, "admin", name, body.DisplayName, body.Color); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	if body.Members != nil {
 		current, err := h.d.Directory.Members(ctx, name)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		want := map[string]bool{}
@@ -643,7 +699,7 @@ func (h *handlers) patchGroup(w http.ResponseWriter, r *http.Request) {
 		for _, m := range current {
 			if !want[m.Name] {
 				if err := h.d.Directory.RemoveMember(ctx, "admin", name, m.Name); err != nil {
-					h.fail(w, err)
+					h.failIn(w, r, err)
 					return
 				}
 			}
@@ -651,7 +707,7 @@ func (h *handlers) patchGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		for m := range want {
 			if err := h.d.Directory.AddMember(ctx, "admin", name, m); err != nil {
-				h.fail(w, err)
+				h.failIn(w, r, err)
 				return
 			}
 		}
@@ -664,16 +720,16 @@ func (h *handlers) deleteGroup(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	n, err := h.d.Directory.GroupShares(ctx, name)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	if n > 0 && r.URL.Query().Get("confirm") != "1" {
 		webx.JSON(w, http.StatusConflict, map[string]any{"error": "has_shares", "shares": n,
-			"message": "des calendriers sont partagés avec ce groupe ; le supprimer retire ces partages (confirm=1)"})
+			"message": i18n.T(i18n.FromRequest(r), "error.admin.groupHasShares")})
 		return
 	}
 	if err := h.d.Directory.RemoveGroup(ctx, "admin", name); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -684,7 +740,7 @@ func (h *handlers) deleteGroup(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) calendars(w http.ResponseWriter, r *http.Request) {
 	cs, err := h.d.Calendar.AdminCalendars(r.Context(), r.URL.Query().Get("owner"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"calendars": cs})
@@ -694,12 +750,12 @@ func (h *handlers) calendars(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) exportCalendar(w http.ResponseWriter, r *http.Request) {
 	ref, err := calendar.ParseRef(r.PathValue("ref"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	data, _, err := h.d.Calendar.AdminExport(r.Context(), "admin", ref)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
@@ -713,7 +769,7 @@ func (h *handlers) exportCalendar(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) exportCalendars(w http.ResponseWriter, r *http.Request) {
 	cs, err := h.d.Calendar.AdminCalendars(r.Context(), "")
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	day := h.d.Clock().UTC().Format("2006-01-02")
@@ -745,7 +801,7 @@ func (h *handlers) exportCalendars(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) calendarStats(w http.ResponseWriter, r *http.Request) {
 	st, err := h.d.Calendar.AdminStats(r.Context(), r.PathValue("ref"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, st)
@@ -758,12 +814,12 @@ func (h *handlers) calendarStats(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) share(w http.ResponseWriter, r *http.Request) {
 	ref, err := calendar.ParseRef(r.PathValue("ref"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	t, err := sharing.ParseTarget(r.PathValue("target"))
 	if err != nil {
-		h.fail(w, validation{err.Error()})
+		h.failIn(w, r, validation{key: "error.share.invalid"})
 		return
 	}
 	var body struct {
@@ -774,20 +830,26 @@ func (h *handlers) share(w http.ResponseWriter, r *http.Request) {
 	}
 	acc, err := sharing.ParseAccess(body.Access)
 	if err != nil {
-		h.fail(w, validation{err.Error()})
+		h.failIn(w, r, validation{key: "error.share.invalid"})
 		return
 	}
 	i, err := h.d.Calendar.Info(r.Context(), calendar.Operator("admin"), ref)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	if err := h.d.Calendar.Sharing().ShareWith(r.Context(), "admin", i.OwnerID, false, i.ID, t, acc, store.Time(h.d.Clock())); err != nil {
 		if errors.Is(err, sharing.ErrNotFound) {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
-		h.fail(w, validation{err.Error()})
+		key := "error.share.invalid"
+		if errors.Is(err, sharing.ErrIsOwner) {
+			key = "error.share.owner"
+		} else {
+			h.d.Log.Warn("admin share", "err", err)
+		}
+		h.failIn(w, r, validation{key: key})
 		return
 	}
 	h.accessChanged(i)
@@ -804,21 +866,21 @@ func (h *handlers) accessChanged(i calendar.Info) {
 func (h *handlers) unshare(w http.ResponseWriter, r *http.Request) {
 	ref, err := calendar.ParseRef(r.PathValue("ref"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	t, err := sharing.ParseTarget(r.PathValue("target"))
 	if err != nil {
-		h.fail(w, validation{err.Error()})
+		h.failIn(w, r, validation{key: "error.share.invalid"})
 		return
 	}
 	i, err := h.d.Calendar.Info(r.Context(), calendar.Operator("admin"), ref)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	if err := h.d.Calendar.Sharing().Unshare(r.Context(), "admin", i.ID, t, store.Time(h.d.Clock())); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	h.accessChanged(i)
@@ -828,7 +890,7 @@ func (h *handlers) unshare(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) transfer(w http.ResponseWriter, r *http.Request) {
 	ref, err := calendar.ParseRef(r.PathValue("ref"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	var body struct {
@@ -840,7 +902,7 @@ func (h *handlers) transfer(w http.ResponseWriter, r *http.Request) {
 	}
 	i, err := h.d.Calendar.Transfer(r.Context(), calendar.Operator("admin"), ref, body.To, body.Keep)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]string{"ref": i.Ref.String()})
@@ -849,23 +911,23 @@ func (h *handlers) transfer(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) deleteCalendar(w http.ResponseWriter, r *http.Request) {
 	ref, err := calendar.ParseRef(r.PathValue("ref"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	op := calendar.Operator("admin")
 	i, err := h.d.Calendar.Info(r.Context(), op, ref)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	// The admin types the calendar's name: deleting is for everyone, and
 	// there is no undo but a backup.
 	if r.URL.Query().Get("confirm") != i.Name {
-		h.fail(w, validation{"tapez le nom du calendrier pour confirmer"})
+		h.failIn(w, r, validation{key: "error.admin.confirmCalendar"})
 		return
 	}
 	if err := h.d.Calendar.DeleteCalendar(r.Context(), op, ref); err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -879,14 +941,14 @@ func (h *handlers) activity(w http.ResponseWriter, r *http.Request) {
 	if b := q.Get("before"); b != "" {
 		t, err := time.Parse(time.RFC3339Nano, b)
 		if err != nil {
-			h.fail(w, validation{"before is an RFC 3339 time"})
+			h.failIn(w, r, validation{key: "error.admin.badBefore"})
 			return
 		}
 		f.Before = t
 	}
 	items, err := h.d.Calendar.AdminActivity(r.Context(), f)
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"activity": items})
@@ -902,7 +964,12 @@ func (h *handlers) exportActivity(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="agendouille-activite.csv"`)
 	w.Header().Set("Cache-Control", "no-store")
 	out := csv.NewWriter(w)
-	_ = out.Write([]string{"at", "by", "kind", "action", "calendar", "via", "device", "detail"})
+	l := i18n.FromRequest(r)
+	head := []string{}
+	for _, c := range []string{"at", "by", "kind", "action", "calendar", "via", "device", "detail"} {
+		head = append(head, i18n.T(l, "activity.csv."+c))
+	}
+	_ = out.Write(head)
 	for n := 0; n < 50000; {
 		items, err := h.d.Calendar.AdminActivity(r.Context(), f)
 		if err != nil {
@@ -927,13 +994,16 @@ func (h *handlers) exportActivity(w http.ResponseWriter, r *http.Request) {
 // from (the file, the environment, a flag, or the default), and the file
 // to edit: the settings live in the configuration file (DECISIONS), as
 // cafard's and claudication's; this page shows them, it does not edit them.
-func (h *handlers) settings(w http.ResponseWriter, _ *http.Request) {
+// Each comes with its help text in the reader's language.
+func (h *handlers) settings(w http.ResponseWriter, r *http.Request) {
 	type item struct {
 		settings.Key
 		Value  json.RawMessage `json:"value"`
 		Origin string          `json:"origin"`
 		Env    string          `json:"env"`
+		Help   string          `json:"help,omitempty"`
 	}
+	l := i18n.FromRequest(r)
 	origins := h.d.Config.Origins
 	if fresh, err := h.d.Config.Reload(); err == nil {
 		origins = fresh.Origins // the file as it is now
@@ -942,14 +1012,18 @@ func (h *handlers) settings(w http.ResponseWriter, _ *http.Request) {
 	for _, k := range settings.Keys() {
 		v, err := h.d.Settings.Value(k.Name)
 		if err != nil {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
 		origin := origins[k.Name]
 		if origin == "" {
 			origin = "default"
 		}
-		out = append(out, item{Key: k, Value: json.RawMessage(v), Origin: origin, Env: config.EnvName(k.Name)})
+		help := ""
+		if key := "setting." + k.Name + ".help"; i18n.Has(key) {
+			help = i18n.T(l, key)
+		}
+		out = append(out, item{Key: k, Value: json.RawMessage(v), Origin: origin, Env: config.EnvName(k.Name), Help: help})
 	}
 	path := h.d.Config.Path
 	if path == "" {
@@ -964,7 +1038,7 @@ func (h *handlers) settings(w http.ResponseWriter, _ *http.Request) {
 func (h *handlers) davAuth(w http.ResponseWriter, r *http.Request) {
 	n, err := h.d.Auth.DevicesWithoutCert(r.Context())
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"mode": h.d.Auth.DavAuthMode(r.Context()), "devices_without_certificate": n})
@@ -978,7 +1052,7 @@ func (h *handlers) setDavAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.d.Auth.SetDavAuthMode(r.Context(), "admin", body.Mode); err != nil {
-		h.fail(w, validation{"le mode est password, both ou keys"})
+		h.failIn(w, r, validation{key: "error.admin.davAuthMode"})
 		return
 	}
 	h.davAuth(w, r)
@@ -986,10 +1060,10 @@ func (h *handlers) setDavAuth(w http.ResponseWriter, r *http.Request) {
 
 // --- backups
 
-func (h *handlers) backups(w http.ResponseWriter, _ *http.Request) {
+func (h *handlers) backups(w http.ResponseWriter, r *http.Request) {
 	files, err := h.d.Backup.List()
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"backups": files})
@@ -998,7 +1072,7 @@ func (h *handlers) backups(w http.ResponseWriter, _ *http.Request) {
 func (h *handlers) makeBackup(w http.ResponseWriter, r *http.Request) {
 	f, err := h.d.Backup.Make(r.Context())
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusCreated, f)
@@ -1007,7 +1081,7 @@ func (h *handlers) makeBackup(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) downloadBackup(w http.ResponseWriter, r *http.Request) {
 	path, err := h.d.Backup.Path(r.PathValue("file"))
 	if err != nil {
-		h.fail(w, err)
+		h.failIn(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/vnd.sqlite3")
@@ -1027,19 +1101,20 @@ func (h *handlers) restore(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("file")
 	if body.Confirm != name {
-		h.fail(w, validation{"confirmez avec le nom du fichier de la sauvegarde"})
+		h.failIn(w, r, validation{key: "error.admin.confirmRestore"})
 		return
 	}
 	if err := h.d.Backup.Stage(name); err != nil {
 		if errors.Is(err, backup.ErrNotFound) {
-			h.fail(w, err)
+			h.failIn(w, r, err)
 			return
 		}
-		h.fail(w, validation{err.Error()})
+		h.d.Log.Warn("restore refused", "file", name, "err", err)
+		h.failIn(w, r, validation{key: "error.admin.backupDamaged"})
 		return
 	}
 	webx.JSON(w, http.StatusAccepted, map[string]string{"status": "restarting",
-		"message": "Le serveur redémarre avec cette sauvegarde ; reconnectez-vous dans quelques secondes."})
+		"message": i18n.T(i18n.FromRequest(r), "error.admin.restarting")})
 	if h.d.Restart != nil {
 		go h.d.Restart("restore " + name)
 	}

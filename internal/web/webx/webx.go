@@ -6,6 +6,7 @@ package webx
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -135,12 +136,26 @@ func Fail(w http.ResponseWriter, status int, code, message string) {
 	JSON(w, status, Error{Code: code, Message: message})
 }
 
+// FailT writes an API error whose message is the catalog's key (an
+// "error." key of internal/i18n) in the request's language. The code is
+// for programs and is never translated.
+func FailT(w http.ResponseWriter, r *http.Request, status int, code, key string, args ...string) {
+	Fail(w, status, code, i18n.T(i18n.FromRequest(r), key, args...))
+}
+
 // DecodeJSON reads a small JSON body into v, refusing unknown fields.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		Fail(w, http.StatusBadRequest, "bad_request", "the body is not the JSON this route takes: "+err.Error())
+		// The decoder's own words are for a developer, not for the person
+		// who reads the message (only our pages call these routes).
+		key := "error.request.invalid"
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			key = "error.request.tooLarge"
+		}
+		FailT(w, r, http.StatusBadRequest, "bad_request", key)
 		return false
 	}
 	return true
@@ -169,7 +184,7 @@ func SameOrigin(url func() string, next http.Handler) http.Handler {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 		default:
 			if !auth.SameOrigin(r, url()) {
-				Fail(w, http.StatusForbidden, "cross_origin", "this request did not come from this site's own pages")
+				FailT(w, r, http.StatusForbidden, "cross_origin", "error.request.crossOrigin")
 				return
 			}
 		}
