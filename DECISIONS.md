@@ -11,6 +11,22 @@ Each entry gives the date, the decision and the reason.
   (`0.0.0.0:8792`, plain http, `admin_allow_insecure`), as claudication's
   container next to it does; the DMZ proxy (HAProxy 10.0.60.1, then Nginx
   Proxy Manager 10.0.60.2) forwards only the public listener (:8791).
+- **Open question 3 answered: `https://agendouille.patapouf.club`**
+  (the user). Public DNS already points there (a CNAME to the home's
+  address); HAProxy hands TLS to Nginx Proxy Manager, which now has proxy
+  host 7 for it: the wildcard `*.patapouf.club` certificate (2), forced
+  https, common exploits blocked, no websocket upgrade, and an advanced
+  block for `/api/live` (no buffering) and 20 MB bodies. It was added the
+  way NPM stores it (a `proxy_host` row and `7.conf` modelled on
+  claudication's, `nginx -t` then reload), with the database saved first
+  as `/data/database.sqlite.bak-avant-agendouille`; opening it in NPM's UI
+  shows it like any other. agendouille's settings: that `public_url`,
+  `trusted_proxies` 10.0.60.2. Checked through the proxy: discovery,
+  PROPFIND, PUT, REPORT, a stale PUT refused (412), DELETE, a web sign-in
+  and a live event, with a throwaway user removed afterwards.
+- **No Debian test container** (the user): M5's "installs and upgrades on
+  Debian" is checked by reading only. install.sh's systemd branch is
+  cafard's, which runs on Debian; agendouille's own runs are on Alpine.
 - **OpenRC runs it under `supervise-daemon`**, not as a plain background
   process: a restore exits with 75 and must be started again. Checked on
   408: a restore from the admin API was back in 3 s.

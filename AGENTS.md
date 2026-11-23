@@ -67,7 +67,9 @@ M0 and M1 are done. What exists:
   hardened unit, OpenRC under supervise-daemon, the container drop-in,
   nginx and Caddy examples, README with the client checklist),
   `scripts/devdeploy.sh`, `admin passwd --if-unset`, the andouille icon.
-  Deployed to CT 408 `dmz-agendouille`:
+  Deployed to CT 408 `dmz-agendouille`, public at
+  https://agendouille.patapouf.club (NPM proxy host 7), admin UI on the
+  LAN at http://10.0.60.8:8792/admin:
   `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
