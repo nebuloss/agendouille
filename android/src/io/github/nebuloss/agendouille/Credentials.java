@@ -30,14 +30,16 @@ final class Credentials {
     final String server;
     final String username;
     final String secret;
-    final long deviceId;
+    final long deviceId; // 0 when set up by hand
+    final String mode;   // "enrolled" or "manual"
 
-    private Credentials(Account account, String server, String username, String secret, long deviceId) {
+    private Credentials(Account account, String server, String username, String secret, long deviceId, String mode) {
         this.account = account;
         this.server = server;
         this.username = username;
         this.secret = secret;
         this.deviceId = deviceId;
+        this.mode = mode;
     }
 
     /** The account there is, or null. */
@@ -51,8 +53,9 @@ final class Credentials {
             String username = am.getUserData(a, "username");
             long id = Long.parseLong(am.getUserData(a, "device_id"));
             String secret = decrypt(am.getUserData(a, "secret"));
+            String mode = "manual".equals(am.getUserData(a, "mode")) ? "manual" : "enrolled";
             if (server == null || username == null || secret == null) return null;
-            return new Credentials(a, server, username, secret, id);
+            return new Credentials(a, server, username, secret, id, mode);
         } catch (Exception e) {
             // A key lost with a reset of the lock screen, or damaged data: the
             // account is useless, sign in again.
@@ -62,7 +65,7 @@ final class Credentials {
     }
 
     /** Keeps a new credential, replacing any other account. */
-    static Credentials save(Context ctx, String server, String username, String secret, long deviceId) throws Exception {
+    static Credentials save(Context ctx, String server, String username, String secret, long deviceId, String mode) throws Exception {
         remove(ctx);
         String host = android.net.Uri.parse(server).getHost();
         Account a = new Account(username + "@" + host, TYPE);
@@ -71,8 +74,14 @@ final class Credentials {
         data.putString("username", username);
         data.putString("device_id", Long.toString(deviceId));
         data.putString("secret", encrypt(secret));
+        data.putString("mode", mode);
         if (!AccountManager.get(ctx).addAccountExplicitly(a, null, data)) throw new IllegalStateException("the account could not be added");
-        return new Credentials(a, server, username, secret, deviceId);
+        // The calendar provider syncs it: on its own every so often, and
+        // when the phone changes an event.
+        android.content.ContentResolver.setIsSyncable(a, android.provider.CalendarContract.AUTHORITY, 1);
+        android.content.ContentResolver.setSyncAutomatically(a, android.provider.CalendarContract.AUTHORITY, true);
+        android.content.ContentResolver.addPeriodicSync(a, android.provider.CalendarContract.AUTHORITY, new Bundle(), 30 * 60);
+        return new Credentials(a, server, username, secret, deviceId, mode);
     }
 
     /** Removes the account (the server side is the caller's). */

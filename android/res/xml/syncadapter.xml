@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The calendar sync adapter of the agendouille account (PLAN.md 7.3):
+     it can upload (the phone's own changes), and Android shows it in the
+     account's settings. -->
+<sync-adapter xmlns:android="http://schemas.android.com/apk/res/android"
+    android:contentAuthority="com.android.calendar"
+    android:accountType="io.github.nebuloss.agendouille"
+    android:supportsUploading="true"
+    android:userVisible="true"
+    android:allowParallelSyncs="false"
+    android:isAlwaysSyncable="true" />

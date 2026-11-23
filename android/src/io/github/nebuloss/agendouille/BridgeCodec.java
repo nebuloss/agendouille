@@ -4,13 +4,13 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * The bridge's messages (CONTRACTS.md 6), version 1: requests from the
+ * The bridge's messages (CONTRACTS.md 6), version 2: requests from the
  * page, answers and events from the app, as JSON strings. Unknown fields
  * are ignored; a malformed request gets no answer (it has no id to answer).
  * Uses only org.json, so it is tested on the JVM.
  */
 public final class BridgeCodec {
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     private BridgeCodec() {}
 
@@ -52,10 +52,12 @@ public final class BridgeCodec {
         }
     }
 
-    /** {"id": id, "ok": false, "error": code}. */
-    public static String error(long id, String code) {
+    /** {"id": id, "ok": false, "error": code, "message": message}: the code for the page, the message for a person. */
+    public static String error(long id, String code, String message) {
         try {
-            return new JSONObject().put("id", id).put("ok", false).put("error", code).toString();
+            JSONObject o = new JSONObject().put("id", id).put("ok", false).put("error", code);
+            if (message != null) o.put("message", message);
+            return o.toString();
         } catch (JSONException e) {
             throw new IllegalStateException(e);
         }

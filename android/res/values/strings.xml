@@ -3,25 +3,23 @@
      in values-fr. The style guide is docs/i18n.md. -->
 <resources>
   <string name="app_name">agendouille</string>
-  <string name="welcome_title">Welcome to agendouille</string>
-  <string name="welcome_body">To sign this phone in, scan the QR code your administrator gave you with the phone\'s camera, then choose to open it with agendouille.</string>
-  <string name="welcome_paste">You can also paste the sign-in link here:</string>
-  <string name="welcome_paste_hint">https://…/enroll/…</string>
-  <string name="welcome_continue">Sign in</string>
   <string name="bad_link">This is not an agendouille sign-in link. Check the address and try again.</string>
-  <string name="enrolling">Signing this phone in…</string>
   <string name="enroll_failed">This phone could not be signed in: %1$s</string>
   <string name="enroll_used">This sign-in link has already been used. Ask your administrator for a new one.</string>
   <string name="enroll_expired">This sign-in link has expired. Ask your administrator for a new one.</string>
-  <string name="enroll_other">This phone is already signed in as %1$s on %2$s. Remove that account first, from the Me page.</string>
+  <string name="enroll_other">This phone is already signed in as %1$s on %2$s. Remove that account in this app first.</string>
   <string name="offline">The server cannot be reached. Check your connection, then try again.</string>
-  <string name="retry">Try again</string>
   <string name="revoked">This phone was removed from agendouille. Ask your administrator for a new sign-in link to use it again.</string>
   <string name="update_title">An update is available</string>
   <string name="update_body">Version %1$s of agendouille is available on your server (this phone has %2$s).</string>
   <string name="update_install">Download</string>
   <string name="update_later">Later</string>
   <string name="camera_needed">The camera is needed to scan a QR code.</string>
-  <string name="no_browser">No app can open this link.</string>
-  <string name="download_started">Download started.</string>
+  <string name="calendar_needed">Calendar access is needed to sync your calendars to this phone.</string>
+  <string name="sync_refused">The server refused this phone\'s credential: the device may have been removed.</string>
+  <string name="sync_offline">The server could not be reached. The next sync will try again.</string>
+  <string name="manual_bad_server">This is not a server address. Enter, for example, agenda.example.org.</string>
+  <string name="manual_missing">Enter the user name and the device password.</string>
+  <string name="manual_refused">The server refused this user name or password. Check them, then try again.</string>
+  <string name="manual_not_caldav">This server does not answer as an agendouille server (HTTP %1$d). Check the address.</string>
 </resources>

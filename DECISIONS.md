@@ -3,6 +3,43 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: the Android app is a sync app, with its own screens
+
+*Replaces* PLAN 7.1's "WebView: the family web app" (the user: "android
+app must be a sync adapter not a web app. i should not be able to see
+calendar from it", "but keep modern ui in typescript"). The app shows no
+calendar: the phone's calendar app shows what the sync adapter puts in
+the phone's calendars.
+
+- **Its screens are TypeScript** (`src/android`, a third Vite bundle) in
+  the shared Material You design, built into `android/assets/web` and
+  served by the app itself at `https://appassets.androidplatform.net/`
+  (`shouldInterceptRequest`, no AndroidX): a welcome ("Scanner le QR
+  code", "Configurer à la main"), then the account (calendar permission,
+  sync status and "Synchroniser", the calendars with a switch each, the
+  account). They follow the phone's language and theme.
+- **Java does the work**: the Android account, the requests to the
+  server, the permissions (camera, calendar, notifications) and the sync
+  adapter. The bridge (CONTRACTS 6) is version 2: the page asks (`state`,
+  `enroll`, `manual`, `camera.request`, `calendar.request`, `sync.now`,
+  `calendar.toggle`, `account.remove`, `open`) and gets the new state, or
+  an error with a sentence for a person; the app pushes `state` events.
+- **Signing in**: the QR code of an enrollment link, scanned in the page
+  (the camera through `getUserMedia`, `jsqr` when the WebView has no
+  `BarcodeDetector`), or an App Link / `agendouille://` link, or by hand:
+  the server, the user and a device's password (one the person made on
+  the Appareils page, or the admin), checked with a CalDAV `PROPFIND`.
+- **CalDAV in Java** goes through `RawHttp`, a small HTTP/1.1 client on
+  the platform's TLS socket and hostname check: Android's
+  `HttpURLConnection` refuses `PROPFIND` and `REPORT`, and the usual
+  reflection fails for https. It can carry a client certificate later.
+- **The sync adapter comes in steps.** First: the user's calendars become
+  the phone's (name, colour, read-only), every 30 minutes, on "Synchroniser"
+  and when the calendar permission is given. Next: the events, from the
+  server, then the phone's own changes (PLAN 7.3).
+- **The family web app's "Ce téléphone"** (the earlier bridge) is gone: the
+  web app no longer runs inside the app.
+
 ## 2026-11-23: M6, the Android app's shell
 
 - **Package and account type** `io.github.nebuloss.agendouille`, after the

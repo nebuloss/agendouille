@@ -45,6 +45,6 @@ describe('Bridge', () => {
     window.dispatchEvent(new MessageEvent('message', { data: 'agendouille-bridge', ports: [a.port] }));
     const b = await p;
     expect(b?.hello?.app_version).toBe('0.6.0');
-    expect(a.sent[0]).toEqual({ id: 1, call: 'hello', args: { page_bridge: 1 } });
+    expect(a.sent[0]).toEqual({ id: 1, call: 'hello', args: { page_bridge: 2 } });
   });
 });

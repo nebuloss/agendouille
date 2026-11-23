@@ -639,34 +639,42 @@ CREATE TABLE audit (                   -- shares, admin actions, settings
 
 ---
 
-## 6. The app bridge (page <-> Java), version 1
+## 6. The app bridge (page <-> Java), version 2
 
-The app posts a `MessagePort` to the page with
-`postWebMessage(new WebMessage("agendouille-bridge", ports), origin)` after
-each page load. `shared/core/Bridge` keeps it; with no port within 500 ms
-after load the page is in a plain browser. Messages are JSON strings:
+The Android app's own screens (`src/android`, in the APK's assets at
+`https://appassets.androidplatform.net/`) talk to its Java over a
+`MessagePort` the app posts with `postWebMessage(new
+WebMessage("agendouille-bridge", ports), origin)` after each page load;
+`shared/core/Bridge` keeps it. Messages are JSON strings:
 
 ```json
 // page -> app
-{ "id": 1, "call": "hello", "args": { "page_bridge": 1 } }
-{ "id": 2, "call": "scan" }                  // the app grants camera, the page scans
-{ "id": 3, "call": "sync.status" }
-{ "id": 4, "call": "sync.now" }
-{ "id": 5, "call": "davx5.handoff" }          // ask the server for a davx5 device, open DAVx5
-{ "id": 6, "call": "account.remove" }
+{ "id": 1, "call": "hello", "args": { "page_bridge": 2 } }
+{ "id": 2, "call": "state" }
+{ "id": 3, "call": "camera.request" }                       // before the page scans
+{ "id": 4, "call": "enroll", "args": { "link": "https://…/enroll/…" } }
+{ "id": 5, "call": "manual", "args": { "server": "…", "username": "…", "password": "…" } }
+{ "id": 6, "call": "calendar.request" }                     // calendar (and notifications) permission
+{ "id": 7, "call": "sync.now" }
+{ "id": 8, "call": "calendar.toggle", "args": { "id": 12, "enabled": false } }
+{ "id": 9, "call": "account.remove" }
+{ "id": 10, "call": "open", "args": { "url": "https://…" } } // in the browser
 
 // app -> page
-{ "id": 1, "ok": true, "result": { "app_bridge": 1, "app_version": "0.6.0", "android": 14 } }
-{ "id": 3, "ok": true, "result": { "last_sync": "…", "state": "idle", "calendars": 4, "error": null } }
-{ "id": 4, "ok": false, "error": "offline" }
-{ "event": "sync.changed", "data": { "state": "syncing" } }
+{ "id": 1, "ok": true, "result": { "app_bridge": 2, "app_version": "0.6.0", "android": 34 } }
+{ "id": 2, "ok": true, "result": {
+    "account": { "server": "https://…", "host": "…", "username": "lea", "mode": "enrolled" },  // or null
+    "permissions": { "calendar": true, "camera": false },
+    "sync": { "state": "idle", "last_sync": "2026-11-23T20:00:00Z", "error": null, "events": 42 },
+    "calendars": [ { "id": 12, "name": "Famille", "color": "#3b6ea5", "sync": true, "read_only": false } ] } }
+{ "id": 5, "ok": false, "error": "refused", "message": "Le serveur a refusé …" }
+{ "event": "state", "data": { … } }
 ```
 
-Both sides ignore unknown fields and answer an unknown `call` with
-`{"ok": false, "error": "unknown_call"}`. A breaking change raises the
-bridge number; the server's page supports the current and the previous
-one (`/api/app/config` tells the app the server's).
-
+The calls that change something answer with the new state. `error` is a
+code for the page, `message` a sentence for a person in the phone's
+language. Both sides ignore unknown fields; an unknown `call` gets
+`{"ok": false, "error": "unknown_call"}`.
 ---
 
 ## 7. SSE (`/api/live`)

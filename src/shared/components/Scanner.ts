@@ -6,7 +6,7 @@
  */
 import { h } from '@/shared/core/Dom.ts';
 import { ui } from '@/shared/components/recipes.ts';
-import { t } from '@/app/components/Scanner.msg.ts';
+import { t } from '@/shared/components/Scanner.msg.ts';
 
 interface Detector {
   detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;

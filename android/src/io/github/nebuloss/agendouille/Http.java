@@ -24,12 +24,29 @@ final class Http {
         final int status;
         final String body;
         final List<String> cookies;
+        String etag;
 
         Answer(int status, String body, List<String> cookies) {
             this.status = status;
             this.body = body;
             this.cookies = cookies;
         }
+    }
+
+    /** A CalDAV request (RawHttp: PROPFIND and REPORT too), with the device's Basic credential. */
+    static Answer dav(String method, String url, String user, String pass, String depth, String contentType, String body, String ifMatch, String userAgent) throws IOException {
+        java.util.Map<String, String> h = new java.util.LinkedHashMap<>();
+        h.put("User-Agent", userAgent);
+        String raw = user + ":" + pass;
+        h.put("Authorization", "Basic " + android.util.Base64.encodeToString(raw.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
+        h.put("Accept-Language", Locale.getDefault().toLanguageTag());
+        if (depth != null) h.put("Depth", depth);
+        if (ifMatch != null) h.put("If-Match", ifMatch);
+        if (body != null) h.put("Content-Type", contentType);
+        RawHttp.Answer r = RawHttp.request(null, method, url, h, body == null ? null : body.getBytes(StandardCharsets.UTF_8));
+        Answer a = new Answer(r.status, r.text(), new ArrayList<>());
+        a.etag = r.headers.get("etag");
+        return a;
     }
 
     /**

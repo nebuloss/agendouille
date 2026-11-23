@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalTarget } from '@/app/components/Scanner.ts';
+import { approvalTarget } from '@/shared/components/Scanner.ts';
 
 describe('approvalTarget', () => {
   const origin = 'https://agenda.example.org';

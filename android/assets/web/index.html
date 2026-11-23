@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- The Android app's screens: android.js and android.css are built from
+     src/android by `npm run build` (vite --mode android) into this folder,
+     and MainActivity serves the folder at https://appassets.androidplatform.net/. -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>agendouille</title>
+<link rel="stylesheet" href="android.css">
+<script type="module" src="android.js"></script>
+</head>
+<body class="bg-surface text-on-surface">
+<main id="app" class="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-4 px-4 pb-10"></main>
+<div class="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4" id="toasts" aria-live="polite"></div>
+</body>
+</html>

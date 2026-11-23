@@ -10,7 +10,7 @@
     "url": "git+https://github.com/nebuloss/agendouille.git"
   },
   "scripts": {
-    "build": "vite build --mode app && vite build --mode admin",
+    "build": "vite build --mode app && vite build --mode admin && vite build --mode android",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

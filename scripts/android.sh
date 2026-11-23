@@ -15,4 +15,7 @@ cd "$repo_root"
 target=${1:-apk}
 version="dev-$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo '-dirty')"
 code=$(git rev-list --count HEAD)
-exec scripts/remote.sh "rtk make -C android $target VERSION=$version VERSION_CODE=$code APP_HOST=${APP_HOST:-} CLEARTEXT=${CLEARTEXT:-false}"
+# The screens (src/android) go into the APK: built first.
+prep=""
+[ "$target" = apk ] && prep="npm run build --silent >/dev/null && "
+exec scripts/remote.sh "${prep}rtk make -C android $target VERSION=$version VERSION_CODE=$code APP_HOST=${APP_HOST:-} CLEARTEXT=${CLEARTEXT:-false}"

@@ -1,12 +1,12 @@
 /**
- * The bridge to the Android app (CONTRACTS.md 6), version 1. The app posts
+ * The bridge to the Android app (CONTRACTS.md 6), version 2. The app posts
  * a MessagePort with the message "agendouille-bridge" after each page load;
  * with none within a moment after load, the page is in a plain browser and
  * connect() resolves null. Calls are JSON, answered by id; the app may also
  * send events ({"event", "data"}).
  */
 
-export const PAGE_BRIDGE = 1;
+export const PAGE_BRIDGE = 2;
 const WAIT_AFTER_LOAD_MS = 1500;
 
 export interface Hello {
@@ -16,8 +16,10 @@ export interface Hello {
 }
 
 export class BridgeError extends Error {
-  constructor(readonly code: string) {
-    super(code);
+  /** code is for the page to test; detail, when there is one, is the app's
+   * sentence for a person, already in the phone's language. */
+  constructor(readonly code: string, readonly detail?: string) {
+    super(detail ?? code);
     this.name = 'BridgeError';
   }
 }
@@ -69,7 +71,7 @@ export class Bridge {
     if (w === undefined) return;
     this.waiting.delete(id);
     if (m['ok'] === true) w.resolve(m['result']);
-    else w.reject(new BridgeError(typeof m['error'] === 'string' ? m['error'] : 'error'));
+    else w.reject(new BridgeError(typeof m['error'] === 'string' ? m['error'] : 'error', typeof m['message'] === 'string' ? m['message'] : undefined));
   }
 }
 

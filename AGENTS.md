@@ -72,15 +72,18 @@ M0 and M1 are done. What exists:
   https://agendouille.dmz.patapouf.club (LAN NPM `srv-npm`, host 26):
   `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
 
-- **M6, the Android app's shell:** `android/` (manifest, plain Java:
-  `MainActivity` with the WebView and the bridge, `Credentials` in the
-  Keystore and an Android account, `AuthenticatorService`, `EnrollLink`,
-  `BridgeCodec`, `Versions`; `Makefile` without Gradle; JVM tests in
-  `android/test`), `scripts/android.sh`, the APK embedded by
+- **M6, the Android app** (a sync app, DECISIONS): its screens in
+  `src/android` (built into `android/assets/web`), and `android/` (plain
+  Java: `MainActivity` serving the screens and the bridge v2,
+  `Credentials` in the Keystore and an Android account,
+  `AuthenticatorService`, `SyncService` and `CalendarSync` (the calendars;
+  events next), `Dav` and `RawHttp` for CalDAV, `EnrollLink`,
+  `ServerAddress`, `BridgeCodec`, `Versions`; `Makefile` without Gradle;
+  JVM tests in `android/test`), `scripts/android.sh`, the APK embedded by
   `scripts/devdeploy.sh` and the release, `/app/agendouille.apk`,
   `assetlinks.json`, `src/shared/core/Bridge.ts`,
-  `src/app/components/Scanner.ts`, the Moi page's "Ce téléphone". Still to
-  check on a phone: M6's "done when".
+  `src/shared/components/Scanner.ts`. `scripts/shots/shoot-android.mjs`
+  shoots the screens with a fake bridge. Still to check on a phone.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.

@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 // serves (PLAN.md 9.1). Each lands where Go's embed picks it up; the file
 // names are fixed because the layouts name them, and the server
 // revalidates them by ETag.
-const BUNDLES = ['app', 'admin'] as const;
+const BUNDLES = ['app', 'admin', 'android'] as const;
 type Bundle = (typeof BUNDLES)[number];
 
 export default defineConfig(({ mode }) => {
@@ -21,7 +21,8 @@ export default defineConfig(({ mode }) => {
     plugins: [tailwindcss()],
     resolve: { alias: { '@': resolve(import.meta.dirname, './src') } },
     build: {
-      outDir: resolve(import.meta.dirname, `internal/web/assets/static/${bundle}`),
+      // The Android app's screens go into the APK's assets, not the server.
+      outDir: bundle === 'android' ? resolve(import.meta.dirname, 'android/assets/web') : resolve(import.meta.dirname, `internal/web/assets/static/${bundle}`),
       // Not emptied: the directory holds the committed README.txt that
       // embed needs on a clean checkout.
       emptyOutDir: false,

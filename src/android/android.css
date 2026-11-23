@@ -1,0 +1,10 @@
+/* The Android app's screens (android/assets/web/android.css): Tailwind and
+   the design shared with the web app and the admin UI. */
+@import "tailwindcss" source(none);
+@import "../shared/design/base.css";
+@source ".";
+@source "../shared";
+@source "../../android/assets/web/index.html";
+
+/* The app draws under the status and navigation bars (edge to edge). */
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }

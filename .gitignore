@@ -27,6 +27,9 @@ android/build/
 *.keystore
 internal/web/assets/apk/*
 !internal/web/assets/apk/README.txt
+android/assets/web/*
+!android/assets/web/index.html
+!android/assets/web/icon.svg
 
 # Claude Code worktrees and local settings.
 .claude/

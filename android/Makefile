@@ -32,6 +32,7 @@ SRC    := $(shell find src -name '*.java')
 RES    := $(shell find res -type f)
 # The parts with no Android types, tested on the JVM.
 PURE   := src/io/github/nebuloss/agendouille/EnrollLink.java \
+          src/io/github/nebuloss/agendouille/ServerAddress.java \
           src/io/github/nebuloss/agendouille/BridgeCodec.java \
           src/io/github/nebuloss/agendouille/Versions.java
 TESTS  := $(shell find test -name '*.java')
@@ -52,9 +53,13 @@ $(B)/res.zip: $(RES)
 	@mkdir -p $(B)
 	$(BUILD_TOOLS)/aapt2 compile --dir res -o $@
 
-$(B)/base.apk: $(B)/AndroidManifest.xml $(B)/res.zip
+# The screens: src/android built by `npm run build` into assets/web.
+ASSETS := $(shell find assets -type f)
+
+$(B)/base.apk: $(B)/AndroidManifest.xml $(B)/res.zip $(ASSETS)
+	@test -s assets/web/android.js || { echo "assets/web/android.js is missing: run npm run build first"; exit 1; }
 	@rm -rf $(B)/gen && mkdir -p $(B)/gen
-	$(BUILD_TOOLS)/aapt2 link -I $(PLATFORM) --manifest $(B)/AndroidManifest.xml \
+	$(BUILD_TOOLS)/aapt2 link -I $(PLATFORM) --manifest $(B)/AndroidManifest.xml -A assets \
 	  --min-sdk-version 26 --target-sdk-version 34 \
 	  --version-code $(VERSION_CODE) --version-name $(VERSION) \
 	  --java $(B)/gen -o $@ $(B)/res.zip

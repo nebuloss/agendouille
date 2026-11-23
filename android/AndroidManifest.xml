@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The agendouille Android app (PLAN.md 7): the family web app in a WebView,
-  an Android account holding the device's credential, and (M7) the CalDAV
-  sync adapter. Built by android/Makefile, no Gradle. The Makefile fills
+  The agendouille Android app (DECISIONS: the app is a sync app): its own
+  screens (TypeScript, in the APK's assets) to sign the phone in and choose
+  what syncs, an Android account holding the device's credential, and the
+  CalDAV sync adapter that fills the phone's calendars. Built by android/Makefile, no Gradle. The Makefile fills
   @APP_LINKS@ with an App Link filter for the server's host when APP_HOST is
   set: an App Link names its host at build time, and each family runs its
   own server, so the agendouille:// scheme works with any server.
@@ -12,6 +13,12 @@
 
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.CAMERA" />
+  <uses-permission android:name="android.permission.READ_CALENDAR" />
+  <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+  <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+  <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
+  <uses-permission android:name="android.permission.READ_SYNC_STATS" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-feature android:name="android.hardware.camera" android:required="false" />
 
   <application
@@ -41,6 +48,18 @@
       </intent-filter>
 @APP_LINKS@
     </activity>
+
+    <service
+        android:name=".SyncService"
+        android:exported="true"
+        android:permission="android.permission.BIND_SYNC_ADAPTER">
+      <intent-filter>
+        <action android:name="android.content.SyncAdapter" />
+      </intent-filter>
+      <meta-data
+          android:name="android.content.SyncAdapter"
+          android:resource="@xml/syncadapter" />
+    </service>
 
     <service
         android:name=".AuthenticatorService"

@@ -66,13 +66,28 @@ public class PureTest {
         assertEquals(BridgeCodec.VERSION, ok.getJSONObject("result").getInt("app_bridge"));
         assertEquals("0.6.0", ok.getJSONObject("result").getString("app_version"));
         assertEquals(34, ok.getJSONObject("result").getInt("android"));
-        JSONObject err = new JSONObject(BridgeCodec.error(2, "unknown_call"));
+        JSONObject err = new JSONObject(BridgeCodec.error(2, "unknown_call", null));
         assertFalse(err.getBoolean("ok"));
         assertEquals("unknown_call", err.getString("error"));
+        assertFalse(err.has("message"));
+        JSONObject told = new JSONObject(BridgeCodec.error(3, "refused", "Identifiants refusés."));
+        assertEquals("Identifiants refusés.", told.getString("message"));
         JSONObject plain = new JSONObject(BridgeCodec.ok(5, null));
         assertFalse(plain.has("result"));
         JSONObject ev = new JSONObject(BridgeCodec.event("sync.changed", new JSONObject().put("state", "syncing")));
         assertEquals("syncing", ev.getJSONObject("data").getString("state"));
+    }
+
+    @Test
+    public void serverAddresses() {
+        assertEquals("https://agenda.example.org", ServerAddress.normalize("agenda.example.org"));
+        assertEquals("https://agenda.example.org", ServerAddress.normalize(" https://Agenda.Example.org/dav/ "));
+        assertEquals("http://10.0.0.5:8791", ServerAddress.normalize("http://10.0.0.5:8791/"));
+        assertEquals("https://agenda.example.org:8443", ServerAddress.normalize("agenda.example.org:8443"));
+        assertNull(ServerAddress.normalize(""));
+        assertNull(ServerAddress.normalize("ftp://agenda.example.org"));
+        assertNull(ServerAddress.normalize("agenda example"));
+        assertNull(ServerAddress.normalize(null));
     }
 
     @Test

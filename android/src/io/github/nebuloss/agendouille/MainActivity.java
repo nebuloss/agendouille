@@ -3,92 +3,140 @@ package io.github.nebuloss.agendouille;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.graphics.Typeface;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.InputType;
-import android.util.TypedValue;
-import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
-import android.webkit.CookieManager;
+import android.provider.CalendarContract;
+import android.provider.CalendarContract.Calendars;
+import android.webkit.MimeTypeMap;
 import android.webkit.PermissionRequest;
-import android.webkit.URLUtil;
-import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebMessage;
 import android.webkit.WebMessagePort;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.ScrollView;
-import android.widget.TextView;
-import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The app's one screen (PLAN.md 7): the welcome page until the phone is
- * enrolled, then the family web app in a WebView, signed in with the
- * device's credential, and the bridge to it (CONTRACTS.md 6).
+ * The app's screens (DECISIONS: the app is a sync app): the TypeScript
+ * pages of src/android, shipped in the APK's assets and served here at
+ * https://appassets.androidplatform.net/, talking to this class over the
+ * bridge (CONTRACTS.md 6, version 2). No calendar is shown: the phone's
+ * calendar app shows what the sync adapter (SyncService) puts there.
  */
 public final class MainActivity extends Activity {
+    static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final int REQ_CAMERA = 1;
-    private static final int REQ_FILE = 2;
-    private static final long CHECK_EVERY_MS = 5 * 60 * 1000;
+    private static final int REQ_CALENDAR = 2;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
-    private Credentials cred;
     private WebView web;
     private WebMessagePort port;
-    private long pendingScan = -1;
-    private ValueCallback<Uri[]> pendingFiles;
-    private long lastCheck;
-    private boolean checkingSession;
+    private long pendingCamera = -1;
+    private long pendingCalendar = -1;
+    private Object syncObserver;
+    private final SharedPreferences.OnSharedPreferenceChangeListener statusListener = (p, k) -> pushState();
+    private String pendingLink;
 
     // --- lifecycle
 
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        cred = Credentials.load(this);
-        handle(getIntent());
+        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
+        web = new WebView(this);
+        WebSettings s = web.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(false);
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+                return asset(req.getUrl());
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                if (ORIGIN.equals(origin(req.getUrl()))) return false;
+                openOutside(req.getUrl());
+                return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                connectBridge();
+            }
+        });
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(PermissionRequest r) {
+                // The page's scanner: the camera, once Android gave it to the app.
+                boolean video = false;
+                for (String res : r.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) video = true;
+                if (video && ORIGIN.equals(origin(r.getOrigin())) && granted(Manifest.permission.CAMERA)) {
+                    r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                } else {
+                    r.deny();
+                }
+            }
+        });
+        setContentView(web);
+        web.loadUrl(ORIGIN + "/index.html");
+        pendingLink = linkOf(getIntent());
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        setIntent(intent);
-        handle(intent);
+        String link = linkOf(intent);
+        if (link != null) enrollFromIntent(link);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // A device removed in the web app, on another phone or by the admin:
-        // checked again when the app comes back, at most every five minutes.
-        if (web != null && cred != null && System.currentTimeMillis() - lastCheck > CHECK_EVERY_MS) checkConfig(false);
+        syncObserver = ContentResolver.addStatusChangeListener(
+                ContentResolver.SYNC_OBSERVER_TYPE_ACTIVE | ContentResolver.SYNC_OBSERVER_TYPE_PENDING, which -> ui.post(this::pushState));
+        SyncStatus.prefs(this).registerOnSharedPreferenceChangeListener(statusListener);
+        pushState();
+        checkConfig();
+    }
+
+    @Override
+    protected void onPause() {
+        if (syncObserver != null) ContentResolver.removeStatusChangeListener(syncObserver);
+        SyncStatus.prefs(this).unregisterOnSharedPreferenceChangeListener(statusListener);
+        super.onPause();
     }
 
     @Override
@@ -97,32 +145,21 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    // Still how back works without opting in to the predictive back gesture
-    // (android:enableOnBackInvokedCallback), which the app does not.
-    @Override
-    @SuppressWarnings("deprecation")
-    public void onBackPressed() {
-        if (web != null && web.getParent() != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+    private static String linkOf(Intent i) {
+        Uri d = i != null ? i.getData() : null;
+        return d != null ? d.toString() : null;
     }
 
-    private void handle(Intent intent) {
-        Uri data = intent != null ? intent.getData() : null;
-        EnrollLink link = data != null ? EnrollLink.parse(data.toString()) : null;
-        if (link != null) {
-            if (cred != null && !cred.server.equals(link.server)) {
-                showWelcome(getString(R.string.enroll_other, cred.username, Uri.parse(cred.server).getHost()));
-                return;
-            }
-            enroll(link);
-        } else if (cred != null) {
-            openWeb();
-        } else {
-            showWelcome(null);
-        }
+    private static String origin(Uri u) {
+        if (u == null || u.getScheme() == null || u.getHost() == null) return "";
+        return u.getScheme() + "://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
     }
 
-    private String version() {
+    private boolean granted(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    String version() {
         try {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (PackageManager.NameNotFoundException e) {
@@ -134,289 +171,334 @@ public final class MainActivity extends Activity {
         return "agendouille-android/" + version() + " (Android " + Build.VERSION.RELEASE + "; " + Build.MODEL + ")";
     }
 
-    // --- the native screens: welcome, and a status with an optional retry
+    // --- the screens, from the APK's assets
 
-    private int dp(int v) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics());
-    }
-
-    private TextView text(String s, int sp, boolean bold, int colour) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        t.setTextColor(getColor(colour));
-        if (bold) t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        t.setLineSpacing(0, 1.2f);
-        return t;
-    }
-
-    private Button button(String label, View.OnClickListener l) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setTextColor(getColor(R.color.on_primary));
-        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.primary)));
-        b.setOnClickListener(l);
-        return b;
-    }
-
-    private LinearLayout column() {
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(dp(28), dp(48), dp(28), dp(28));
-        return col;
-    }
-
-    private void showWelcome(String message) {
-        web = null;
-        port = null;
-        LinearLayout col = column();
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(R.mipmap.ic_launcher);
-        col.addView(icon, new LinearLayout.LayoutParams(dp(72), dp(72)));
-        TextView title = text(getString(R.string.welcome_title), 26, false, R.color.text);
-        title.setPadding(0, dp(20), 0, dp(12));
-        col.addView(title);
-        if (message != null) {
-            TextView m = text(message, 15, true, R.color.primary);
-            m.setPadding(0, 0, 0, dp(16));
-            col.addView(m);
+    private WebResourceResponse asset(Uri u) {
+        if (!ORIGIN.equals(origin(u))) return null;
+        String path = u.getPath() == null || u.getPath().equals("/") ? "/index.html" : u.getPath();
+        if (path.contains("..")) return null;
+        try {
+            InputStream in = getAssets().open("web" + path);
+            String ext = MimeTypeMap.getFileExtensionFromUrl(path);
+            String mime = "js".equals(ext) ? "text/javascript" : "css".equals(ext) ? "text/css" : "svg".equals(ext) ? "image/svg+xml"
+                    : "html".equals(ext) ? "text/html" : MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+            return new WebResourceResponse(mime != null ? mime : "application/octet-stream", "utf-8", in);
+        } catch (IOException e) {
+            WebResourceResponse r = new WebResourceResponse("text/plain", "utf-8", null);
+            r.setStatusCodeAndReasonPhrase(404, "Not Found");
+            return r;
         }
-        col.addView(text(getString(R.string.welcome_body), 16, false, R.color.muted));
-        TextView paste = text(getString(R.string.welcome_paste), 14, false, R.color.muted);
-        paste.setPadding(0, dp(28), 0, dp(6));
-        col.addView(paste);
-        EditText field = new EditText(this);
-        field.setHint(R.string.welcome_paste_hint);
-        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        field.setSingleLine(true);
-        col.addView(field);
-        Button go = button(getString(R.string.welcome_continue), v -> {
-            EnrollLink link = EnrollLink.parse(field.getText().toString());
-            if (link == null) Toast.makeText(this, R.string.bad_link, Toast.LENGTH_LONG).show();
-            else enroll(link);
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.gravity = Gravity.END;
-        lp.topMargin = dp(12);
-        col.addView(go, lp);
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(col);
-        setContentView(scroll);
-    }
-
-    private void showStatus(String message, Runnable retry) {
-        LinearLayout col = column();
-        col.setGravity(Gravity.CENTER_HORIZONTAL);
-        if (retry == null) col.addView(new ProgressBar(this));
-        TextView t = text(message, 16, false, R.color.text);
-        t.setGravity(Gravity.CENTER);
-        t.setPadding(0, dp(20), 0, dp(20));
-        col.addView(t);
-        if (retry != null) col.addView(button(getString(R.string.retry), v -> retry.run()));
-        setContentView(col);
-    }
-
-    // --- enrollment (PLAN.md 7.2)
-
-    private void enroll(EnrollLink link) {
-        showStatus(getString(R.string.enrolling), null);
-        io.execute(() -> {
-            try {
-                JSONObject body = new JSONObject().put("token", link.token).put("model", Build.MANUFACTURER + " " + Build.MODEL)
-                        .put("android", Build.VERSION.SDK_INT).put("app_version", version());
-                Http.Answer a = Http.call("POST", link.server + "/api/app/enroll", null, null, null, body.toString(), userAgent());
-                JSONObject o = a.body.isEmpty() ? new JSONObject() : new JSONObject(a.body);
-                if (a.status != 200) {
-                    String code = o.optString("error");
-                    String msg = code.equals("used") ? getString(R.string.enroll_used)
-                            : code.equals("expired") ? getString(R.string.enroll_expired)
-                            : getString(R.string.enroll_failed, o.optString("message", "HTTP " + a.status));
-                    ui.post(() -> showWelcome(msg));
-                    return;
-                }
-                Credentials c = Credentials.save(this, link.server, o.getString("username"), o.getString("secret"), o.getLong("device_id"));
-                ui.post(() -> {
-                    cred = c;
-                    openWeb();
-                });
-            } catch (IOException e) {
-                ui.post(() -> showStatus(getString(R.string.offline), () -> enroll(link)));
-            } catch (Exception e) {
-                ui.post(() -> showWelcome(getString(R.string.enroll_failed, String.valueOf(e.getMessage()))));
-            }
-        });
-    }
-
-    // --- the web app, signed in
-
-    private void openWeb() {
-        showStatus(getString(R.string.enrolling), null);
-        Credentials c = cred;
-        io.execute(() -> {
-            try {
-                Http.Answer a = Http.call("POST", c.server + "/api/app/session", c.username, c.secret, null, null, userAgent());
-                if (a.status == 401 || a.status == 403) {
-                    ui.post(this::revoked);
-                    return;
-                }
-                if (a.status != 204 && a.status != 200) throw new IOException("HTTP " + a.status);
-                ui.post(() -> {
-                    CookieManager cm = CookieManager.getInstance();
-                    for (String sc : a.cookies) cm.setCookie(c.server, sc);
-                    cm.flush();
-                    showWeb(c.server + "/");
-                    checkConfig(true);
-                });
-            } catch (IOException e) {
-                ui.post(() -> showStatus(getString(R.string.offline), this::openWeb));
-            }
-        });
-    }
-
-    private boolean ours(Uri u) {
-        Uri s = Uri.parse(cred.server);
-        return u != null && s.getScheme().equals(u.getScheme()) && s.getHost().equals(u.getHost()) && s.getPort() == u.getPort();
-    }
-
-    private void showWeb(String url) {
-        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
-        web = new WebView(this);
-        WebSettings s = web.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        s.setAllowFileAccess(false);
-        s.setAllowContentAccess(false);
-        s.setUserAgentString(s.getUserAgentString() + " agendouille-android/" + version());
-        web.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-                Uri u = req.getUrl();
-                if (ours(u)) {
-                    // Sent to the sign-in page: the session is gone (the device
-                    // removed, or the session expired). The app signs in again,
-                    // or signs out if the device is no more.
-                    if ("/signin".equals(u.getPath())) {
-                        sessionLost();
-                        return true;
-                    }
-                    return false;
-                }
-                openOutside(u);
-                return true;
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                if (ours(Uri.parse(url))) {
-                    if ("/signin".equals(Uri.parse(url).getPath())) sessionLost();
-                    else connectBridge();
-                }
-            }
-        });
-        web.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(PermissionRequest r) {
-                // The page's scanner: the camera, for our origin, once Android
-                // has given it to the app (the bridge's scan asks).
-                boolean video = false;
-                for (String res : r.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) video = true;
-                if (video && ours(r.getOrigin()) && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
-                } else {
-                    r.deny();
-                }
-            }
-
-            @Override
-            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
-                // The .ics import's file field.
-                if (pendingFiles != null) pendingFiles.onReceiveValue(null);
-                pendingFiles = callback;
-                try {
-                    startActivityForResult(params.createIntent(), REQ_FILE);
-                } catch (ActivityNotFoundException e) {
-                    pendingFiles = null;
-                    return false;
-                }
-                return true;
-            }
-        });
-        web.setDownloadListener((link, ua, disposition, mime, length) -> download(link, disposition, mime));
-        setContentView(web);
-        web.loadUrl(url);
     }
 
     private void openOutside(Uri u) {
+        if (u == null || !("https".equals(u.getScheme()) || "http".equals(u.getScheme()))) return;
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, u));
-        } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, R.string.no_browser, Toast.LENGTH_LONG).show();
+        } catch (ActivityNotFoundException ignored) {
+            // nothing to open it with
         }
     }
 
-    /** An export (.ics, a calendar's zip): Android's downloads, with the session. */
-    private void download(String url, String disposition, String mime) {
-        Uri u = Uri.parse(url);
-        if (!ours(u)) {
-            openOutside(u);
-            return;
+    // --- the bridge (CONTRACTS.md 6, version 2)
+
+    private void connectBridge() {
+        WebMessagePort[] ch = web.createWebMessageChannel();
+        port = ch[0];
+        port.setWebMessageCallback(new WebMessagePort.WebMessageCallback() {
+            @Override
+            public void onMessage(WebMessagePort p, WebMessage m) {
+                onBridge(m.getData());
+            }
+        });
+        web.postWebMessage(new WebMessage("agendouille-bridge", new WebMessagePort[]{ch[1]}), Uri.parse(ORIGIN));
+        if (pendingLink != null) {
+            String l = pendingLink;
+            pendingLink = null;
+            ui.postDelayed(() -> enrollFromIntent(l), 300);
         }
-        DownloadManager.Request r = new DownloadManager.Request(u);
-        r.addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url));
-        r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, disposition, mime));
-        ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
-        Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show();
+    }
+
+    private void send(String text) {
+        ui.post(() -> {
+            if (port != null) port.postMessage(new WebMessage(text));
+        });
+    }
+
+    private void pushState() {
+        if (port == null) return;
+        io.execute(() -> send(BridgeCodec.event("state", state())));
+    }
+
+    private void onBridge(String text) {
+        BridgeCodec.Request r = BridgeCodec.parse(text);
+        if (r == null) return;
+        switch (r.call) {
+            case "hello":
+                send(BridgeCodec.ok(r.id, BridgeCodec.hello(version(), Build.VERSION.SDK_INT)));
+                break;
+            case "state":
+                io.execute(() -> send(BridgeCodec.ok(r.id, state())));
+                break;
+            case "camera.request":
+                if (granted(Manifest.permission.CAMERA)) send(BridgeCodec.ok(r.id, null));
+                else {
+                    pendingCamera = r.id;
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                }
+                break;
+            case "calendar.request":
+                pendingCalendar = r.id;
+                List<String> want = new ArrayList<>();
+                want.add(Manifest.permission.READ_CALENDAR);
+                want.add(Manifest.permission.WRITE_CALENDAR);
+                if (Build.VERSION.SDK_INT >= 33) want.add("android.permission.POST_NOTIFICATIONS");
+                requestPermissions(want.toArray(new String[0]), REQ_CALENDAR);
+                break;
+            case "enroll":
+                enroll(r.id, r.args.optString("link"));
+                break;
+            case "manual":
+                manual(r.id, r.args.optString("server"), r.args.optString("username"), r.args.optString("password"));
+                break;
+            case "sync.now":
+                syncNow();
+                io.execute(() -> send(BridgeCodec.ok(r.id, state())));
+                break;
+            case "calendar.toggle":
+                io.execute(() -> {
+                    toggle(r.args.optLong("id"), r.args.optBoolean("enabled"));
+                    send(BridgeCodec.ok(r.id, state()));
+                });
+                break;
+            case "account.remove":
+                removeAccount(r.id);
+                break;
+            case "open":
+                ui.post(() -> openOutside(Uri.parse(r.args.optString("url"))));
+                send(BridgeCodec.ok(r.id, null));
+                break;
+            default:
+                send(BridgeCodec.error(r.id, "unknown_call", null));
+        }
     }
 
     @Override
-    protected void onActivityResult(int request, int result, Intent data) {
-        super.onActivityResult(request, result, data);
-        if (request == REQ_FILE && pendingFiles != null) {
-            pendingFiles.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
-            pendingFiles = null;
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        if (request == REQ_CAMERA && pendingCamera >= 0) {
+            long id = pendingCamera;
+            pendingCamera = -1;
+            if (granted(Manifest.permission.CAMERA)) send(BridgeCodec.ok(id, null));
+            else send(BridgeCodec.error(id, "camera_denied", getString(R.string.camera_needed)));
+        } else if (request == REQ_CALENDAR && pendingCalendar >= 0) {
+            long id = pendingCalendar;
+            pendingCalendar = -1;
+            if (granted(Manifest.permission.WRITE_CALENDAR)) {
+                syncNow();
+                io.execute(() -> send(BridgeCodec.ok(id, state())));
+            } else {
+                send(BridgeCodec.error(id, "calendar_denied", getString(R.string.calendar_needed)));
+            }
         }
     }
 
-    /** The WebView's session is gone: a new one, or signed out. */
-    private void sessionLost() {
-        if (checkingSession) return;
-        checkingSession = true;
-        openWeb();
-        ui.postDelayed(() -> checkingSession = false, 2000);
+    // --- what the screens show
+
+    private JSONObject state() {
+        try {
+            JSONObject o = new JSONObject();
+            Credentials c = Credentials.load(this);
+            if (c != null) {
+                o.put("account", new JSONObject().put("server", c.server).put("host", Uri.parse(c.server).getHost())
+                        .put("username", c.username).put("mode", c.mode));
+            } else {
+                o.put("account", JSONObject.NULL);
+            }
+            boolean cal = granted(Manifest.permission.READ_CALENDAR) && granted(Manifest.permission.WRITE_CALENDAR);
+            o.put("permissions", new JSONObject().put("calendar", cal).put("camera", granted(Manifest.permission.CAMERA)));
+            SharedPreferences p = SyncStatus.prefs(this);
+            boolean active = c != null && ContentResolver.isSyncActive(c.account, CalendarContract.AUTHORITY);
+            JSONObject sync = new JSONObject().put("state", active ? "syncing" : p.getString("state", "never"))
+                    .put("events", p.getInt("events", 0));
+            long last = p.getLong("last_sync", 0);
+            sync.put("last_sync", last > 0 ? iso(last) : JSONObject.NULL);
+            sync.put("error", p.contains("error") ? p.getString("error", "") : JSONObject.NULL);
+            o.put("sync", sync);
+            JSONArray cals = new JSONArray();
+            if (c != null && cal) {
+                try (Cursor q = getContentResolver().query(Calendars.CONTENT_URI,
+                        new String[]{Calendars._ID, Calendars.CALENDAR_DISPLAY_NAME, Calendars.CALENDAR_COLOR, Calendars.SYNC_EVENTS, Calendars.CALENDAR_ACCESS_LEVEL},
+                        Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=?", new String[]{c.account.name, c.account.type},
+                        Calendars.CALENDAR_DISPLAY_NAME)) {
+                    while (q != null && q.moveToNext()) {
+                        cals.put(new JSONObject().put("id", q.getLong(0)).put("name", q.getString(1))
+                                .put("color", String.format("#%06x", q.getInt(2) & 0xffffff)).put("sync", q.getInt(3) == 1)
+                                .put("read_only", q.getInt(4) < Calendars.CAL_ACCESS_CONTRIBUTOR));
+                    }
+                }
+            }
+            o.put("calendars", cals);
+            return o;
+        } catch (Exception e) {
+            return new JSONObject();
+        }
     }
 
-    private void revoked() {
-        Credentials.remove(this);
-        cred = null;
-        CookieManager.getInstance().removeAllCookies(null);
-        showWelcome(getString(R.string.revoked));
+    private static String iso(long ms) {
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ROOT);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return f.format(new Date(ms));
+    }
+
+    private void syncNow() {
+        Credentials c = Credentials.load(this);
+        if (c == null) return;
+        Bundle b = new Bundle();
+        b.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
+        b.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
+        ContentResolver.requestSync(c.account, CalendarContract.AUTHORITY, b);
+    }
+
+    private void toggle(long id, boolean enabled) {
+        Credentials c = Credentials.load(this);
+        if (c == null || !granted(Manifest.permission.WRITE_CALENDAR)) return;
+        ContentValues v = new ContentValues();
+        v.put(Calendars.SYNC_EVENTS, enabled ? 1 : 0);
+        v.put(Calendars.VISIBLE, enabled ? 1 : 0);
+        getContentResolver().update(ContentUris.withAppendedId(CalendarSync.asSyncAdapter(Calendars.CONTENT_URI, c.account), id), v, null, null);
+        if (enabled) syncNow();
+    }
+
+    // --- signing in: an enrollment link (PLAN.md 7.2), or by hand
+
+    private void enrollFromIntent(String link) {
+        // An App Link or agendouille:// opened the app: the screens hear of it
+        // as the state that follows.
+        io.execute(() -> {
+            String err = doEnroll(link);
+            if (err != null) ui.post(() -> new AlertDialog.Builder(this).setMessage(err).setPositiveButton(android.R.string.ok, null).show());
+            pushState();
+        });
+    }
+
+    private void enroll(long id, String link) {
+        io.execute(() -> {
+            String err = doEnroll(link);
+            if (err != null) send(BridgeCodec.error(id, "enroll", err));
+            else send(BridgeCodec.ok(id, state()));
+        });
+    }
+
+    /** Redeems an enrollment link; null, or the reason it failed, for a person. */
+    private String doEnroll(String text) {
+        EnrollLink link = EnrollLink.parse(text);
+        if (link == null) return getString(R.string.bad_link);
+        Credentials have = Credentials.load(this);
+        if (have != null) return getString(R.string.enroll_other, have.username, Uri.parse(have.server).getHost());
+        try {
+            JSONObject body = new JSONObject().put("token", link.token).put("model", Build.MANUFACTURER + " " + Build.MODEL)
+                    .put("android", Build.VERSION.SDK_INT).put("app_version", version());
+            Http.Answer a = Http.call("POST", link.server + "/api/app/enroll", null, null, null, body.toString(), userAgent());
+            JSONObject o = a.body.isEmpty() ? new JSONObject() : new JSONObject(a.body);
+            if (a.status != 200) {
+                String code = o.optString("error");
+                return code.equals("used") ? getString(R.string.enroll_used)
+                        : code.equals("expired") ? getString(R.string.enroll_expired)
+                        : getString(R.string.enroll_failed, o.optString("message", "HTTP " + a.status));
+            }
+            Credentials.save(this, link.server, o.getString("username"), o.getString("secret"), o.getLong("device_id"), "enrolled");
+            syncNow();
+            return null;
+        } catch (IOException e) {
+            return getString(R.string.offline);
+        } catch (Exception e) {
+            return getString(R.string.enroll_failed, String.valueOf(e.getMessage()));
+        }
+    }
+
+    /** By hand: the server, the user and a device's password, checked on CalDAV. */
+    private void manual(long id, String serverText, String username, String password) {
+        io.execute(() -> {
+            String server = ServerAddress.normalize(serverText);
+            if (server == null) {
+                send(BridgeCodec.error(id, "bad_server", getString(R.string.manual_bad_server)));
+                return;
+            }
+            if (username.isEmpty() || password.isEmpty()) {
+                send(BridgeCodec.error(id, "missing", getString(R.string.manual_missing)));
+                return;
+            }
+            if (Credentials.load(this) != null) {
+                send(BridgeCodec.error(id, "signed_in", getString(R.string.enroll_other, username, Uri.parse(server).getHost())));
+                return;
+            }
+            try {
+                Http.Answer a = Http.dav("PROPFIND", server + "/dav/", username, password, "0", "application/xml; charset=utf-8",
+                        "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:current-user-principal/></d:prop></d:propfind>", null, userAgent());
+                if (a.status == 401) {
+                    send(BridgeCodec.error(id, "refused", getString(R.string.manual_refused)));
+                    return;
+                }
+                if (a.status != 207) {
+                    send(BridgeCodec.error(id, "not_caldav", getString(R.string.manual_not_caldav, a.status)));
+                    return;
+                }
+                Credentials.save(this, server, username, password, 0, "manual");
+                syncNow();
+                send(BridgeCodec.ok(id, state()));
+            } catch (IOException e) {
+                send(BridgeCodec.error(id, "offline", getString(R.string.offline)));
+            } catch (Exception e) {
+                send(BridgeCodec.error(id, "error", getString(R.string.enroll_failed, String.valueOf(e.getMessage()))));
+            }
+        });
     }
 
     /**
-     * /api/app/config: whether the device still exists (401 when removed),
-     * and whether the server holds another version of the app.
+     * Removes the account: Android deletes its calendars with it. A phone
+     * that was enrolled also removes its device on the server, through a
+     * session its credential opens (PLAN.md 7.2).
      */
-    private void checkConfig(boolean offerUpdate) {
-        Credentials c = cred;
+    private void removeAccount(long id) {
+        io.execute(() -> {
+            Credentials c = Credentials.load(this);
+            if (c != null && "enrolled".equals(c.mode)) {
+                try {
+                    Http.Answer s = Http.call("POST", c.server + "/api/app/session", c.username, c.secret, null, null, userAgent());
+                    StringBuilder cookie = new StringBuilder();
+                    for (String sc : s.cookies) {
+                        if (cookie.length() > 0) cookie.append("; ");
+                        cookie.append(sc.split(";", 2)[0]);
+                    }
+                    if (s.status == 204 || s.status == 200) {
+                        Http.call("DELETE", c.server + "/api/devices/" + c.deviceId, null, null, cookie.toString(), null, userAgent());
+                    }
+                } catch (IOException ignored) {
+                    // Offline: the device stays listed in agendouille, where it can be removed.
+                }
+            }
+            Credentials.remove(this);
+            SyncStatus.clear(this);
+            send(BridgeCodec.ok(id, state()));
+        });
+    }
+
+    /** At start and on return: whether the device still exists, and an update. */
+    private void checkConfig() {
+        Credentials c = Credentials.load(this);
         if (c == null) return;
-        lastCheck = System.currentTimeMillis();
         io.execute(() -> {
             try {
                 Http.Answer a = Http.call("GET", c.server + "/api/app/config", c.username, c.secret, null, null, userAgent());
                 if (a.status == 401) {
-                    ui.post(this::revoked);
+                    SyncStatus.failed(this, getString(R.string.revoked));
                     return;
                 }
-                if (a.status != 200 || !offerUpdate) return;
+                if (a.status != 200) return;
                 JSONObject o = new JSONObject(a.body);
                 String theirs = o.optString("apk_version");
-                boolean apk = !o.optString("apk_sha256").isEmpty();
-                if (Versions.updateAvailable(version(), theirs, apk)) ui.post(() -> offerUpdate(c.server, theirs));
+                if (Versions.updateAvailable(version(), theirs, !o.optString("apk_sha256").isEmpty())) ui.post(() -> offerUpdate(c.server, theirs));
             } catch (Exception ignored) {
-                // Offline: the next check will tell.
+                // Offline: the next start will tell.
             }
         });
     }
@@ -430,115 +512,5 @@ public final class MainActivity extends Activity {
                 .setPositiveButton(R.string.update_install, (d, w) -> openOutside(Uri.parse(server + "/app/agendouille.apk")))
                 .setNegativeButton(R.string.update_later, (d, w) -> p.edit().putString("update_dismissed", theirs).apply())
                 .show();
-    }
-
-    // --- the bridge (CONTRACTS.md 6)
-
-    private void connectBridge() {
-        if (web == null) return;
-        WebMessagePort[] ch = web.createWebMessageChannel();
-        port = ch[0];
-        port.setWebMessageCallback(new WebMessagePort.WebMessageCallback() {
-            @Override
-            public void onMessage(WebMessagePort p, WebMessage m) {
-                onBridge(m.getData());
-            }
-        });
-        web.postWebMessage(new WebMessage("agendouille-bridge", new WebMessagePort[]{ch[1]}), Uri.parse(cred.server));
-    }
-
-    private void send(String text) {
-        ui.post(() -> {
-            if (port != null) port.postMessage(new WebMessage(text));
-        });
-    }
-
-    private void onBridge(String text) {
-        BridgeCodec.Request r = BridgeCodec.parse(text);
-        if (r == null) return;
-        switch (r.call) {
-            case "hello":
-                send(BridgeCodec.ok(r.id, BridgeCodec.hello(version(), Build.VERSION.SDK_INT)));
-                break;
-            case "scan":
-                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    send(BridgeCodec.ok(r.id, null));
-                } else {
-                    pendingScan = r.id;
-                    requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
-                }
-                break;
-            case "sync.status":
-                // The sync adapter comes with M7.
-                send(BridgeCodec.ok(r.id, new JSONObject()));
-                break;
-            case "sync.now":
-                send(BridgeCodec.error(r.id, "not_available"));
-                break;
-            case "davx5.handoff":
-                davx5(r.id);
-                break;
-            case "account.remove":
-                removeAccount(r.id);
-                break;
-            default:
-                send(BridgeCodec.error(r.id, "unknown_call"));
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
-        if (request != REQ_CAMERA || pendingScan < 0) return;
-        long id = pendingScan;
-        pendingScan = -1;
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) send(BridgeCodec.ok(id, null));
-        else send(BridgeCodec.error(id, "camera_denied"));
-    }
-
-    /** A DAVx5 device for this user, and DAVx5 opened with it. */
-    private void davx5(long id) {
-        try {
-            getPackageManager().getPackageInfo("at.bitfire.davdroid", 0);
-        } catch (PackageManager.NameNotFoundException e) {
-            send(BridgeCodec.error(id, "davx5_missing"));
-            return;
-        }
-        Credentials c = cred;
-        String cookie = CookieManager.getInstance().getCookie(c.server);
-        io.execute(() -> {
-            try {
-                JSONObject body = new JSONObject().put("kind", "davx5").put("label", Build.MODEL + " · DAVx5");
-                Http.Answer a = Http.call("POST", c.server + "/api/devices", null, null, cookie, body.toString(), userAgent());
-                if (a.status != 201) {
-                    send(BridgeCodec.error(id, "server"));
-                    return;
-                }
-                String uri = new JSONObject(a.body).optString("davx5_uri");
-                ui.post(() -> openOutside(Uri.parse(uri)));
-                send(BridgeCodec.ok(id, null));
-            } catch (Exception e) {
-                send(BridgeCodec.error(id, "offline"));
-            }
-        });
-    }
-
-    /** Removes this phone: its device on the server, then the account here. */
-    private void removeAccount(long id) {
-        Credentials c = cred;
-        String cookie = CookieManager.getInstance().getCookie(c.server);
-        send(BridgeCodec.ok(id, null));
-        io.execute(() -> {
-            try {
-                Http.call("DELETE", c.server + "/api/devices/" + c.deviceId, null, null, cookie, null, userAgent());
-            } catch (IOException ignored) {
-                // Offline: the device stays listed in the web app, where it can be removed.
-            }
-            ui.post(() -> {
-                Credentials.remove(this);
-                cred = null;
-                CookieManager.getInstance().removeAllCookies(null);
-                showWelcome(null);
-            });
-        });
     }
 }
