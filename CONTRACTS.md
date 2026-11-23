@@ -418,7 +418,8 @@ errors are 3.1's, with messages in French for the UI to show as they are.
 | GET, POST | `/users` | list ; create `{name, display_name, color, groups, enrol}` -> `{user, enrolment?}` (201) |
 | GET, PATCH | `/users/{name}` | 3.5.1 ; `{display_name?, color?, groups?, disabled?}` -> 3.5.1 |
 | POST | `/users/{name}/remove` | `{"calendars": {"<ref>": {"transfer_to": "<user>"} or {"delete": true}}}` -> 204; 409 `owns_calendars` with `calendars` when one is missing |
-| POST | `/users/{name}/enrolments` | -> `{id, url, qr_svg, created_at, expires_at}` (201); 400 without `public_url` |
+| POST | `/users/{name}/enrolments` | `{kind}`: `phone` (default) or `browser` (an hour) -> `{id, kind, url, qr_svg, created_at, expires_at}` (201); 400 without `public_url` |
+| GET | `/users/{name}/enrolments/{id}` | a pending link again, the same answer; 410 `used` or `expired` once gone |
 | DELETE | `/users/{name}/enrolments/{id}`, `/users/{name}/devices/{id}`, `/users/{name}/sessions/{id}` | revoke -> 204 |
 | GET, POST | `/groups` | list with `members` and `shares` ; create `{name, display_name, color}` |
 | PATCH | `/groups/{name}` | `{display_name?, color?, members?}` (members: the exact list) -> 204 |

@@ -38,12 +38,19 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['ph
   } else errors.push(`${label}: no "Nouvel utilisateur" button`);
   if (label === 'desktop') {
     await page.goto(base + '/users/lea/signin', { waitUntil: 'networkidle0' });
-    const [button] = await page.$$('xpath/.//button[contains(., "Créer un QR")]');
-    if (button) {
+    for (const [label2, file] of [['QR pour un téléphone', 'enrolment-dialog'], ['Lien pour un navigateur', 'browser-link-dialog']]) {
+      const [button] = await page.$$(`xpath/.//button[contains(., "${label2}")]`);
+      if (!button) {
+        errors.push(`no "${label2}" button`);
+        continue;
+      }
       await button.click();
       await new Promise((r) => setTimeout(r, 500));
-      await page.screenshot({ path: `${out}/desktop-enrolment-dialog.png` });
-    } else errors.push('no enrolment button');
+      await page.screenshot({ path: `${out}/desktop-${file}.png` });
+      await page.keyboard.press('Escape');
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    await page.screenshot({ path: `${out}/desktop-signin-links.png` });
   }
   await page.close();
 }

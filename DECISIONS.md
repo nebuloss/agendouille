@@ -3,6 +3,26 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: sign-in links shown again, and links for a browser
+
+The user: "we should be able to show it again while it is not used. and
+also for testing we should be able to generate sign in link for web view".
+
+- **A pending link can be shown again**, as often as needed: its token is
+  kept, readable, in `enrolments.token` while the link is pending, and
+  cleared when it is used, cancelled, or seen expired (migration 0005;
+  `GET /api/admin/users/{name}/enrolments/{id}`, 410 once gone). Until
+  now only its hash was stored. Kept readable for at most the link's
+  life, in a database that already holds everything a family has: it adds
+  no reach. redeem still looks the hash up.
+- **Two kinds of link** (`enrolments.kind`): "phone", the QR for a phone's
+  camera (`enrolment_link_ttl_hours`), and "browser", a link that signs
+  the browser opening it in as that user, for an hour, to try the web app
+  as they see it. Same redemption; the admin's dialog opens it in a new
+  tab and says to sign that browser out when done.
+- The Connexion page lists them as rows (the admin UI's one way to list,
+  a row that opens the link again when pending), with "Annuler".
+
 ## 2026-11-23: one way to list things in the admin UI
 
 The user: "navigation is not easy at all ... we must be able to click on

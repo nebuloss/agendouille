@@ -172,6 +172,29 @@ func TestM3AdminUI(t *testing.T) {
 		!strings.HasPrefix(a.body, "at,by,kind,action,calendar,via,device,detail\n") || !strings.Contains(a.body, ",user,") {
 		t.Errorf("activity export: %d %q", a.status, a.body)
 	}
+	// A pending sign-in link shows again; a browser link lasts an hour;
+	// once used, it is gone.
+	pl := A.json("POST", "/users/maman/enrolments", map[string]any{"kind": "browser"}, 201)
+	id := fmtID(pl["id"])
+	again := A.json("GET", "/users/maman/enrolments/"+id, nil, 200)
+	if again["url"] != pl["url"] || pl["kind"] != "browser" {
+		t.Errorf("shown again: %v, first %v", again["url"], pl["url"])
+	}
+	if exp, _ := time.Parse(time.RFC3339Nano, pl["expires_at"].(string)); time.Until(exp) > time.Hour+time.Minute {
+		t.Errorf("a browser link lasts until %v", exp)
+	}
+	token := pl["url"].(string)[strings.LastIndex(pl["url"].(string), "/")+1:]
+	if a := x.do("POST", x.public+"/enrol/"+token, nil, nil); cookieOf(a, auth.AppCookie) == "" {
+		t.Fatalf("the browser link did not sign in: %d", a.status)
+	}
+	if a := A.call("GET", "/users/maman/enrolments/"+id, nil); a.status != http.StatusGone {
+		t.Errorf("a used link shown again: %d", a.status)
+	}
+	var kept int
+	_ = x.svc.store.DB().QueryRow(`SELECT count(*) FROM enrolments WHERE token IS NOT NULL AND used_at IS NOT NULL`).Scan(&kept)
+	if kept != 0 {
+		t.Error("a used link's token is still kept")
+	}
 	if a := x.do("GET", x.admin+"/users/lea/nonsense", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/users/lea" {
 		t.Errorf("an unknown page of a user: %d %s", a.status, a.header.Get("Location"))
 	}

@@ -1,4 +1,4 @@
-import { avatar, calendarMark, entries, groupMark } from '@/admin/entries.ts';
+import { avatar, calendarMark, entries, groupMark, iconMark } from '@/admin/entries.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { seg } from '@/shared/core/Api.ts';
@@ -32,6 +32,8 @@ interface Group {
 
 export interface Enrolment {
   id: number;
+  kind?: 'phone' | 'browser';
+  state?: 'pending' | 'used' | 'expired';
   url?: string;
   qr_svg?: string;
   made_by?: string;
@@ -79,6 +81,15 @@ interface UserDetail {
 
 /** Shows a fresh enrolment's QR code and link, once (PLAN.md 7.2). */
 export async function showEnrolment(doc: Document, who: string, e: Enrolment): Promise<void> {
+  if (e.kind === 'browser') {
+    await dialog(doc, `Connecter un navigateur en tant que ${who}`, [
+      h('p', {}, `Pour essayer l'application comme ${who} la voit : ce lien connecte le navigateur qui l'ouvre, une fois, jusqu'au ${when(e.expires_at)}.`),
+      h('p', { class: ui.secret }, e.url ?? ''),
+      h('p', {}, h('a', { class: ui.btn('filled'), href: e.url ?? '#', target: '_blank', rel: 'noopener noreferrer' }, icon('link'), 'Ouvrir dans un nouvel onglet')),
+      h('p', { class: ui.notice }, icon('warn'), `Ce navigateur sera connecté en tant que ${who} : déconnectez-le depuis Connexion quand vous avez fini.`),
+    ], [{ label: 'Fermer', value: 'close', kind: 'text' }]);
+    return;
+  }
   const body: Child[] = [
     h('p', {}, `${who} scanne ce code avec l'appareil photo de son téléphone. Il ne marche qu'une fois, jusqu'au ${when(e.expires_at)}.`),
     e.qr_svg !== undefined ? h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(e.qr_svg), alt: 'QR code de connexion', width: 240, height: 240 }) : null,
@@ -282,25 +293,51 @@ export class UserPage extends AdminPage {
   }
 
 
+  /**
+   * Its sign-in links, a row each: a QR for a phone, or a link to sign a
+   * browser in (for testing). A pending one opens again, as often as
+   * needed, until it is used, cancelled or expired.
+   */
   private signin(u: User, enrolments: Enrolment[]): HTMLElement {
-    return section('Connexion',
-      h('p', {}, 'Un QR de connexion connecte son premier appareil, ou un nouveau téléphone après une perte.'),
-      action('Créer un QR de connexion', async () => {
-        try {
-          const e = await this.api.post<Enrolment>(`${this.path()}/enrolments`);
-          await showEnrolment(this.doc, u.display_name, e);
-          await this.refresh();
-        } catch (err) {
-          this.toasts.error(err);
-        }
-      }, 'filled'),
-      table(['Créé', 'Expire', 'État', ''],
-        enrolments.map((e) => [when(e.created_at), when(e.expires_at),
-          e.used_at !== undefined ? `utilisé ${ago(e.used_at)}` : new Date(e.expires_at).getTime() < Date.now() ? 'expiré' : 'en attente',
-          e.used_at === undefined ? action('Annuler', () => this.act(() => this.api.delete(`${this.path()}/enrolments/${e.id}`), 'Lien annulé.'), 'text') : '']),
-        'Aucun lien pour le moment.'),
-    );
+    const who = u.display_name || u.name;
+    const make = async (kind: 'phone' | 'browser'): Promise<void> => {
+      try {
+        const e = await this.api.post<Enrolment>(`${this.path()}/enrolments`, { kind });
+        await showEnrolment(this.doc, who, e);
+        await this.refresh();
+      } catch (err) {
+        this.toasts.error(err);
+      }
+    };
+    const show = async (e: Enrolment): Promise<void> => {
+      try {
+        await showEnrolment(this.doc, who, await this.api.get<Enrolment>(`${this.path()}/enrolments/${e.id}`));
+      } catch (err) {
+        this.toasts.error(err);
+        await this.refresh();
+      }
+    };
+    const STATE: Record<string, [string, string]> = { pending: ['en attente', ui.pill.ok], used: ['utilisé', ui.pill.muted], expired: ['expiré', ui.pill.muted] };
+    return card('Connexion', [
+      action('QR pour un téléphone', () => make('phone'), 'filled', 'qr'),
+      action('Lien pour un navigateur', () => make('browser'), 'tonal', 'laptop'),
+    ],
+    h('p', { class: 'text-sm text-on-surface-variant' }, "Un QR connecte son premier téléphone, ou un nouveau après une perte. Un lien pour un navigateur sert à essayer l'application comme cette personne la voit ; il dure une heure. Un lien en attente se rouvre tant qu'il n'a pas servi."),
+    entries(enrolments.map((e) => {
+      const state = e.state ?? (e.used_at !== undefined ? 'used' : 'pending');
+      const [label, cls] = STATE[state] ?? STATE['pending']!;
+      return {
+        open: state === 'pending' ? () => void show(e) : undefined,
+        lead: iconMark(e.kind === 'browser' ? 'laptop' : 'qr'),
+        title: e.kind === 'browser' ? 'Lien pour un navigateur' : 'QR pour un téléphone',
+        sub: state === 'used' && e.used_at !== undefined ? `utilisé ${ago(e.used_at)} · créé le ${when(e.created_at)}`
+          : state === 'expired' ? `expiré le ${when(e.expires_at)}` : `créé le ${when(e.created_at)} · expire le ${when(e.expires_at)}`,
+        tags: [h('span', { class: cls }, label)],
+        actions: state === 'pending' ? [action('Annuler', () => this.act(() => this.api.delete(`${this.path()}/enrolments/${e.id}`), 'Lien annulé.'), 'danger-text', 'close', 'sm')] : [],
+      };
+    }), 'Aucun lien pour le moment.'));
   }
+
 
   /** Removing asks, calendar by calendar, whom to give it to or to delete it (PLAN.md 6). */
   private async remove(u: User, owned: CalendarMeta[], users: UserRow[]): Promise<void> {

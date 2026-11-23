@@ -41,6 +41,7 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("PATCH /api/admin/users/{name}", h.patchUser)
 	api("POST /api/admin/users/{name}/remove", h.removeUser)
 	api("POST /api/admin/users/{name}/enrolments", h.addEnrolment)
+	api("GET /api/admin/users/{name}/enrolments/{id}", h.showEnrolment)
 	api("DELETE /api/admin/users/{name}/enrolments/{id}", h.revokeEnrolment)
 	api("DELETE /api/admin/users/{name}/devices/{id}", h.revokeDevice)
 	api("DELETE /api/admin/users/{name}/sessions/{id}", h.revokeSession)
@@ -270,7 +271,7 @@ func (h *handlers) enrolmentView(e auth.Enrolment) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"id": e.ID, "url": link, "qr_svg": qr, "created_at": e.CreatedAt, "expires_at": e.ExpiresAt}, nil
+	return map[string]any{"id": e.ID, "kind": e.Kind, "url": link, "qr_svg": qr, "created_at": e.CreatedAt, "expires_at": e.ExpiresAt}, nil
 }
 
 func (h *handlers) addUser(w http.ResponseWriter, r *http.Request) {
@@ -465,7 +466,19 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, validation{"public_url n'est pas renseignée : il n'y a pas d'adresse pour le lien de connexion. Renseignez-la dans les réglages."})
 		return
 	}
-	e, err := h.d.Auth.NewEnrolment(r.Context(), "admin", u.ID, 0)
+	// {"kind": "phone"} (the default: a QR for the phone's camera, the
+	// enrolment_link_ttl_hours setting) or "browser" (an hour, to sign a
+	// browser in for testing). An empty body is a phone's.
+	var body struct {
+		Kind string `json:"kind"`
+	}
+	if r.ContentLength != 0 && !decode(w, r, &body) {
+		return
+	}
+	if body.Kind == "" {
+		body.Kind = "phone"
+	}
+	e, err := h.d.Auth.NewEnrolmentKind(r.Context(), "admin", u.ID, 0, body.Kind)
 	if err != nil {
 		h.fail(w, err)
 		return
@@ -476,6 +489,38 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webx.JSON(w, http.StatusCreated, view)
+}
+
+// showEnrolment shows a pending link again: its QR and its address. Gone
+// (410) once used, cancelled or expired.
+func (h *handlers) showEnrolment(w http.ResponseWriter, r *http.Request) {
+	u, ok := h.lookupUser(w, r)
+	if !ok {
+		return
+	}
+	id, ok := pathID(r, "id")
+	if !ok {
+		h.fail(w, auth.ErrInvalid)
+		return
+	}
+	e, err := h.d.Auth.PendingEnrolment(r.Context(), u.ID, id)
+	switch {
+	case errors.Is(err, auth.ErrUsed):
+		webx.Fail(w, http.StatusGone, "used", "Ce lien a déjà servi.")
+		return
+	case errors.Is(err, auth.ErrExpired):
+		webx.Fail(w, http.StatusGone, "expired", "Ce lien a expiré : créez-en un autre.")
+		return
+	case err != nil:
+		h.fail(w, err)
+		return
+	}
+	view, err := h.enrolmentView(e)
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	webx.JSON(w, http.StatusOK, view)
 }
 
 func (h *handlers) revokeEnrolment(w http.ResponseWriter, r *http.Request) {
