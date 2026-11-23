@@ -2,6 +2,8 @@ package admin
 
 import (
 	"context"
+	"fmt"
+	"github.com/nebuloss/agendouille/internal/auth"
 	"net/http"
 	"net/url"
 	"sort"
@@ -45,6 +47,14 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 			n.severity = "warn"
 		}
 		out = append(out, notice{ID: "server:" + w.Code, Kind: "server", Severity: n.severity, Title: w.Message, Link: n.link})
+	}
+	if mode := h.d.Auth.DavAuthMode(ctx); mode != auth.DavPassword {
+		if n, err := h.d.Auth.DevicesWithoutCert(ctx); err == nil && n > 0 {
+			out = append(out, notice{ID: "server:devices_without_certificate", Kind: "device", Severity: "warn",
+				Title:  fmt.Sprintf("%d appareil(s) sans certificat ne synchronisent plus", n),
+				Detail: "CalDAV demande un certificat : chacun en obtient un depuis Appareils, dans l'application.",
+				Link:   "/settings"})
+		}
 	}
 	stale, err := h.d.Auth.StaleDevices(ctx)
 	if err != nil {

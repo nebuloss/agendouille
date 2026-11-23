@@ -3,6 +3,35 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: device keys, chosen by the admin
+
+The plan wanted keys rather than passwords for sync. CalDAV clients know
+one kind of key: a TLS client certificate (DAVx5 and Thunderbird do;
+iOS is unverified). So agendouille is a small CA (`ca.pem`, `ca.key`
+0600, in `data_dir`, made at first start) and issues each device a P-256
+certificate, valid five years, as a `.p12` (legacy 3DES, which every
+Android imports; `software.sslmate.com/src/go-pkcs12`, BSD, since Go
+cannot write PKCS#12). The private key is never stored: the `.p12` waits
+ten minutes behind a one-time link, and only the fingerprint is kept
+(`devices.cert_fingerprint`). Revoking the device revokes its certificate;
+a new one replaces the old.
+
+TLS ends at the DMZ proxy, so the proxy asks for the certificate
+(`ssl_verify_client optional_no_ca`) and passes it in `X-Client-Cert`
+(`$ssl_client_escaped_cert`); agendouille verifies it against its own CA,
+and reads the header only when the TCP peer is in `trusted_proxies`.
+
+The mode is a switch in the admin UI (the user's call), not a key of the
+configuration file: `password` (default, as before), `both` (the password
+and the same device's certificate) or `keys` (the certificate alone). It
+lives in a `switches` table, is audited, and a notice counts the devices
+that cannot sync under it. It is the one choice the admin page makes
+itself; every other setting stays in the file.
+
+Trade-off: the certificate request is per TLS host, so a browser on a
+phone holding one may be asked to pick a certificate on the web app's
+address. A separate `dav.` host would avoid it; one host for now.
+
 ## 2026-11-23: sign-in links shown again, and links for a browser
 
 The user: "we should be able to show it again while it is not used. and

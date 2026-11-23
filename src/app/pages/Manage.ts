@@ -175,9 +175,19 @@ interface Device {
   client: string;
   created_at: string;
   last_used_at?: string;
+  has_certificate?: boolean;
 }
 
-interface NewDevice extends Device {
+type DavAuth = 'password' | 'both' | 'keys';
+
+/** A device's certificate, handed over once (DECISIONS: device keys). */
+interface CertificateHandover {
+  certificate_url?: string;
+  certificate_password?: string;
+  dav_auth?: DavAuth;
+}
+
+interface NewDevice extends Device, CertificateHandover {
   username: string;
   secret: string;
   davx5_uri?: string;
@@ -209,23 +219,33 @@ const KINDS: Record<string, string> = { davx5: 'DAVx5 (Android)', ios: 'iPhone, 
 export class DevicesPage extends AppPage {
   protected async render(): Promise<Child[]> {
     const [devices, links, sessions, cals] = await Promise.all([
-      this.api.get<{ devices: Device[] }>('/devices'), this.api.get<{ links: Link[] }>('/links'),
+      this.api.get<{ devices: Device[]; dav_auth?: DavAuth }>('/devices'), this.api.get<{ links: Link[] }>('/links'),
       this.api.get<{ sessions: Session[] }>('/sessions'), this.api.get<Calendars>('/calendars'),
     ]);
     const name = (ref: string): string => cals.calendars.find((c) => c.ref === ref)?.name ?? ref;
+    const mode: DavAuth = devices.dav_auth ?? 'password';
     return [
       section('Synchroniser un appareil',
-        h('p', { class: 'text-sm text-on-surface-variant' }, 'Chaque appareil a son propre mot de passe, que vous pouvez retirer seul.'),
+        h('p', { class: 'text-sm text-on-surface-variant' }, mode === 'password'
+          ? 'Chaque appareil a son propre mot de passe, que vous pouvez retirer seul.'
+          : mode === 'both' ? 'Chaque appareil a son mot de passe et son certificat : il lui faut les deux pour synchroniser.'
+            : 'Chaque appareil se connecte avec son certificat, sans mot de passe.'),
         h('div', { class: 'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap' },
-          action('Android (DAVx5)', () => this.add('davx5'), 'filled', 'phone'),
-          action('iPhone, iPad, Mac', () => this.add('ios'), 'tonal', 'phone'),
-          action('Thunderbird', () => this.add('thunderbird'), 'tonal', 'laptop'),
-          action('Autre', () => this.add('other'), 'outlined', 'devices')),
+          action('Android (DAVx5)', () => this.add('davx5', mode), 'filled', 'phone'),
+          action('iPhone, iPad, Mac', () => this.add('ios', mode), 'tonal', 'phone'),
+          action('Thunderbird', () => this.add('thunderbird', mode), 'tonal', 'laptop'),
+          action('Autre', () => this.add('other', mode), 'outlined', 'devices')),
+        mode !== 'password' && devices.devices.some((d) => !d.has_certificate)
+          ? h('p', { class: ui.notice }, icon('warn'), 'Un appareil sans certificat ne synchronise plus : touchez « Certificat » sur sa ligne pour lui en donner un.')
+          : null,
         table(['Appareil', 'Accès', 'Dernière synchro', ''], devices.devices.map((d) => [
-          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' }, KINDS[d.kind] ?? d.kind)),
+          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' }, KINDS[d.kind] ?? d.kind,
+            mode !== 'password' ? (d.has_certificate ? ' · certificat' : ' · sans certificat') : '')),
           d.cap === 'read' ? 'lecture seule' : 'lecture et écriture',
           d.last_used_at ? ago(d.last_used_at) : 'jamais',
-          action('Retirer', () => this.revoke(`/devices/${d.id}`, `Retirer « ${d.label} » ?`, 'Il ne pourra plus synchroniser.'), 'danger-text', 'trash', 'sm'),
+          h('span', { class: 'flex flex-wrap justify-end gap-1' },
+            mode !== 'password' ? action('Certificat', () => this.newCertificate(d), d.has_certificate ? 'text' : 'tonal', 'lock', 'sm') : null,
+            action('Retirer', () => this.revoke(`/devices/${d.id}`, `Retirer « ${d.label} » ?`, 'Il ne pourra plus synchroniser.'), 'danger-text', 'trash', 'sm')),
         ]), "Aucun appareil pour l'instant.")),
       card("Liens d'abonnement", [action('Nouveau lien', () => this.addLink(cals.calendars), 'tonal', 'link', 'sm')],
         h('p', { class: 'text-sm text-on-surface-variant' }, 'Une adresse .ics en lecture seule, pour une télé ou un agenda qui ne sait pas CalDAV. Qui a le lien voit les calendriers choisis.'),
@@ -247,7 +267,43 @@ export class DevicesPage extends AppPage {
     await this.act(() => this.api.delete(path), 'Retiré.');
   }
 
-  private async add(kind: string): Promise<void> {
+  /**
+   * A device's certificate, as DAVx5 (or Thunderbird) takes it: download
+   * the .p12 once, install it with its password, then choose it in DAVx5.
+   */
+  private certificateBlock(c: CertificateHandover, server: string): Child[] {
+    if (c.certificate_url === undefined) return [];
+    return [
+      h('h3', { class: 'text-base font-semibold text-on-surface' }, 'Son certificat'),
+      h('p', { class: 'flex justify-center' }, h('a', { class: ui.btn('filled'), href: c.certificate_url, download: 'agendouille-appareil.p12' }, icon('download'), 'Télécharger le certificat (.p12)')),
+      h('p', { class: 'text-sm' }, 'Mot de passe du certificat, demandé à son installation :'),
+      secretField(c.certificate_password ?? '', 'Mot de passe du certificat'),
+      h('ol', { class: 'm-0 list-decimal space-y-1 pl-5 text-sm' },
+        h('li', {}, 'Ouvrez ce fichier sur le téléphone (le lien ne marche qu’une fois, dix minutes), ou dans Réglages, Sécurité, Chiffrement et identifiants, Installer un certificat, « Certificat utilisateur d’appli et de VPN ».'),
+        h('li', {}, 'Donnez-lui le mot de passe ci-dessus.'),
+        h('li', {}, c.dav_auth === 'keys'
+          ? `Dans DAVx5 : ajouter un compte, « Se connecter avec une URL et un certificat client », l’adresse ${server}, puis choisissez ce certificat.`
+          : `Dans DAVx5 : ajouter un compte avec l’adresse, l’utilisateur et le mot de passe, et choisissez ce certificat comme certificat client.`)),
+    ];
+  }
+
+  private async newCertificate(d: Device): Promise<void> {
+    const ok = await confirmDialog(this.doc, `Nouveau certificat pour « ${d.label} » ?`,
+      d.has_certificate ? 'Le certificat qu’il a cessera de marcher : il faudra installer le nouveau.' : 'Il en a besoin pour synchroniser.', 'Créer', false);
+    if (!ok) return;
+    try {
+      const c = await this.api.post<CertificateHandover>(`/devices/${d.id}/certificate`);
+      const server = `${this.doc.location.origin}/dav/`;
+      await dialog(this.doc, `Certificat de « ${d.label} »`, [...this.certificateBlock(c, server),
+        h('p', { class: ui.notice }, icon('warn'), 'Ce certificat ne sera plus proposé : en cas de perte, créez-en un autre.')],
+      [{ label: "C'est fait", value: 'ok', kind: 'filled' }]);
+      await this.refresh();
+    } catch (e) {
+      this.toasts.error(e);
+    }
+  }
+
+  private async add(kind: string, mode: DavAuth = 'password'): Promise<void> {
     const label = h('input', { required: true, value: kind === 'ios' ? 'iPhone' : kind === 'davx5' ? 'Téléphone' : 'Ordinateur' });
     const cap = h('select', {}, h('option', { value: 'readwrite' }, 'Lecture et écriture'), h('option', { value: 'read' }, 'Lecture seule'));
     const v = await dialog(this.doc, `Ajouter : ${KINDS[kind] ?? kind}`, [field('Nom', label), field('Accès', cap)],
@@ -265,7 +321,8 @@ export class DevicesPage extends AppPage {
       h('dt', {}, 'Utilisateur'), h('dd', {}, h('code', {}, d.username)),
       h('dt', {}, 'Mot de passe'), h('dd', {}, secretField(d.secret, 'Mot de passe de l’appareil')));
     const body: Child[] = [];
-    if (d.davx5_uri !== undefined) {
+    const keysOnly = (d.dav_auth ?? mode) === 'keys';
+    if (d.davx5_uri !== undefined && !keysOnly) {
       body.push(h('p', {}, 'Sur le téléphone, installez DAVx5, puis scannez ce code avec l’appareil photo, ou touchez le lien depuis le téléphone.'));
       if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(d.qr_svg), alt: 'QR code pour DAVx5', width: 240, height: 240 }));
       body.push(h('p', { class: 'flex justify-center' }, h('a', { href: d.davx5_uri, class: ui.btn('tonal') }, icon('phone'), 'Ouvrir dans DAVx5')));
@@ -274,8 +331,14 @@ export class DevicesPage extends AppPage {
       body.push(h('p', {}, 'Ouvrez cette page sur l’iPhone, touchez le bouton, puis Réglages, Profil téléchargé, Installer. Le lien ne marche qu’une fois, dix minutes.'),
         h('p', {}, h('a', { class: ui.btn('filled'), href: d.mobileconfig_url }, 'Installer le profil')));
     }
-    body.push(h('p', { class: 'text-sm' }, 'Ou à la main, dans un compte CalDAV :'), manual,
-      h('p', { class: ui.notice }, icon('warn'), 'Le mot de passe ne sera plus affiché. Retirez l’appareil pour en refaire un.'));
+    if (keysOnly) {
+      body.push(...this.certificateBlock(d, d.manual.server),
+        h('p', { class: 'text-sm' }, 'Adresse du serveur : ', h('code', {}, d.manual.server)));
+    } else {
+      body.push(h('p', { class: 'text-sm' }, 'Ou à la main, dans un compte CalDAV :'), manual, ...this.certificateBlock(d, d.manual.server));
+    }
+    body.push(h('p', { class: ui.notice }, icon('warn'), keysOnly ? 'Le certificat ne sera plus proposé. Retirez l’appareil pour en refaire un.'
+      : 'Le mot de passe ne sera plus affiché. Retirez l’appareil pour en refaire un.'));
     await dialog(this.doc, `« ${d.label} » ajouté`, body, [{ label: "C'est fait", value: 'ok', kind: 'filled' }]);
     await this.refresh();
   }

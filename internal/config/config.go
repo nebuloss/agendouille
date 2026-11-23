@@ -49,6 +49,9 @@ type Config struct {
 
 	// Path is the file read, or "" when there was none.
 	Path string `yaml:"-"`
+	// Stamp is the file's modification time and size when it was read: a
+	// watcher starts from it, so an edit made right after the read is seen.
+	Stamp string `yaml:"-"`
 	// Origins says where each key's value came from: default, file, env or
 	// flag (claudication's Origin), for the admin UI.
 	Origins map[string]string `yaml:"-"`

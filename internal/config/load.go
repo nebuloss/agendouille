@@ -52,6 +52,7 @@ func (l *Loader) Load(getenv func(string) string) (*Config, string, error) {
 	cfg := Default()
 	cfg.Origins = map[string]string{}
 	path, explicit := l.Path(getenv)
+	stamp := FileStamp(path) // before reading: an edit after it differs
 	data, err := os.ReadFile(path)
 	switch {
 	case err == nil:
@@ -97,6 +98,7 @@ func (l *Loader) Load(getenv func(string) string) (*Config, string, error) {
 		return nil, path, err
 	}
 	cfg.Path = path
+	cfg.Stamp = stamp
 	cfg.reload = func() (*Config, error) {
 		c, _, err := l.Load(getenv)
 		return c, err
@@ -144,4 +146,13 @@ func (f *flagValue) IsBoolFlag() bool { return f.key.typ.Kind() == reflect.Bool 
 // EnvName is the environment variable of a key, for the admin UI.
 func EnvName(key string) string {
 	return EnvPrefix + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+}
+
+// FileStamp is a file's modification time and size, or "gone".
+func FileStamp(path string) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "gone"
+	}
+	return fmt.Sprint(info.ModTime().UnixNano(), info.Size())
 }

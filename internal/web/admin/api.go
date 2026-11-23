@@ -65,6 +65,8 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/backups/{file}", h.downloadBackup)
 	api("POST /api/admin/backups/{file}/restore", h.restore)
 	api("GET /api/admin/system", h.system)
+	api("GET /api/admin/dav-auth", h.davAuth)
+	api("PUT /api/admin/dav-auth", h.setDavAuth)
 	api("GET /api/admin/notices", h.notices)
 	api("POST /api/admin/notices/read", h.readNotices)
 }
@@ -954,6 +956,32 @@ func (h *handlers) settings(w http.ResponseWriter, _ *http.Request) {
 		path = config.DefaultPath
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"settings": out, "path": path, "exists": h.d.Config.Path != ""})
+}
+
+// davAuth is how CalDAV signs a device in, chosen in the admin UI (the one
+// switch kept out of the configuration file, the user's call), and how
+// many devices have no certificate yet.
+func (h *handlers) davAuth(w http.ResponseWriter, r *http.Request) {
+	n, err := h.d.Auth.DevicesWithoutCert(r.Context())
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	webx.JSON(w, http.StatusOK, map[string]any{"mode": h.d.Auth.DavAuthMode(r.Context()), "devices_without_certificate": n})
+}
+
+func (h *handlers) setDavAuth(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if err := h.d.Auth.SetDavAuthMode(r.Context(), "admin", body.Mode); err != nil {
+		h.fail(w, validation{"le mode est password, both ou keys"})
+		return
+	}
+	h.davAuth(w, r)
 }
 
 // --- backups

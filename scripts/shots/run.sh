@@ -64,4 +64,9 @@ curl -s -o /dev/null -b "$jar" -X POST -H 'Content-Type: application/json' -H 'S
 ln -sfn "$HOME/shots/node_modules" scripts/shots/node_modules
 node scripts/shots/shoot.mjs http://127.0.0.1:18892 "$pw" "$out"
 node scripts/shots/shoot-app.mjs "$enrol" "$out"
+# The certificate pass: CalDAV in "both" mode, a DAVx5 device added.
+curl -s -o /dev/null -b "$jar" -X PUT -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: same-origin' \
+  --data '{"mode":"both"}' http://127.0.0.1:18892/api/admin/dav-auth
+enrol2=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
+node scripts/shots/shoot-app.mjs "$enrol2" "$out" certs
 ls "$out"

@@ -223,7 +223,7 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | Method | Path | Auth |
 |---|---|---|
 | GET | `/.well-known/caldav` | none (301 to `/dav/`) |
-| DAV methods | `/dav/...` | Basic, device credential |
+| DAV methods | `/dav/...` | the admin's mode: Basic (`password`), Basic and the device's certificate in `X-Client-Cert` from a trusted proxy (`both`), or the certificate alone (`keys`) |
 | GET | `/ics/{secret}.ics` | the secret |
 
 ### 2.2 Surface `app`: pages and the additional API
@@ -371,6 +371,14 @@ date>` (required on recurring events) and `If-Match`. `move` takes
 `{"to": "<ref>"}` and moves the whole object.
 
 ### 3.4 People, devices, sign-in
+
+Device certificates: `POST /api/devices` answers, when the mode is not
+`password`, `certificate_url` (one use, ten minutes), `certificate_password`
+and `certificate_expires_at`, and always `dav_auth`. `POST
+/api/devices/{id}/certificate` issues a new one (the old stops working);
+`GET /api/devices/{id}/certificate.p12?t=` is the file. `GET /api/devices`
+has `dav_auth` and each device's `has_certificate`. Admin: `GET|PUT
+/api/admin/dav-auth` `{mode, devices_without_certificate}`.
 
 ```json
 // GET /api/me

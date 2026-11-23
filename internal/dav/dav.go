@@ -156,7 +156,8 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	p, err := s.d.Auth.Basic(r, auth.ClientIP(r, s.d.Trusted()).String())
+	trusted := s.d.Trusted()
+	p, err := s.d.Auth.Dav(r, auth.ClientIP(r, trusted).String(), auth.FromProxy(r, trusted))
 	if err != nil {
 		w.Header().Set("WWW-Authenticate", `Basic realm="agendouille", charset="UTF-8"`)
 		http.Error(w, "a device credential is needed", http.StatusUnauthorized)

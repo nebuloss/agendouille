@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -99,7 +98,16 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 	dir := directory.New(st.DB(), time.Now, func() []string { return set.Get().Palette })
 	h := hub.New()
 	cal := calendar.New(st.DB(), time.Now, set, dir, sharing.New(st.DB(), dir), h)
-	return &services{store: st, settings: set, dir: dir, auth: auth.New(st.DB(), time.Now, set, dir), calendar: cal, hub: h}, nil
+	a := auth.New(st.DB(), time.Now, set, dir)
+	// Device certificates (DECISIONS: device keys): the CA lives beside the
+	// database, made the first time.
+	ca, err := auth.LoadCA(cfg.DataDir)
+	if err != nil {
+		st.Close()
+		return nil, fmt.Errorf("the device certificate authority: %w", err)
+	}
+	a.UseCA(ca)
+	return &services{store: st, settings: set, dir: dir, auth: a, calendar: cal, hub: h}, nil
 }
 
 // muxes builds each listener's routes once: the public one holds the dav
@@ -254,14 +262,10 @@ func watchConfig(ctx context.Context, cfg *config.Config, set *settings.Service,
 	if cfg.Path == "" {
 		return
 	}
-	stamp := func() string {
-		info, err := os.Stat(cfg.Path)
-		if err != nil {
-			return "gone"
-		}
-		return fmt.Sprint(info.ModTime().UnixNano(), info.Size())
-	}
-	last := stamp()
+	stamp := func() string { return config.FileStamp(cfg.Path) }
+	// From the read the settings in force came from, not from now: an edit
+	// made between the two is not missed.
+	last := cfg.Stamp
 	t := time.NewTicker(settingsPoll)
 	defer t.Stop()
 	for {

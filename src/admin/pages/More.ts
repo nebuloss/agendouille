@@ -257,6 +257,40 @@ const shown = (v: unknown): string => (Array.isArray(v) ? (v.length === 0 ? '—
  * seconds (DECISIONS: settings in the configuration file).
  */
 export class SettingsPage extends AdminPage {
+  /**
+   * How CalDAV signs a device in: the one choice made here rather than in
+   * the configuration file (the user's call; DECISIONS: device keys).
+   */
+  private async davAuthCard(): Promise<HTMLElement> {
+    const st = await this.api.get<{ mode: string; devices_without_certificate: number }>('/dav-auth');
+    const choices: [string, string, string][] = [
+      ['password', 'Mot de passe', 'Chaque appareil a son mot de passe, comme DAVx5, l’iPhone et Thunderbird le savent.'],
+      ['both', 'Mot de passe et certificat', 'Il faut les deux : un mot de passe volé ne suffit plus. L’iPhone ne sait pas toujours présenter un certificat.'],
+      ['keys', 'Certificat seul', 'Une clé par appareil, sans mot de passe. Pour DAVx5 et Thunderbird ; pas pour l’iPhone.'],
+    ];
+    const options = choices.map(([value, label, help]) => {
+      const on = st.mode === value;
+      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on),
+        class: on ? 'state-layer flex flex-1 flex-col gap-1 rounded-md3-l bg-secondary-container p-3 text-left text-on-secondary-container ring-2 ring-primary'
+          : 'state-layer flex flex-1 flex-col gap-1 rounded-md3-l bg-surface-lowest p-3 text-left text-on-surface' },
+      h('b', { class: 'flex items-center gap-2' }, on ? icon('check') : null, label), h('span', { class: 'text-xs opacity-80' }, help));
+      b.addEventListener('click', () => {
+        if (on) return;
+        void this.act(() => this.api.put('/dav-auth', { mode: value }), `Connexion des appareils : ${label.toLowerCase()}.`);
+      });
+      return b;
+    });
+    return card('Connexion des appareils (CalDAV)', [],
+      h('p', { class: 'text-sm text-on-surface-variant' }, "Choisi ici, pas dans le fichier : il s'applique tout de suite à toutes les synchronisations."),
+      h('div', { class: 'flex flex-col gap-2 md:flex-row', role: 'radiogroup', 'aria-label': 'Connexion des appareils' }, ...options),
+      st.mode !== 'password' && st.devices_without_certificate > 0
+        ? h('p', { class: ui.notice }, icon('warn'), `${st.devices_without_certificate} appareil(s) sans certificat ne synchronisent plus : chacun en obtient un depuis Appareils, dans l’application.`)
+        : null,
+      st.mode !== 'password'
+        ? h('p', { class: 'text-xs text-on-surface-variant' }, 'Le proxy de la DMZ doit demander le certificat et le transmettre dans X-Client-Cert, sur /dav/ (deploy/README.md) ; il est vérifié ici, et seulement venant de trusted_proxies.')
+        : null);
+  }
+
   protected async render(): Promise<Child[]> {
     const { settings, path, exists } = await this.api.get<{ settings: Setting[]; path: string; exists: boolean }>('/settings');
     const groups = new Map<string, Setting[]>();
@@ -282,7 +316,7 @@ export class SettingsPage extends AdminPage {
             changed ? h('span', { class: 'text-xs text-on-surface-variant' }, `Par défaut : ${shown(st.default)} · ${st.env}`)
               : h('span', { class: 'text-xs text-on-surface-variant' }, st.env)));
       }))));
-    return [how, h('div', { class: ui.cards }, ...cards)];
+    return [await this.davAuthCard(), how, h('div', { class: ui.cards }, ...cards)];
   }
 }
 

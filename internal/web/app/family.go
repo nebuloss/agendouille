@@ -61,6 +61,8 @@ func (h *handlers) registerFamily(mux *http.ServeMux, guard func(http.Handler) h
 	api("POST /api/devices", h.addDevice)
 	api("DELETE /api/devices/{id}", h.revokeDevice)
 	api("GET /api/devices/{id}/mobileconfig", h.mobileconfig)
+	api("POST /api/devices/{id}/certificate", h.newCertificate)
+	api("GET /api/devices/{id}/certificate.p12", h.certificateFile)
 	api("GET /api/links", h.links)
 	api("POST /api/links", h.addLink)
 	api("DELETE /api/links/{id}", h.revokeLink)
@@ -861,7 +863,7 @@ func (h *handlers) devices(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		h.fail(w, err)
 		return
 	}
-	webx.JSON(w, http.StatusOK, map[string]any{"devices": ds})
+	webx.JSON(w, http.StatusOK, map[string]any{"devices": ds, "dav_auth": h.d.Auth.DavAuthMode(r.Context())})
 }
 
 // profiles keeps a new iPhone device's profile for ten minutes, behind a
@@ -875,6 +877,7 @@ type profiles struct {
 type profile struct {
 	userID   int64
 	deviceID int64
+	kind     string // mobileconfig, p12
 	body     []byte
 	expires  time.Time
 }
@@ -893,11 +896,11 @@ func (ps *profiles) put(token string, p profile, now time.Time) {
 	ps.byID[token] = p
 }
 
-func (ps *profiles) take(token string, userID, deviceID int64, now time.Time) ([]byte, bool) {
+func (ps *profiles) take(token, kind string, userID, deviceID int64, now time.Time) ([]byte, bool) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	p, ok := ps.byID[token]
-	if !ok || p.userID != userID || p.deviceID != deviceID {
+	if !ok || p.userID != userID || p.deviceID != deviceID || p.kind != kind {
 		return nil, false // someone else's token stays usable by its owner
 	}
 	delete(ps.byID, token)
@@ -941,15 +944,75 @@ func (h *handlers) addDevice(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	}
 	if d.Kind == "ios" {
 		token := newProfileToken()
-		pending.put(token, profile{userID: p.User.ID, deviceID: d.ID, body: mobileconfig(pub.Host, d.Username, d.Secret, d.Label, d.ID)}, h.d.Clock())
+		pending.put(token, profile{userID: p.User.ID, deviceID: d.ID, kind: "mobileconfig", body: mobileconfig(pub.Host, d.Username, d.Secret, d.Label, d.ID)}, h.d.Clock())
 		out["mobileconfig_url"] = fmt.Sprintf("/api/devices/%d/mobileconfig?t=%s", d.ID, token)
+	}
+	// When CalDAV wants a certificate (DECISIONS: device keys), the device
+	// gets one now: a .p12 to download once, and its password.
+	mode := h.d.Auth.DavAuthMode(r.Context())
+	out["dav_auth"] = mode
+	if mode != auth.DavPassword {
+		cert, err := h.certificateFor(r, p, d.ID)
+		if err != nil {
+			h.fail(w, err)
+			return
+		}
+		for k, v := range cert {
+			out[k] = v
+		}
 	}
 	webx.JSON(w, http.StatusCreated, out)
 }
 
+// certificateFor issues a device's certificate and keeps its .p12 ten
+// minutes behind a one-time link: the private key is never stored.
+func (h *handlers) certificateFor(r *http.Request, p *auth.Principal, deviceID int64) (map[string]any, error) {
+	c, err := h.d.Auth.IssueCertificate(r.Context(), p.User.ID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	token := newProfileToken()
+	pending.put(token, profile{userID: p.User.ID, deviceID: deviceID, kind: "p12", body: c.P12}, h.d.Clock())
+	return map[string]any{
+		"certificate_url":        fmt.Sprintf("/api/devices/%d/certificate.p12?t=%s", deviceID, token),
+		"certificate_password":   c.Password,
+		"certificate_expires_at": c.ExpiresAt,
+	}, nil
+}
+
+// newCertificate gives an existing device a new certificate (the mode
+// changed, or the file was lost); the one it had stops working.
+func (h *handlers) newCertificate(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.fail(w, auth.ErrInvalid)
+		return
+	}
+	out, err := h.certificateFor(r, p, id)
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	out["dav_auth"] = h.d.Auth.DavAuthMode(r.Context())
+	webx.JSON(w, http.StatusCreated, out)
+}
+
+func (h *handlers) certificateFile(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	body, ok := pending.take(r.URL.Query().Get("t"), "p12", p.User.ID, id, h.d.Clock())
+	if !ok {
+		http.Error(w, "ce lien a servi ou a expiré : demandez un nouveau certificat", http.StatusGone)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-pkcs12")
+	w.Header().Set("Content-Disposition", `attachment; filename="agendouille-appareil.p12"`)
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(body)
+}
+
 func (h *handlers) mobileconfig(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	body, ok := pending.take(r.URL.Query().Get("t"), p.User.ID, id, h.d.Clock())
+	body, ok := pending.take(r.URL.Query().Get("t"), "mobileconfig", p.User.ID, id, h.d.Clock())
 	if !ok {
 		http.Error(w, "this profile link has been used or has expired; add the device again", http.StatusGone)
 		return

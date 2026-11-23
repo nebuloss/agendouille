@@ -66,6 +66,7 @@ type Principal struct {
 
 // Service is the authentication state, all of it in the database.
 type Service struct {
+	ca       *CA // device certificates; nil until UseCA
 	db       *sql.DB
 	now      func() time.Time
 	settings *settings.Service
@@ -78,6 +79,7 @@ type Service struct {
 
 // New wraps the database.
 func New(db *sql.DB, now func() time.Time, set *settings.Service, dir *directory.Service) *Service {
+	// ca is set by UseCA: device certificates (certs.go).
 	return &Service{db: db, now: now, settings: set, dir: dir, gate: make(chan struct{}, 2), waiters: map[string]chan struct{}{}}
 }
 

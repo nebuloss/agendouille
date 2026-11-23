@@ -26,6 +26,8 @@ type Device struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	LastIP     string     `json:"last_ip,omitempty"`
+	// HasCertificate: the device holds a current client certificate.
+	HasCertificate bool `json:"has_certificate"`
 }
 
 // DeviceSecret is a new device with its secret, shown once.
@@ -106,6 +108,13 @@ func (s *Service) Basic(r *http.Request, clientIP string) (*Principal, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	return s.signedIn(r, id, userID, cap, lastUsed, clientIP)
+}
+
+// signedIn is a device signed in to CalDAV, by its password or its
+// certificate: its user, and when it was last seen.
+func (s *Service) signedIn(r *http.Request, id, userID int64, cap string, lastUsed sql.NullString, clientIP string) (*Principal, error) {
+	ctx := r.Context()
 	u, err := s.dir.UserByID(ctx, userID)
 	if err != nil {
 		return nil, ErrInvalid
@@ -122,8 +131,9 @@ func (s *Service) Basic(r *http.Request, clientIP string) (*Principal, error) {
 
 // Devices lists a user's devices that are not revoked, newest first.
 func (s *Service) Devices(ctx context.Context, userID int64) ([]Device, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, kind, label, cap, client, created_at, last_used_at, COALESCE(last_ip, '')
-		FROM devices WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC`, userID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, kind, label, cap, client, created_at, last_used_at, COALESCE(last_ip, ''),
+		cert_fingerprint IS NOT NULL AND cert_expires_at > ?
+		FROM devices WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC`, store.Time(s.now()), userID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +143,7 @@ func (s *Service) Devices(ctx context.Context, userID int64) ([]Device, error) {
 		var d Device
 		var created string
 		var used sql.NullString
-		if err := rows.Scan(&d.ID, &d.UserID, &d.Kind, &d.Label, &d.Cap, &d.Client, &created, &used, &d.LastIP); err != nil {
+		if err := rows.Scan(&d.ID, &d.UserID, &d.Kind, &d.Label, &d.Cap, &d.Client, &created, &used, &d.LastIP, &d.HasCertificate); err != nil {
 			return nil, err
 		}
 		d.CreatedAt, _ = store.ParseTime(created)

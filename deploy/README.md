@@ -108,6 +108,25 @@ location /api/live {
 }
 ```
 
+### Device certificates (when the admin chooses "both" or "keys")
+
+agendouille checks the certificate itself; the proxy only asks the client
+for one and passes it on. In proxy host 7's "Advanced" tab, with
+`ca.pem` copied from the server's `data_dir` to the proxy:
+
+```nginx
+ssl_verify_client optional_no_ca;
+ssl_client_certificate /data/custom_ssl/agendouille-ca.pem; # names the CA to clients
+location /dav/ {
+    proxy_pass http://10.0.60.8:8791;
+    proxy_set_header X-Client-Cert $ssl_client_escaped_cert;
+    include /etc/nginx/conf.d/include/proxy.conf;
+}
+```
+
+A client cannot forge it: the server reads the header only from
+`trusted_proxies` and verifies the certificate against its own CA.
+
 ## DNS and certificates
 
 One name (`agenda.example.org`) pointing at the proxy; the proxy holds the
