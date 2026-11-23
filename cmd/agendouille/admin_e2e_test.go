@@ -167,7 +167,7 @@ func TestM3AdminUI(t *testing.T) {
 		}
 	}
 	if a := x.do("GET", x.admin+"/users/lea/devices", nil, cookie(auth.AdminCookie, A.session)); !strings.Contains(a.body, `href="/users/lea/devices" class="state-layer`) ||
-		!strings.Contains(a.body, `<span>Appareils</span></a>`) || !strings.Contains(a.body, `href="/users"`) {
+		!strings.Contains(a.body, `>Appareils</span></a>`) || !strings.Contains(a.body, `href="/users"`) {
 		t.Errorf("the rail of a user's page: %s", a.body)
 	}
 	// The same page in English, the reader's choice: the rail, the trail
@@ -176,7 +176,7 @@ func TestM3AdminUI(t *testing.T) {
 		r.AddCookie(&http.Cookie{Name: auth.AdminCookie, Value: A.session})
 		r.AddCookie(&http.Cookie{Name: "agd_lang", Value: "en"})
 	}
-	if a := x.do("GET", x.admin+"/users/lea/devices", nil, english); !strings.Contains(a.body, `<span>Devices</span></a>`) ||
+	if a := x.do("GET", x.admin+"/users/lea/devices", nil, english); !strings.Contains(a.body, `>Devices</span></a>`) ||
 		!strings.Contains(a.body, `<span>Users</span>`) || !strings.Contains(a.body, `aria-label="Overview"`) ||
 		!strings.Contains(a.body, "Sign out") || !strings.Contains(a.body, "Devices · lea") {
 		t.Errorf("a user's page in English: %s", a.body)

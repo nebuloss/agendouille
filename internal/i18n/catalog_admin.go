@@ -70,6 +70,14 @@ func init() {
 			FR: "Fil d’Ariane",
 			EN: "Breadcrumb",
 		},
+		"admin.shell.fold": {
+			FR: "Réduire le menu",
+			EN: "Collapse the menu",
+		},
+		"admin.shell.unfold": {
+			FR: "Déplier le menu",
+			EN: "Expand the menu",
+		},
 		"admin.shell.pages": {
 			FR: "Pages",
 			EN: "Pages",

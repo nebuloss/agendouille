@@ -3,7 +3,7 @@
   <div class="mx-auto flex min-h-10 max-w-[110rem] items-center gap-3">
     <a href="/" class="mr-auto flex min-w-0 items-center gap-2 text-on-surface no-underline" title="{{t "admin.shell.home"}}">
       <img src="/static/shared/icon.svg" alt="" width="30" height="30" class="rounded-md3-s">
-      <span class="text-[17px] font-bold">agendouille</span>
+      <span class="hidden text-[17px] font-bold min-[30rem]:inline">agendouille</span>
       <small class="hidden text-[13px] font-semibold text-on-surface-variant sm:inline">{{t "admin.shell.tagline"}}</small>
       {{with .Version}}<span class="hidden rounded-md3-xs bg-surface-high px-1.5 font-mono text-[11px] text-on-surface-variant md:inline">{{.}}</span>{{end}}
     </a>
@@ -19,11 +19,17 @@
     {{end}}
   </nav>
 </header>
-<div class="mx-auto grid w-full max-w-[110rem] flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 px-3 pb-10 md:grid-cols-[13.5rem_minmax(0,1fr)] md:grid-rows-1 md:gap-4 md:px-4">
-  <nav class="rail flex gap-0.5 self-start overflow-x-auto rounded-md3-full bg-surface-container p-1 [scrollbar-width:none] md:sticky md:top-[7.5rem] md:flex-col md:rounded-md3-xl md:p-2" aria-label="{{if .Nav.Back}}{{t "admin.shell.pages"}}{{else}}{{t "admin.shell.sections"}}{{end}}">
-    {{with .Nav.Back}}<a href="{{.Href}}" class="state-layer flex min-h-9 shrink-0 items-center gap-3 rounded-md3-full bg-surface-lowest px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant no-underline max-md:mr-1 md:mb-1.5 md:min-h-10"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span>{{.Label}}</span></a>{{end}}
-    {{range .Nav.Items}}<a href="{{.Href}}" class="state-layer flex min-h-9 shrink-0 items-center gap-3 rounded-md3-full px-3 text-sm font-semibold whitespace-nowrap text-on-surface no-underline md:min-h-10 aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" {{if .Current}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span>{{.Label}}</span></a>{{end}}
+<div class="mx-auto grid w-full max-w-[110rem] flex-1 grid-cols-[auto_minmax(0,1fr)] gap-2 px-2 pb-10 md:gap-4 md:px-4">
+  <!-- The rail: a column beside the page at every width, folded to its
+       icons with the first button (folded by default on a phone; the
+       choice is kept per browser, src/admin/main.ts). -->
+  <div class="relative max-md:w-[3.25rem]">
+  <nav class="rail group/rail sticky top-[7.5rem] z-20 flex w-[13.5rem] flex-col gap-0.5 self-start rounded-md3-xl bg-surface-container p-1.5 data-[folded=true]:w-auto max-md:data-[folded=auto]:w-auto max-md:data-[folded=false]:absolute max-md:data-[folded=false]:top-0 max-md:data-[folded=false]:w-[15rem] max-md:data-[folded=false]:elevation-2 md:p-2" data-folded="auto" aria-label="{{if .Nav.Back}}{{t "admin.shell.pages"}}{{else}}{{t "admin.shell.sections"}}{{end}}">
+    <button type="button" class="rail-toggle state-layer flex min-h-10 items-center gap-3 rounded-md3-full px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant" aria-expanded="true" title="{{t "admin.shell.fold"}}" data-fold="{{t "admin.shell.fold"}}" data-unfold="{{t "admin.shell.unfold"}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z M9 5v14 M15 10l-2 2 2 2"/></svg><span class="truncate group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{t "admin.shell.fold"}}</span></button>
+    {{with .Nav.Back}}<a href="{{.Href}}" class="state-layer flex min-h-10 shrink-0 items-center gap-3 rounded-md3-full bg-surface-lowest px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant no-underline mb-1" title="{{.Label}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span class="truncate group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{.Label}}</span></a>{{end}}
+    {{range .Nav.Items}}<a href="{{.Href}}" class="state-layer flex min-h-10 shrink-0 items-center gap-3 rounded-md3-full px-3 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" title="{{.Label}}" {{if .Current}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span class="truncate group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{.Label}}</span></a>{{end}}
   </nav>
+  </div>
   <section class="flex min-w-0 flex-col gap-4" id="admin-content" data-name="{{.Name}}" data-sub="{{.Sub}}">
     <h1 class="sr-only">{{.Title}}</h1>
     <noscript><p class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">{{t "admin.shell.noscript"}}</p></noscript>

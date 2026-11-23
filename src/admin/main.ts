@@ -28,9 +28,11 @@ export const pages = new Pages({
 whenReady(document, () => {
   document.documentElement.dataset['bundle'] = 'admin';
   pages.mount(document);
-  // On a phone the rail is a row and the trail can be wider than the
-  // screen: bring the page's own entry, and the trail's end, into view.
-  document.querySelector('.rail [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  // The rail folds to its icons (folded by default on a phone); the choice
+  // is this browser's.
+  const rail = document.querySelector<HTMLElement>('.rail');
+  if (rail !== null) foldable(rail);
+  // On a phone the trail can be wider than the screen: show its end.
   const trail = document.querySelector<HTMLElement>('.trail');
   if (trail !== null) trail.scrollLeft = trail.scrollWidth;
   // The theme, one button that cycles: system, light, dark.
@@ -45,3 +47,49 @@ whenReady(document, () => {
     document.addEventListener('agd:changed', () => void notices.load());
   }
 });
+
+/** The rail's fold button: folded shows the icons only, their names as tooltips. */
+function foldable(rail: HTMLElement): void {
+  const button = rail.querySelector<HTMLButtonElement>('.rail-toggle');
+  if (button === null) return;
+  const key = 'agd_rail';
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(key);
+  } catch {
+    stored = null;
+  }
+  if (stored === 'folded' || stored === 'open') rail.dataset['folded'] = String(stored === 'folded');
+  const folded = (): boolean => rail.dataset['folded'] === 'true' || (rail.dataset['folded'] === 'auto' && window.matchMedia('(max-width: 47.99rem)').matches);
+  const draw = (): void => {
+    const f = folded();
+    const label = f ? button.dataset['unfold'] ?? '' : button.dataset['fold'] ?? '';
+    button.setAttribute('aria-expanded', String(!f));
+    button.title = label;
+    const span = button.querySelector('span');
+    if (span !== null) span.textContent = label;
+  };
+  // On a phone the open rail covers the page: it does not stay open from one
+  // page to the next, and a tap beside it folds it.
+  const phone = (): boolean => window.matchMedia('(max-width: 47.99rem)').matches;
+  if (phone() && stored === 'open') rail.dataset['folded'] = 'auto';
+  button.addEventListener('click', () => {
+    const next = !folded();
+    rail.dataset['folded'] = String(next);
+    if (!phone()) {
+      try {
+        window.localStorage.setItem(key, next ? 'folded' : 'open');
+      } catch {
+        // a browser that keeps nothing: the choice lasts this page
+      }
+    }
+    draw();
+  });
+  document.addEventListener('click', (e) => {
+    if (phone() && !folded() && !rail.contains(e.target as Node)) {
+      rail.dataset['folded'] = 'true';
+      draw();
+    }
+  });
+  draw();
+}

@@ -67,6 +67,16 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
       await page.screenshot({ path: `${out}/desktop-picker-search.png` });
       await page.keyboard.press('Escape');
     } else errors.push('no "Ajouter un membre" button');
+    // On a phone, the rail folded then unfolded.
+    await page.setViewport({ width: 390, height: 844, isMobile: true });
+    await page.goto(base + '/users/lea', { waitUntil: 'networkidle2' });
+    await new Promise((r) => setTimeout(r, 400));
+    await page.screenshot({ path: `${out}/phone-rail-folded.png` });
+    await page.click('.rail-toggle');
+    await new Promise((r) => setTimeout(r, 300));
+    await page.screenshot({ path: `${out}/phone-rail-open.png` });
+    await page.click('.rail-toggle');
+    await page.setViewport({ width: 1280, height: 860 });
     // The admin adds a device for someone: its manual settings.
     await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle2' });
     await new Promise((r) => setTimeout(r, 500));
