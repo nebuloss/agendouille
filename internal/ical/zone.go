@@ -2,6 +2,7 @@ package ical
 
 import (
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -51,6 +52,49 @@ var windowsZones = map[string]string{
 // the text either way; only the instants computed here depend on this.
 func Zone(tzid string, fallback *time.Location) *time.Location {
 	tzid = strings.Trim(strings.TrimSpace(tzid), `"`)
+	if len(tzid) > 128 {
+		return fallback // no real TZID is this long; a hostile one costs a lookup per segment
+	}
+	if v, ok := zoneCache.Load(tzid); ok {
+		if loc, ok := v.(*time.Location); ok {
+			return loc
+		}
+		return fallback
+	}
+	loc := resolveZone(tzid)
+	if zoneCount.Add(1) < 4096 { // bounded: TZIDs come from clients
+		if loc != nil {
+			zoneCache.Store(tzid, loc)
+		} else {
+			zoneCache.Store(tzid, false)
+		}
+	}
+	if loc == nil {
+		return fallback
+	}
+	return loc
+}
+
+var (
+	zoneCache sync.Map
+	zoneCount atomicCounter
+)
+
+type atomicCounter struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (c *atomicCounter) Add(d int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.n += d
+	return c.n
+}
+
+// resolveZone is Zone without the fallback and the cache: nil when the
+// TZID means nothing Go knows.
+func resolveZone(tzid string) *time.Location {
 	if loc, err := time.LoadLocation(tzid); err == nil && tzid != "" && tzid != "Local" {
 		return loc
 	}
@@ -59,14 +103,18 @@ func Zone(tzid string, fallback *time.Location) *time.Location {
 			return loc
 		}
 	}
-	// "/mozilla.org/20050126_1/Europe/Paris", "/citadel.org/.../Europe/Paris"
-	if parts := strings.Split(tzid, "/"); len(parts) >= 2 {
-		for i := 1; i < len(parts); i++ {
-			candidate := strings.Join(parts[i:], "/")
-			if loc, err := time.LoadLocation(candidate); err == nil && strings.Contains(candidate, "/") {
+	// "/mozilla.org/20050126_1/Europe/Paris", "/citadel.org/.../Europe/Paris":
+	// an IANA name is its last two or three segments.
+	if parts := strings.Split(tzid, "/"); len(parts) >= 2 && len(parts) <= 8 {
+		for n := 3; n >= 2; n-- {
+			if len(parts) < n {
+				continue
+			}
+			candidate := strings.Join(parts[len(parts)-n:], "/")
+			if loc, err := time.LoadLocation(candidate); err == nil {
 				return loc
 			}
 		}
 	}
-	return fallback
+	return nil
 }

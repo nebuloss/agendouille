@@ -76,13 +76,13 @@ func ParseRule(s string, loc *time.Location) (Rule, error) {
 			r.Freq = f
 		case "INTERVAL":
 			r.Interval, err = strconv.Atoi(v)
-			if err == nil && r.Interval < 1 {
-				err = fmt.Errorf("must be at least 1")
+			if err == nil && (r.Interval < 1 || r.Interval > MaxInterval) {
+				err = fmt.Errorf("must be from 1 to %d", MaxInterval)
 			}
 		case "COUNT":
 			r.Count, err = strconv.Atoi(v)
-			if err == nil && r.Count < 1 {
-				err = fmt.Errorf("must be at least 1")
+			if err == nil && (r.Count < 1 || r.Count > MaxIterations) {
+				err = fmt.Errorf("must be from 1 to %d", MaxIterations)
 			}
 		case "UNTIL":
 			switch {
@@ -133,7 +133,14 @@ func ParseRule(s string, loc *time.Location) (Rule, error) {
 						return Rule{}, fmt.Errorf("BYDAY=%s", v)
 					}
 				}
-				r.ByDay = append(r.ByDay, WeekdayNum{Day: d, N: n})
+				w := WeekdayNum{Day: d, N: n}
+				dup := false
+				for _, x := range r.ByDay {
+					dup = dup || x == w
+				}
+				if !dup {
+					r.ByDay = append(r.ByDay, w)
+				}
 			}
 		default:
 			if !strings.HasPrefix(k, "X-") {
@@ -150,18 +157,57 @@ func ParseRule(s string, loc *time.Location) (Rule, error) {
 	if r.Count > 0 && !r.Until.IsZero() {
 		return Rule{}, fmt.Errorf("COUNT and UNTIL together")
 	}
+	if n := r.perPeriod(); n > MaxPerPeriod {
+		return Rule{}, fmt.Errorf("the BY parts make up to %d instances in one period (at most %d)", n, MaxPerPeriod)
+	}
 	return r, nil
 }
 
+// MaxInterval bounds INTERVAL: larger steps overflow time arithmetic
+// (FREQ=SECONDLY;INTERVAL=2^55 is a step of zero), and no calendar needs
+// an event every thousand years.
+const MaxInterval = 1000
+
+// MaxPerPeriod bounds the instances one period can hold, so the product
+// of the BY lists cannot fill memory (a found attack: BYHOUR and BYMINUTE
+// with thousands of entries).
+const MaxPerPeriod = 50000
+
+// perPeriod is an upper bound of the instances one period holds.
+func (r Rule) perPeriod() int {
+	days := map[Freq]int{Yearly: 366, Monthly: 31, Weekly: 7}[r.Freq]
+	if days == 0 {
+		days = 1
+	}
+	n := days
+	if r.Freq > Hourly && len(r.ByHour) > 0 {
+		n *= len(r.ByHour)
+	}
+	if r.Freq > Minutely && len(r.ByMinute) > 0 {
+		n *= len(r.ByMinute)
+	}
+	if r.Freq > Secondly && len(r.BySecond) > 0 {
+		n *= len(r.BySecond)
+	}
+	return n
+}
+
+// intList reads a BY list, sorted and without duplicates: a repeated value
+// adds nothing but work.
 func intList(s string, lo, hi int, noZero bool) ([]int, error) {
+	seen := map[int]bool{}
 	var out []int
 	for _, item := range strings.Split(s, ",") {
 		n, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(item), "+"))
 		if err != nil || n < lo || n > hi || (noZero && n == 0) {
 			return nil, fmt.Errorf("%q is out of range", item)
 		}
-		out = append(out, n)
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
 	}
+	sort.Ints(out)
 	return out, nil
 }
 
@@ -169,19 +215,112 @@ func intList(s string, lo, hi int, noZero bool) ([]int, error) {
 func (r Rule) Ends() bool { return r.Count > 0 || !r.Until.IsZero() }
 
 // maxEmptyPeriods stops a rule that never matches again (FREQ=YEARLY;
-// BYMONTH=2;BYMONTHDAY=30) instead of looping forever.
+// BYMONTH=2;BYMONTHDAY=30) instead of looping forever. Periods skipped in
+// one jump (a day or an hour that cannot match) count once.
 const maxEmptyPeriods = 10000
+
+// maxPeriods bounds the periods one iterator walks, whatever they hold.
+const maxPeriods = 2000000
 
 // Iterator returns the rule's instances from dtstart on, in order. DTSTART
 // is always the first, whether or not it matches the rule, and counts
 // toward COUNT (RFC 5545 3.8.5.3). Times are wall times in dtstart's zone.
 func (r Rule) Iterator(dtstart time.Time) func() (time.Time, bool) {
+	return r.iterator(dtstart, r.firstPeriod(dtstart))
+}
+
+// IteratorFrom is Iterator for a caller that only wants instances at or
+// after from: without COUNT, nothing before from can change what comes
+// after, so it starts at the period before from's instead of walking
+// years of instances (an hourly event made long ago). With COUNT it is
+// Iterator. DTSTART is still returned first.
+func (r Rule) IteratorFrom(dtstart, from time.Time) func() (time.Time, bool) {
+	first := r.firstPeriod(dtstart)
+	if r.Count > 0 || !from.After(dtstart) {
+		return r.iterator(dtstart, first)
+	}
+	return r.iterator(dtstart, r.periodNear(first, from))
+}
+
+// periodNear is the last period of the rule's grid (first, first+step,
+// ...) that starts at least one step before from.
+func (r Rule) periodNear(first, from time.Time) time.Time {
+	loc := first.Location()
+	fy, fm, fd := first.Date()
+	ty, tm, _ := from.In(loc).Date()
+	k := 0
+	switch r.Freq {
+	case Yearly:
+		k = (ty - fy) / r.Interval
+	case Monthly:
+		k = ((ty-fy)*12 + int(tm) - int(fm)) / r.Interval
+	case Weekly:
+		k = int(from.Sub(first).Hours()/24/7) / r.Interval
+	case Daily:
+		k = int(from.Sub(first).Hours()/24) / r.Interval
+	default:
+		d := from.Sub(first)
+		if d > 100*365*24*time.Hour {
+			return first // older than a Duration can span safely: walk from the start
+		}
+		k = int(d / r.step())
+	}
+	k -= 2 // a margin for DST and the instances of the period before
+	if k <= 0 {
+		return first
+	}
+	switch r.Freq {
+	case Yearly:
+		return time.Date(fy+k*r.Interval, 1, 1, 0, 0, 0, 0, loc)
+	case Monthly:
+		return time.Date(fy, fm+time.Month(k*r.Interval), 1, 0, 0, 0, 0, loc)
+	case Weekly:
+		return time.Date(fy, fm, fd+7*k*r.Interval, 0, 0, 0, 0, loc)
+	case Daily:
+		return time.Date(fy, fm, fd+k*r.Interval, 0, 0, 0, 0, loc)
+	}
+	return first.Add(time.Duration(k) * r.step())
+}
+
+// step is the length of a sub-daily period.
+func (r Rule) step() time.Duration {
+	unit := map[Freq]time.Duration{Hourly: time.Hour, Minutely: time.Minute, Secondly: time.Second}[r.Freq]
+	return time.Duration(r.Interval) * unit
+}
+
+// skip moves a sub-daily period past a day, hour or minute that the BY
+// parts rule out, to the first period of the grid after it. It returns
+// the period unchanged when nothing can be skipped.
+func (r Rule) skip(first, period time.Time) time.Time {
+	if r.Freq > Hourly {
+		return period
+	}
+	y, m, d := period.Date()
+	loc := period.Location()
+	var until time.Time
+	switch {
+	case !r.limitDay(day{y, m, d}):
+		until = time.Date(y, m, d+1, 0, 0, 0, 0, loc)
+	case r.Freq <= Minutely && len(r.ByHour) > 0 && !containsInt(r.ByHour, period.Hour()):
+		until = time.Date(y, m, d, period.Hour()+1, 0, 0, 0, loc)
+	case r.Freq == Secondly && len(r.ByMinute) > 0 && !containsInt(r.ByMinute, period.Minute()):
+		until = time.Date(y, m, d, period.Hour(), period.Minute()+1, 0, 0, loc)
+	default:
+		return period
+	}
+	st := r.step()
+	n := (until.Sub(period) + st - 1) / st
+	return period.Add(n * st)
+}
+
+func (r Rule) iterator(dtstart, start time.Time) func() (time.Time, bool) {
 	loc := dtstart.Location()
+	first := r.firstPeriod(dtstart)
 	emitted := 0
 	firstDone := false
 	var pending []time.Time
-	period := r.firstPeriod(dtstart)
-	empty := 0
+	period := start
+	empty, periods := 0, 0
 	done := false
 	untilOK := func(t time.Time) bool {
 		if r.Until.IsZero() {
@@ -194,6 +333,10 @@ func (r Rule) Iterator(dtstart time.Time) func() (time.Time, bool) {
 		}
 		return !t.After(r.Until)
 	}
+	stop := func() (time.Time, bool) {
+		done = true
+		return time.Time{}, false
+	}
 	return func() (time.Time, bool) {
 		if done {
 			return time.Time{}, false
@@ -201,16 +344,14 @@ func (r Rule) Iterator(dtstart time.Time) func() (time.Time, bool) {
 		if !firstDone {
 			firstDone = true
 			if !untilOK(dtstart) {
-				done = true
-				return time.Time{}, false
+				return stop()
 			}
 			emitted++
 			return dtstart, true
 		}
 		for {
 			if r.Count > 0 && emitted >= r.Count {
-				done = true
-				return time.Time{}, false
+				return stop()
 			}
 			for len(pending) > 0 {
 				t := pending[0]
@@ -219,27 +360,33 @@ func (r Rule) Iterator(dtstart time.Time) func() (time.Time, bool) {
 					continue // before DTSTART, or DTSTART itself again
 				}
 				if !untilOK(t) {
-					done = true
-					return time.Time{}, false
+					return stop()
 				}
 				emitted++
 				return t, true
 			}
-			pending = r.expand(period, dtstart, loc)
-			period = r.nextPeriod(period)
-			if len(pending) == 0 {
+			periods++
+			if periods > maxPeriods {
+				return stop()
+			}
+			if next := r.skip(first, period); !next.Equal(period) {
+				period = next
 				empty++
-				if empty > maxEmptyPeriods {
-					done = true
-					return time.Time{}, false
-				}
 			} else {
-				empty = 0
+				pending = r.expand(period, dtstart, loc)
+				period = r.nextPeriod(period)
+				if len(pending) == 0 {
+					empty++
+				} else {
+					empty = 0
+				}
+			}
+			if empty > maxEmptyPeriods {
+				return stop()
 			}
 			// A period that starts past UNTIL cannot bring anything.
 			if !r.Until.IsZero() && len(pending) == 0 && period.After(r.Until.Add(366*24*time.Hour)) {
-				done = true
-				return time.Time{}, false
+				return stop()
 			}
 		}
 	}
@@ -478,9 +625,22 @@ func (r Rule) dayIn(dd day) bool {
 	return false
 }
 
+// byWeekday lists a span's days per weekday, for nthIn.
+type byWeekday [7][]day
+
+func indexSpan(span []day) *byWeekday {
+	var idx byWeekday
+	for _, s := range span {
+		w := s.weekday()
+		idx[w] = append(idx[w], s)
+	}
+	return &idx
+}
+
 // nthIn matches BYDAY with ordinals counted inside a span of days (a month
-// or a year): 2MO is the second Monday of it, -1FR the last Friday.
-func (r Rule) nthIn(dd day, span []day) bool {
+// or a year, indexed once by indexSpan): 2MO is the second Monday of it,
+// -1FR the last Friday.
+func (r Rule) nthIn(dd day, idx *byWeekday) bool {
 	wd := dd.weekday()
 	for _, b := range r.ByDay {
 		if b.Day != wd {
@@ -489,12 +649,7 @@ func (r Rule) nthIn(dd day, span []day) bool {
 		if b.N == 0 {
 			return true
 		}
-		var same []day
-		for _, s := range span {
-			if s.weekday() == wd {
-				same = append(same, s)
-			}
-		}
+		same := idx[wd]
 		i := b.N - 1
 		if b.N < 0 {
 			i = len(same) + b.N
@@ -520,6 +675,7 @@ func monthSpan(y int, m time.Month) []day {
 // day of DTSTART (skipped in months too short for it).
 func (r Rule) monthDays(y int, m time.Month, dtstart time.Time) []day {
 	span := monthSpan(y, m)
+	idx := indexSpan(span)
 	var out []day
 	for _, dd := range span {
 		switch {
@@ -531,7 +687,7 @@ func (r Rule) monthDays(y int, m time.Month, dtstart time.Time) []day {
 			if len(r.ByMonthDay) > 0 && !r.monthDayIn(dd) {
 				continue
 			}
-			if len(r.ByDay) > 0 && !r.nthIn(dd, span) {
+			if len(r.ByDay) > 0 && !r.nthIn(dd, idx) {
 				continue
 			}
 		}
@@ -545,9 +701,13 @@ func (r Rule) monthDays(y int, m time.Month, dtstart time.Time) []day {
 func (r Rule) yearDays(y int, dtstart time.Time) []day {
 	noDayParts := len(r.ByWeekNo) == 0 && len(r.ByYearDay) == 0 && len(r.ByMonthDay) == 0 && len(r.ByDay) == 0
 	var yearSpan []day
+	var monthIdx [13]*byWeekday
 	for m := time.January; m <= time.December; m++ {
-		yearSpan = append(yearSpan, monthSpan(y, m)...)
+		ms := monthSpan(y, m)
+		monthIdx[m] = indexSpan(ms)
+		yearSpan = append(yearSpan, ms...)
 	}
+	yearIdx := indexSpan(yearSpan)
 	var out []day
 	for _, dd := range yearSpan {
 		if len(r.ByMonth) > 0 && !containsInt(r.ByMonth, int(dd.m)) {
@@ -572,11 +732,11 @@ func (r Rule) yearDays(y int, dtstart time.Time) []day {
 			continue
 		}
 		if len(r.ByDay) > 0 {
-			span := yearSpan
+			idx := yearIdx
 			if len(r.ByMonth) > 0 {
-				span = monthSpan(y, dd.m)
+				idx = monthIdx[dd.m]
 			}
-			if !r.nthIn(dd, span) {
+			if !r.nthIn(dd, idx) {
 				continue
 			}
 		} else if len(r.ByWeekNo) > 0 && len(r.ByYearDay) == 0 && len(r.ByMonthDay) == 0 && dd.weekday() != dtstart.Weekday() {

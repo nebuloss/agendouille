@@ -226,6 +226,34 @@ func (s *Service) withAccess(ctx context.Context, a Actor, i Info) (Info, error)
 	return i, nil
 }
 
+// recheck repeats, inside a write transaction, what lookup saw before it:
+// the calendar is still live and the actor may still write it. Transactions
+// take the write lock first (_txlock=immediate), so no other write can
+// land between this check and the caller's (PLAN.md 4.3, step 1).
+func (s *Service) recheck(ctx context.Context, tx *sql.Tx, a Actor, i Info, needOwner bool) error {
+	var deleted sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT deleted_at FROM calendars WHERE id = ?`, i.ID).Scan(&deleted); err != nil || deleted.Valid {
+		return ErrNotFound
+	}
+	if a.UserID == 0 {
+		return nil
+	}
+	acc, err := s.sharing.AccessTx(ctx, tx, a.UserID, i.ID)
+	if err != nil {
+		return err
+	}
+	acc = sharing.Effective(acc, a.Cap)
+	switch {
+	case !acc.CanRead():
+		return ErrNotFound
+	case needOwner && acc != sharing.Owner:
+		return ErrNotOwner
+	case !acc.CanWrite():
+		return ErrForbidden
+	}
+	return nil
+}
+
 // Info is a calendar the actor may read.
 func (s *Service) Info(ctx context.Context, a Actor, r Ref) (Info, error) { return s.lookup(ctx, a, r) }
 
@@ -413,6 +441,9 @@ func (s *Service) Update(ctx context.Context, a Actor, r Ref, p Props) (Info, er
 	}
 	var seq int64
 	err = store.InTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.recheck(ctx, tx, a, i, true); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `UPDATE calendars SET `+strings.Join(sets, ", ")+` WHERE id = ?`, append(args, i.ID)...); err != nil {
 			return err
 		}
@@ -439,6 +470,9 @@ func (s *Service) DeleteCalendar(ctx context.Context, a Actor, r Ref) error {
 	}
 	var seq int64
 	err = store.InTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.recheck(ctx, tx, a, i, true); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM objects WHERE calendar_id = ?`, i.ID); err != nil {
 			return err
 		}
@@ -486,6 +520,9 @@ func (s *Service) Transfer(ctx context.Context, a Actor, r Ref, to string, keep 
 	}
 	var seq int64
 	err = store.InTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.recheck(ctx, tx, a, i, true); err != nil {
+			return err
+		}
 		var n int
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM calendars WHERE owner_id = ? AND slug = ?`, u.ID, i.Ref.Slug).Scan(&n); err != nil {
 			return err
@@ -733,6 +770,9 @@ func (s *Service) Put(ctx context.Context, a Actor, r Ref, name string, data []b
 		author = i.OwnerID // the operator imports in the owner's name
 	}
 	err = store.InTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.recheck(ctx, tx, a, i, false); err != nil {
+			return err
+		}
 		var oldETag, oldUID string
 		err := tx.QueryRowContext(ctx, `SELECT etag, uid FROM objects WHERE calendar_id = ? AND name = ?`, i.ID, name).Scan(&oldETag, &oldUID)
 		exists := err == nil
@@ -800,6 +840,9 @@ func (s *Service) Delete(ctx context.Context, a Actor, r Ref, name string, p Pre
 	}
 	var seq int64
 	err = store.InTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.recheck(ctx, tx, a, i, false); err != nil {
+			return err
+		}
 		var etag, summary string
 		err := tx.QueryRowContext(ctx, `SELECT etag, summary FROM objects WHERE calendar_id = ? AND name = ?`, i.ID, name).Scan(&etag, &summary)
 		if errors.Is(err, sql.ErrNoRows) {

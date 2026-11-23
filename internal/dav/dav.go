@@ -177,7 +177,7 @@ func (c *call) fail(err error) {
 	var conflict *calendar.UIDConflict
 	switch {
 	case errors.As(err, &conflict):
-		c.xmlError(http.StatusForbidden, nsCalDAV, "no-uid-conflict", href(objectPath(c.p.User.Name, mustRef(c.t), conflict.Name)))
+		c.xmlError(http.StatusForbidden, nsCalDAV, "no-uid-conflict", href(homePath(c.p.User.Name)+url.PathEscape(c.t.calSeg)+"/"+url.PathEscape(conflict.Name)))
 	case errors.Is(err, calendar.ErrNotFound), errors.Is(err, sharing.ErrNotFound):
 		http.Error(c.w, "not found", http.StatusNotFound)
 	case errors.Is(err, calendar.ErrForbidden), errors.Is(err, calendar.ErrNotOwner):
@@ -203,11 +203,6 @@ func (c *call) fail(err error) {
 		c.s.d.Log.Error("caldav", "method", c.r.Method, "path", c.r.URL.Path, "err", err)
 		http.Error(c.w, "internal error", http.StatusInternalServerError)
 	}
-}
-
-func mustRef(t target) calendar.Ref {
-	r, _ := t.ref()
-	return r
 }
 
 // info looks up the calendar the path names, with the caller's access.

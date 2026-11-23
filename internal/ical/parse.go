@@ -155,13 +155,23 @@ func Decode(data []byte) ([]*Component, error) {
 func unfold(s string) []string {
 	raw := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
 	out := make([]string, 0, len(raw))
+	var cur strings.Builder
+	have := false
 	for _, l := range raw {
 		l = strings.TrimSuffix(l, "\r")
-		if len(out) > 0 && len(l) > 0 && (l[0] == ' ' || l[0] == '\t') {
-			out[len(out)-1] += l[1:]
+		if have && len(l) > 0 && (l[0] == ' ' || l[0] == '\t') {
+			cur.WriteString(l[1:]) // a builder: thousands of continuations stay linear
 			continue
 		}
-		out = append(out, l)
+		if have {
+			out = append(out, cur.String())
+			cur.Reset()
+		}
+		cur.WriteString(l)
+		have = true
+	}
+	if have {
+		out = append(out, cur.String())
 	}
 	return out
 }

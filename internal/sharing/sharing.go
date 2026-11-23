@@ -104,9 +104,22 @@ func New(db *sql.DB, dir *directory.Service) *Service { return &Service{db: db, 
 // Access is a user's access to a calendar. A deleted calendar, or one
 // whose owner was removed, gives None.
 func (s *Service) Access(ctx context.Context, userID, calendarID int64) (Access, error) {
+	return access(ctx, s.db, userID, calendarID)
+}
+
+// AccessTx is Access inside a transaction, for the write path's re-check.
+func (s *Service) AccessTx(ctx context.Context, tx *sql.Tx, userID, calendarID int64) (Access, error) {
+	return access(ctx, tx, userID, calendarID)
+}
+
+type querier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func access(ctx context.Context, q querier, userID, calendarID int64) (Access, error) {
 	var owner int64
 	var deleted sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT owner_id, deleted_at FROM calendars WHERE id = ?`, calendarID).Scan(&owner, &deleted)
+	err := q.QueryRowContext(ctx, `SELECT owner_id, deleted_at FROM calendars WHERE id = ?`, calendarID).Scan(&owner, &deleted)
 	if errors.Is(err, sql.ErrNoRows) || deleted.Valid {
 		return None, nil
 	} else if err != nil {
@@ -116,7 +129,7 @@ func (s *Service) Access(ctx context.Context, userID, calendarID int64) (Access,
 		return Owner, nil
 	}
 	var best sql.NullString
-	err = s.db.QueryRowContext(ctx, `SELECT max(access) FROM shares WHERE calendar_id = ? AND (user_id = ?
+	err = q.QueryRowContext(ctx, `SELECT max(access) FROM shares WHERE calendar_id = ? AND (user_id = ?
 		OR group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))`, calendarID, userID, userID).Scan(&best)
 	if err != nil {
 		return None, err

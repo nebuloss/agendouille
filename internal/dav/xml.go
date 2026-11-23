@@ -27,6 +27,7 @@ type node struct {
 	Attr     []xml.Attr
 	Children []*node
 	Text     string
+	text     strings.Builder // filled while parsing: many small chunks stay linear
 }
 
 func (n *node) is(space, local string) bool {
@@ -88,10 +89,13 @@ func parse(r io.Reader) (*node, error) {
 			}
 			stack = append(stack, n)
 		case xml.EndElement:
+			top := stack[len(stack)-1]
+			top.Text = top.text.String()
+			top.text.Reset()
 			stack = stack[:len(stack)-1]
 		case xml.CharData:
 			if len(stack) > 0 {
-				stack[len(stack)-1].Text += string(t)
+				stack[len(stack)-1].text.Write(t)
 			}
 		}
 	}

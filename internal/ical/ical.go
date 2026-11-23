@@ -239,7 +239,10 @@ func ParseDuration(s string) (Duration, error) {
 			if num == "" {
 				return Duration{}, fmt.Errorf("not a duration")
 			}
-			n, _ := strconv.Atoi(num)
+			n, err := strconv.Atoi(num)
+			if err != nil || n > 1000000 {
+				return Duration{}, fmt.Errorf("not a duration")
+			}
 			num = ""
 			switch {
 			case r == 'W' && !inTime:
@@ -259,6 +262,9 @@ func ParseDuration(s string) (Duration, error) {
 	}
 	if num != "" {
 		return Duration{}, fmt.Errorf("not a duration")
+	}
+	if d.Days > 36600 || d.Exact > 36600*24*time.Hour || d.Exact < 0 {
+		return Duration{}, fmt.Errorf("longer than a century")
 	}
 	if neg {
 		d.Days, d.Exact = -d.Days, -d.Exact
@@ -308,7 +314,8 @@ func (o *Object) span(loc *time.Location) (when, Duration, error) {
 
 // instances returns the master's recurrence set as an iterator, or nil
 // when it does not recur: RRULE from DTSTART, plus RDATEs, minus EXDATEs.
-func (o *Object) instances(loc *time.Location) (func() (time.Time, bool), bool, error) {
+// from, when not zero, lets the rule start near it (Rule.IteratorFrom).
+func (o *Object) instances(loc *time.Location, from time.Time) (func() (time.Time, bool), bool, error) {
 	start, _, err := o.span(loc)
 	if err != nil {
 		return nil, false, err
@@ -325,7 +332,11 @@ func (o *Object) instances(loc *time.Location) (func() (time.Time, bool), bool, 
 		if err != nil {
 			return nil, false, invalid("RRULE: %v", err)
 		}
-		rule = r.Iterator(start.t)
+		if from.IsZero() {
+			rule = r.Iterator(start.t)
+		} else {
+			rule = r.IteratorFrom(start.t, from)
+		}
 		ends = r.Ends()
 	} else {
 		done := false
@@ -421,7 +432,9 @@ func (o *Object) Expand(loc *time.Location, from, to time.Time, max int) (occ []
 		if err != nil {
 			return nil, false, err
 		}
-		next, _, err := o.instances(loc)
+		// Start the rule a little before the range: an instance that began
+		// before from may still overlap it.
+		next, _, err := o.instances(loc, from.AddDate(0, 0, -dur.Days-1).Add(-dur.Exact))
 		if err != nil {
 			return nil, false, err
 		}
@@ -481,7 +494,7 @@ func (o *Object) index(loc *time.Location) (Index, error) {
 			return Index{}, err
 		}
 		idx.AllDay = start.allDay
-		next, ends, err := o.instances(loc)
+		next, ends, err := o.instances(loc, time.Time{})
 		if err != nil {
 			return Index{}, err
 		}
@@ -526,10 +539,25 @@ func (o *Object) index(loc *time.Location) (Index, error) {
 		}
 		consider(start.t, end.t)
 	}
-	idx.Start = first.UTC()
+	idx.Start = clamp(first.UTC())
 	if !open {
-		e := last.UTC()
+		e := clamp(last.UTC())
 		idx.End = &e
 	}
 	return idx, nil
+}
+
+// latest is the last instant the index stores: times are kept as text,
+// and a year of five digits would sort before every other.
+var latest = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+var earliest = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
+
+func clamp(t time.Time) time.Time {
+	if t.After(latest) {
+		return latest
+	}
+	if t.Before(earliest) {
+		return earliest
+	}
+	return t
 }

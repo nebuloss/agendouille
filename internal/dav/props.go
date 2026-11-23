@@ -215,7 +215,7 @@ func (c *call) propfind() {
 			c.fail(err)
 			return
 		}
-		c.write(w, resource{kind: kCalendar, path: calendarPath(user, i.Ref), cal: &i}, q)
+		c.write(w, resource{kind: kCalendar, path: c.calHref(i), cal: &i}, q)
 		if depth == "1" {
 			objs, err := c.s.d.Calendar.List(ctx, i)
 			if err != nil {
@@ -223,7 +223,7 @@ func (c *call) propfind() {
 				return
 			}
 			for k := range objs {
-				c.write(w, resource{kind: kObject, path: objectPath(user, i.Ref, objs[k].Name), obj: &objs[k]}, q)
+				c.write(w, resource{kind: kObject, path: c.objHref(i, objs[k].Name), obj: &objs[k]}, q)
 			}
 		}
 	case kObject:
@@ -237,7 +237,7 @@ func (c *call) propfind() {
 			c.fail(err)
 			return
 		}
-		c.write(w, resource{kind: kObject, path: objectPath(user, i.Ref, o.Name), obj: &o}, q)
+		c.write(w, resource{kind: kObject, path: c.objHref(i, o.Name), obj: &o}, q)
 	}
 	c.multistatus(w.finish())
 }
@@ -267,6 +267,21 @@ func (c *call) report() {
 	default:
 		c.xmlError(http.StatusForbidden, nsDAV, "supported-report", "")
 	}
+}
+
+// calHref is a calendar's href as this request names it: under the bare
+// slug when the client used its MKCALENDAR URL (PLAN.md 5.2's fallback; a
+// client that insists on its own URL matches answers by it), else under
+// <owner>~<slug>.
+func (c *call) calHref(i calendar.Info) string {
+	if (c.t.kind == kCalendar || c.t.kind == kObject) && !strings.Contains(c.t.calSeg, "~") && i.Ref.Owner == c.p.User.Name {
+		return homePath(c.p.User.Name) + url.PathEscape(c.t.calSeg) + "/"
+	}
+	return calendarPath(c.p.User.Name, i.Ref)
+}
+
+func (c *call) objHref(i calendar.Info, name string) string {
+	return c.calHref(i) + url.PathEscape(name)
 }
 
 // nameOf reads the object an href names inside calendar i, from any of the
@@ -302,14 +317,13 @@ func (c *call) multiget(i calendar.Info, root *node) {
 		return
 	}
 	w := newMultistatus()
-	user := c.p.User.Name
 	for k, n := range names {
 		o, ok := found[n]
 		if !ok {
 			w.status(hrefs[k], "404 Not Found")
 			continue
 		}
-		c.write(w, resource{kind: kObject, path: objectPath(user, i.Ref, o.Name), obj: &o}, q)
+		c.write(w, resource{kind: kObject, path: c.objHref(i, o.Name), obj: &o}, q)
 	}
 	c.multistatus(w.finish())
 }
@@ -467,12 +481,11 @@ func (c *call) query(i calendar.Info, root *node) {
 		c.fail(err)
 		return
 	}
-	user := c.p.User.Name
 	for k := range objs {
 		if !f.matches(objs[k]) {
 			continue
 		}
-		c.write(w, resource{kind: kObject, path: objectPath(user, i.Ref, objs[k].Name), obj: &objs[k]}, q)
+		c.write(w, resource{kind: kObject, path: c.objHref(i, objs[k].Name), obj: &objs[k]}, q)
 	}
 	c.multistatus(w.finish())
 }
@@ -508,10 +521,9 @@ func (c *call) syncCollection(i calendar.Info, root *node) {
 		c.fail(err)
 		return
 	}
-	user := c.p.User.Name
 	w := newMultistatus()
 	for _, n := range ch.Names {
-		path := objectPath(user, i.Ref, n)
+		path := c.objHref(i, n)
 		if o, ok := found[n]; ok {
 			c.write(w, resource{kind: kObject, path: path, obj: &o}, q)
 		} else {
@@ -519,7 +531,7 @@ func (c *call) syncCollection(i calendar.Info, root *node) {
 		}
 	}
 	if ch.Truncated {
-		w.raw("<d:response>" + href(calendarPath(user, i.Ref)) +
+		w.raw("<d:response>" + href(c.calHref(i)) +
 			"<d:status>HTTP/1.1 507 Insufficient Storage</d:status><d:error><d:number-of-matches-within-limits/></d:error></d:response>")
 	}
 	next := i
@@ -633,51 +645,39 @@ func (c *call) mkcalendar() {
 }
 
 // proppatch changes a calendar's properties: the owner's for everyone, a
-// sharee's for their own devices (PLAN.md 5.2). It is all or nothing: one
-// property refused fails the others with 424 (RFC 4918 9.2).
+// sharee's for their own devices (PLAN.md 5.2). It is all or nothing (RFC
+// 4918 9.2): a property that cannot be set as asked is 403 and every other
+// one 424, and nothing changes. A property answered 200 was really set.
 func (c *call) proppatch() {
 	root, err := parse(c.r.Body)
 	if err != nil || !root.is(nsDAV, "propertyupdate") {
 		http.Error(c.w, "PROPPATCH takes a propertyupdate body", http.StatusBadRequest)
 		return
 	}
-	var names []xml.Name
-	var props calendar.Props
-	var refused []xml.Name
-	for _, op := range root.Children {
-		remove := op.is(nsDAV, "remove")
-		if !remove && !op.is(nsDAV, "set") {
-			continue
-		}
-		for _, ch := range op.child(nsDAV, "prop").childrenOrNil() {
-			v := ch.Text
-			if remove {
-				v = ""
-			}
-			names = append(names, ch.Name)
-			switch ch.Name {
-			case pDisplayName:
-				props.Name = &v
-			case pColor:
-				props.Color = &v
-			case pDescription:
-				props.Description = &v
-			case pOrder:
-				n, err := strconv.Atoi(strings.TrimSpace(v))
-				if err == nil || v == "" {
-					props.Order = &n
-				} else {
-					refused = append(refused, ch.Name)
-				}
-			case pCalendarTimezone:
-				// Kept in the client's events; the calendar's own zone is
-				// the owner's choice in the web app.
-			default:
-				refused = append(refused, ch.Name)
-			}
-		}
+	if c.p.DeviceCap == "read" {
+		c.xmlError(http.StatusForbidden, nsDAV, "need-privileges", "")
+		return
 	}
 	path := c.r.URL.Path
+	type op struct {
+		name   xml.Name
+		value  string
+		remove bool
+	}
+	var ops []op
+	for _, o := range root.Children {
+		remove := o.is(nsDAV, "remove")
+		if !remove && !o.is(nsDAV, "set") {
+			continue
+		}
+		for _, ch := range o.child(nsDAV, "prop").childrenOrNil() {
+			ops = append(ops, op{name: ch.Name, value: ch.Text, remove: remove})
+		}
+	}
+	names := make([]xml.Name, 0, len(ops))
+	for _, o := range ops {
+		names = append(names, o.name)
+	}
 	w := newMultistatus()
 	if c.t.kind != kCalendar {
 		w.response(path, nil, nil, nil, names)
@@ -688,6 +688,61 @@ func (c *call) proppatch() {
 	if err != nil {
 		c.fail(err)
 		return
+	}
+	owner := i.Access == sharing.Owner
+	var props calendar.Props
+	var refused []xml.Name
+	for _, o := range ops {
+		v := o.value
+		ok := true
+		switch o.name {
+		case pDisplayName:
+			// A sharee may drop their own name for it; the owner's is the
+			// calendar's, which cannot be removed.
+			if o.remove && owner {
+				ok = false
+			} else if o.remove {
+				v = ""
+			}
+			props.Name = &v
+		case pColor:
+			if o.remove && owner {
+				ok = false
+			} else if o.remove {
+				v = ""
+			} else if _, valid := calendar.NormalizeColor(v); !valid {
+				ok = false
+			}
+			props.Color = &v
+		case pDescription:
+			if !owner {
+				ok = false // the description is the owner's, there is no view of it
+			}
+			if o.remove {
+				v = ""
+			}
+			props.Description = &v
+		case pOrder:
+			n := 0
+			if !o.remove {
+				var err error
+				if n, err = strconv.Atoi(strings.TrimSpace(v)); err != nil {
+					ok = false
+				}
+			}
+			props.Order = &n
+		case pCalendarTimezone:
+			tz := tzidOf(v)
+			if !owner || o.remove || tz == "" {
+				ok = false
+			}
+			props.Timezone = &tz
+		default:
+			ok = false
+		}
+		if !ok {
+			refused = append(refused, o.name)
+		}
 	}
 	if len(refused) > 0 {
 		var failed []xml.Name
@@ -712,16 +767,6 @@ func (c *call) proppatch() {
 		w.raw("</d:response>")
 		c.multistatus(w.finish())
 		return
-	}
-	if props.Color != nil && *props.Color != "" {
-		if _, ok := calendar.NormalizeColor(*props.Color); !ok {
-			w.response(path, nil, nil, nil, []xml.Name{pColor})
-			c.multistatus(w.finish())
-			return
-		}
-	}
-	if i.Access != sharing.Owner && props.Description != nil {
-		props.Description = nil // a sharee's view has no description of its own
 	}
 	if _, err := c.s.d.Calendar.Update(c.r.Context(), c.a, i.Ref, props); err != nil {
 		c.fail(err)
