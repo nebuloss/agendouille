@@ -14,6 +14,7 @@ import (
 
 	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/deps"
+	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/web/assets"
 	"github.com/nebuloss/agendouille/internal/web/webx"
 )
@@ -34,10 +35,10 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	guard := func(next http.Handler) http.Handler { return webx.SameOrigin(d.PublicURL, next) }
 
 	for path, page := range map[string][2]string{
-		"GET /{$}":       {"calendar", "Calendrier"},
-		"GET /calendars": {"calendars", "Calendriers"},
-		"GET /devices":   {"devices", "Appareils"},
-		"GET /me":        {"me", "Moi"},
+		"GET /{$}":       {"calendar", "app.title.calendar"},
+		"GET /calendars": {"calendars", "app.title.calendars"},
+		"GET /devices":   {"devices", "app.title.devices"},
+		"GET /me":        {"me", "app.title.me"},
 	} {
 		mux.Handle(path, h.page(h.shell(page[0], page[1])))
 	}
@@ -66,8 +67,10 @@ func (h *handlers) clientIP(r *http.Request) string {
 
 func (h *handlers) secure() bool { return webx.Secure(h.d.PublicURL()) }
 
-func (h *handlers) render(w http.ResponseWriter, r *http.Request, status int, name, title string, data any) {
-	webx.Render(w, r, h.d.Log, status, name, webx.Page{Title: title, Page: strings.TrimSuffix(strings.TrimPrefix(name, "app/"), ".html"),
+// render shows a page outside the shell; titleKey is its title's key in
+// internal/i18n.
+func (h *handlers) render(w http.ResponseWriter, r *http.Request, status int, name, titleKey string, data any) {
+	webx.Render(w, r, h.d.Log, status, name, webx.Page{Title: i18n.T(i18n.FromRequest(r), titleKey), Page: strings.TrimSuffix(strings.TrimPrefix(name, "app/"), ".html"),
 		Bundle: assets.App, Data: data})
 }
 
@@ -90,7 +93,7 @@ func (h *handlers) api(next withPrincipal) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, err := h.d.Auth.Session(r, auth.SurfaceApp)
 		if err != nil {
-			webx.Fail(w, http.StatusUnauthorized, "unauthenticated", "sign in first")
+			webx.FailT(w, r, http.StatusUnauthorized, "unauthenticated", "error.signin.required")
 			return
 		}
 		next(w, r.WithContext(auth.WithPrincipal(r.Context(), p)), p)
@@ -103,7 +106,7 @@ func (h *handlers) basic(next withPrincipal) http.Handler {
 		p, err := h.d.Auth.Basic(r, h.clientIP(r))
 		if err != nil {
 			w.Header().Set("WWW-Authenticate", `Basic realm="agendouille", charset="UTF-8"`)
-			webx.Fail(w, http.StatusUnauthorized, "unauthenticated", "a device credential is needed")
+			webx.FailT(w, r, http.StatusUnauthorized, "unauthenticated", "error.device.unknown")
 			return
 		}
 		next(w, r, p)
@@ -112,8 +115,9 @@ func (h *handlers) basic(next withPrincipal) http.Handler {
 
 // shell is a page of the family web app: the navigation and a mount point
 // the app bundle fills from the API (PLAN.md 9.3).
-func (h *handlers) shell(page, title string) withPrincipal {
+func (h *handlers) shell(page, titleKey string) withPrincipal {
 	return func(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+		title := i18n.T(i18n.FromRequest(r), titleKey)
 		webx.Render(w, r, h.d.Log, http.StatusOK, "app/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.App,
 			Data: map[string]any{"Page": page, "Title": title, "User": p.User, "Initial": initial(p.User.DisplayName, p.User.Name),
 				"Zone": h.d.Settings.Get().FamilyTimezone}})
@@ -124,13 +128,13 @@ func (h *handlers) shell(page, title string) withPrincipal {
 func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	a, err := h.d.Auth.StartApproval(r.Context(), r.UserAgent(), h.clientIP(r))
 	if err != nil {
-		status, msg := http.StatusInternalServerError, "Une erreur est survenue."
+		status, key := http.StatusInternalServerError, "error.internal"
 		if errors.Is(err, auth.ErrBusy) {
-			status, msg = http.StatusServiceUnavailable, "Trop de connexions en attente. Réessayez dans une minute."
+			status, key = http.StatusServiceUnavailable, "error.signin.busy"
 		} else {
 			h.d.Log.Error("starting an approval", "err", err)
 		}
-		h.render(w, r, status, "app/signin.html", "Se connecter", map[string]any{"Error": msg})
+		h.render(w, r, status, "app/signin.html", "app.title.signin", map[string]any{"Error": i18n.T(i18n.FromRequest(r), key)})
 		return
 	}
 	// The code rides in the fragment, which browsers never send: it stays
@@ -141,7 +145,7 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	}
 	// What is left, not when: the page counts it down on its own clock, so
 	// a phone whose clock is wrong still refreshes the code on time.
-	h.render(w, r, http.StatusOK, "app/signin.html", "Se connecter", map[string]any{"Approval": a, "QR": qr,
+	h.render(w, r, http.StatusOK, "app/signin.html", "app.title.signin", map[string]any{"Approval": a, "QR": qr,
 		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()})
 }
 
@@ -191,29 +195,29 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 // enrolPage only shows a button: a GET never burns the link, since chat
 // apps and mail scanners open links to preview them.
 func (h *handlers) enrolPage(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, http.StatusOK, "app/enrol.html", "Bienvenue", map[string]any{"Token": r.PathValue("token")})
+	h.render(w, r, http.StatusOK, "app/enrol.html", "app.title.welcome", map[string]any{"Token": r.PathValue("token")})
 }
 
 func enrolError(err error) (int, string) {
 	switch {
 	case errors.Is(err, auth.ErrUsed):
-		return http.StatusGone, "Ce lien a déjà servi."
+		return http.StatusGone, "error.enrol.used"
 	case errors.Is(err, auth.ErrExpired):
-		return http.StatusGone, "Ce lien a expiré."
+		return http.StatusGone, "error.enrol.expired"
 	case errors.Is(err, auth.ErrInvalid):
-		return http.StatusNotFound, "Ce lien n'est pas valable."
+		return http.StatusNotFound, "error.enrol.invalid"
 	}
-	return http.StatusInternalServerError, "Une erreur est survenue."
+	return http.StatusInternalServerError, "error.internal"
 }
 
 func (h *handlers) enrol(w http.ResponseWriter, r *http.Request) {
 	secret, err := h.d.Auth.RedeemForBrowser(r.Context(), r.PathValue("token"), r.UserAgent())
 	if err != nil {
-		status, msg := enrolError(err)
+		status, key := enrolError(err)
 		if status == http.StatusInternalServerError {
 			h.d.Log.Error("redeeming an enrolment", "err", err)
 		}
-		h.render(w, r, status, "app/enrol.html", "Bienvenue", map[string]any{"Error": msg})
+		h.render(w, r, status, "app/enrol.html", "app.title.welcome", map[string]any{"Error": i18n.T(i18n.FromRequest(r), key)})
 		return
 	}
 	auth.SetCookie(w, auth.SurfaceApp, secret, h.secure(), h.d.Settings.Get().SessionTTL())
@@ -229,19 +233,19 @@ func (h *handlers) signout(w http.ResponseWriter, r *http.Request) {
 func approvalError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, auth.ErrWrongNumber):
-		return http.StatusGone, "cancelled", "Mauvais nombre : la demande est annulée. L'autre appareil doit recommencer."
+		return http.StatusGone, "cancelled", "error.approval.wrongNumber"
 	case errors.Is(err, auth.ErrExpired):
-		return http.StatusGone, "expired", "Ce code a expiré. L'autre appareil doit recommencer."
+		return http.StatusGone, "expired", "error.approval.expired"
 	case errors.Is(err, auth.ErrUsed):
-		return http.StatusGone, "used", "Cette demande a déjà été approuvée."
+		return http.StatusGone, "used", "error.approval.used"
 	case errors.Is(err, auth.ErrInvalid):
-		return http.StatusNotFound, "not_found", "Ce code ne correspond à aucune demande en attente."
+		return http.StatusNotFound, "not_found", "error.approval.notFound"
 	}
-	return http.StatusInternalServerError, "error", "Une erreur est survenue."
+	return http.StatusInternalServerError, "error", "error.internal"
 }
 
 func (h *handlers) approvePage(w http.ResponseWriter, r *http.Request, _ *auth.Principal) {
-	h.render(w, r, http.StatusOK, "app/approve.html", "Approuver", map[string]any{})
+	h.render(w, r, http.StatusOK, "app/approve.html", "app.title.approve", map[string]any{})
 }
 
 // approvePost is the form flow: a code alone looks the request up and
@@ -252,30 +256,30 @@ func (h *handlers) approvePost(w http.ResponseWriter, r *http.Request, p *auth.P
 	if raw := r.PostFormValue("number"); raw != "" {
 		n, _ := strconv.Atoi(raw)
 		if err := h.d.Auth.Approve(r.Context(), p, code, n); err != nil {
-			status, _, msg := approvalError(err)
-			data["Error"] = msg
-			h.render(w, r, status, "app/approve.html", "Approuver", data)
+			status, _, key := approvalError(err)
+			data["Error"] = i18n.T(i18n.FromRequest(r), key)
+			h.render(w, r, status, "app/approve.html", "app.title.approve", data)
 			return
 		}
 		data["Done"] = true
-		h.render(w, r, http.StatusOK, "app/approve.html", "Approuver", data)
+		h.render(w, r, http.StatusOK, "app/approve.html", "app.title.approve", data)
 		return
 	}
 	view, err := h.d.Auth.LookupApproval(r.Context(), p, code)
 	if err != nil {
-		status, _, msg := approvalError(err)
-		data["Error"] = msg
-		h.render(w, r, status, "app/approve.html", "Approuver", data)
+		status, _, key := approvalError(err)
+		data["Error"] = i18n.T(i18n.FromRequest(r), key)
+		h.render(w, r, status, "app/approve.html", "app.title.approve", data)
 		return
 	}
 	data["View"] = view
-	h.render(w, r, http.StatusOK, "app/approve.html", "Approuver", data)
+	h.render(w, r, http.StatusOK, "app/approve.html", "app.title.approve", data)
 }
 
 func (h *handlers) me(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	groups, err := h.d.Directory.GroupsOf(r.Context(), p.User.ID)
 	if err != nil {
-		webx.Fail(w, http.StatusInternalServerError, "error", "")
+		webx.FailT(w, r, http.StatusInternalServerError, "error", "error.internal")
 		return
 	}
 	type group struct {
@@ -293,8 +297,8 @@ func (h *handlers) me(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 func (h *handlers) approvalView(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	view, err := h.d.Auth.LookupApproval(r.Context(), p, r.PathValue("code"))
 	if err != nil {
-		status, code, msg := approvalError(err)
-		webx.Fail(w, status, code, msg)
+		status, code, key := approvalError(err)
+		webx.FailT(w, r, status, code, key)
 		return
 	}
 	webx.JSON(w, http.StatusOK, view)
@@ -308,8 +312,8 @@ func (h *handlers) approvalPost(w http.ResponseWriter, r *http.Request, p *auth.
 		return
 	}
 	if err := h.d.Auth.Approve(r.Context(), p, r.PathValue("code"), body.Number); err != nil {
-		status, code, msg := approvalError(err)
-		webx.Fail(w, status, code, msg)
+		status, code, key := approvalError(err)
+		webx.FailT(w, r, status, code, key)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -329,18 +333,20 @@ func (h *handlers) appEnrol(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := h.d.Auth.RedeemForApp(r.Context(), body.Token, body.Model)
 	if err != nil {
-		status, msg := enrolError(err)
+		status, key := enrolError(err)
 		code := map[int]string{http.StatusGone: "used", http.StatusNotFound: "not_found"}[status]
 		if errors.Is(err, auth.ErrExpired) {
 			code = "expired"
 		}
+		var args []string
 		if errors.Is(err, auth.ErrTooMany) {
-			status, code, msg = http.StatusInsufficientStorage, "quota", err.Error()
+			e := h.explain(err)
+			status, code, key, args = e.status, e.code, e.key, e.args
 		} else if status == http.StatusInternalServerError {
 			h.d.Log.Error("enrolling the app", "err", err)
 			code = "error"
 		}
-		webx.Fail(w, status, code, msg)
+		webx.FailT(w, r, status, code, key, args...)
 		return
 	}
 	base := h.d.PublicURL()
@@ -352,7 +358,7 @@ func (h *handlers) appEnrol(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) appSession(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	secret, err := h.d.Auth.AppSession(r.Context(), p, r.UserAgent())
 	if err != nil {
-		webx.Fail(w, http.StatusForbidden, "forbidden", "only the agendouille app's credential opens a web session")
+		webx.FailT(w, r, http.StatusForbidden, "forbidden", "error.app.sessionOnly")
 		return
 	}
 	auth.SetCookie(w, auth.SurfaceApp, secret, h.secure(), h.d.Settings.Get().SessionTTL())

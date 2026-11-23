@@ -4,18 +4,28 @@ import { Countdown } from '@/shared/components/Countdown.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
-import { action, card, check, confirmDialog, dialog, field, secretField, section, styleControl, swatch, table, themeChoice } from '@/shared/components/Ui.ts';
+import {
+  action, card, check, confirmDialog, dialog, field, langChoice, secretField, section, styleControl, swatch, table, themeChoice,
+} from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
+import { t } from '@/app/pages/Manage.msg.ts';
 
 /** A page of the family web app that renders from the API into #app-content. */
 abstract class AppPage extends ApiPage {
   constructor(doc: Document, api: Api = appApi()) {
     super(doc, api, 'app-content');
   }
+
+  /** Asks first (danger style), then runs a deletion and says it is done. */
+  protected async confirmed(title: string, text: string, button: string, run: () => Promise<unknown>, done: string): Promise<void> {
+    if (!(await confirmDialog(this.doc, title, text, button, true))) return;
+    await this.act(run, done);
+  }
 }
 
-const ACCESS: Record<string, string> = { owner: 'à moi', readwrite: 'lecture et écriture', read: 'lecture seule' };
+const accessLabel = (access: string): string =>
+  access === 'owner' ? t('accessOwner') : access === 'readwrite' ? t('accessReadwrite') : access === 'read' ? t('accessRead') : access;
 const COLORS = ['#1e88e5', '#43a047', '#e53935', '#fb8c00', '#8e24aa', '#00897b', '#6d4c41', '#3949ab'];
 
 interface People {
@@ -30,13 +40,13 @@ export class CalendarsPage extends AppPage {
     const me = this.doc.querySelector<HTMLElement>('.app')?.dataset['user'] ?? '';
     const mine = cals.calendars.filter((c) => c.owner === me);
     const others = cals.calendars.filter((c) => c.owner !== me);
-    const newBtn = action('Nouveau calendrier', () => this.create(), 'filled', 'plus');
+    const newBtn = action(t('createCalendar'), () => this.create(), 'filled', 'plus');
     return [
-      card('Mes calendriers', [newBtn],
-        mine.length === 0 ? h('p', { class: ui.empty }, "Vous n'avez pas encore de calendrier.") : null,
+      card(t('myCalendars'), [newBtn],
+        mine.length === 0 ? h('p', { class: ui.empty }, t('noOwnCalendar')) : null,
         ...mine.map((c) => this.ownedCard(c, people))),
-      section('Partagés avec moi',
-        others.length === 0 ? h('p', { class: ui.empty }, 'Personne ne vous a encore partagé de calendrier.') : null,
+      section(t('sharedWithMe'),
+        others.length === 0 ? h('p', { class: ui.empty }, t('noSharedCalendar')) : null,
         ...others.map((c) => this.sharedCard(c))),
     ];
   }
@@ -45,32 +55,37 @@ export class CalendarsPage extends AppPage {
     const [kind, name] = [target.slice(0, 1), target.slice(2)];
     const list = kind === 'g' ? people.groups : people.users;
     const p = list.find((x) => x.name === name);
-    return (kind === 'g' ? 'groupe ' : '') + (p?.display_name || name);
+    const shown = p?.display_name || name;
+    return kind === 'g' ? t('groupInline', { name: shown }) : shown;
   }
 
   private ownedCard(c: Calendar, people: People): HTMLElement {
     const shares = c.shares ?? [];
     const path = `/calendars/${seg(c.ref)}`;
-    const shareRows = shares.map((s: Share) => [
-      this.nameOf(people, s.target),
-      ACCESS[s.access] ?? s.access,
-      action('Retirer', () => this.act(() => this.api.delete(`${path}/shares/${seg(s.target)}`), 'Partage retiré.'), 'text', 'close', 'sm'),
-    ]);
+    const shareRows = shares.map((s: Share) => {
+      const who = this.nameOf(people, s.target);
+      return [
+        who,
+        accessLabel(s.access),
+        action(t('removeShare'), () => this.confirmed(t('removeShareTitle', { calendar: c.name, name: who }), t('removeShareText', { name: who }),
+          t('removeShareButton'), () => this.api.delete(`${path}/shares/${seg(s.target)}`), t('shareRemoved')), 'text', 'close', 'sm'),
+      ];
+    });
     return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
       h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
         h('div', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate text-base' }, c.name),
-          h('span', { class: 'text-xs text-on-surface-variant' }, shares.length === 0 ? 'À moi, partagé avec personne' : `À moi, partagé ${shares.length === 1 ? 'une fois' : `${shares.length} fois`}`)),
-        c.hidden ? h('span', { class: ui.pill.muted }, 'masqué') : null),
+          h('span', { class: 'text-xs text-on-surface-variant' }, t('sharedCount', { count: shares.length }))),
+        c.hidden ? h('span', { class: ui.pill.muted }, t('hidden')) : null),
       c.description !== '' ? h('p', { class: 'text-sm text-on-surface-variant' }, c.description) : null,
-      shares.length > 0 ? table(['Partagé avec', 'Accès', ''], shareRows) : null,
+      shares.length > 0 ? table([t('sharedWith'), t('access'), ''], shareRows) : null,
       h('div', { class: 'flex flex-wrap items-center gap-1' },
-        action('Partager', () => this.share(c, people), 'tonal', 'share', 'sm'),
-        action('Modifier', () => this.editProps(c), 'text', 'edit', 'sm'),
-        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`${path}/export`), download: `${c.ref}.ics` }, icon('download'), 'Exporter'),
-        action('Importer', () => this.importInto(c), 'text', 'upload', 'sm'),
-        action('Donner', () => this.transfer(c, people), 'text', 'give', 'sm'),
+        action(t('share'), () => this.share(c, people), 'tonal', 'share', 'sm'),
+        action(t('edit'), () => this.editProps(c), 'text', 'edit', 'sm'),
+        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`${path}/export`), download: `${c.ref}.ics` }, icon('download'), t('export')),
+        action(t('import'), () => this.importInto(c), 'text', 'upload', 'sm'),
+        action(t('give'), () => this.transfer(c, people), 'text', 'give', 'sm'),
         h('span', { class: 'ml-auto' }),
-        action('Supprimer', () => this.remove(c), 'danger-text', 'trash', 'sm')));
+        action(t('delete'), () => this.remove(c), 'danger-text', 'trash', 'sm')));
   }
 
   private sharedCard(c: Calendar): HTMLElement {
@@ -78,13 +93,13 @@ export class CalendarsPage extends AppPage {
     return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
       h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
         h('div', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate text-base' }, c.name),
-          h('span', { class: 'text-xs text-on-surface-variant' }, `De ${c.owner}`)),
-        h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, ACCESS[c.access] ?? c.access)),
+          h('span', { class: 'text-xs text-on-surface-variant' }, t('ownerIs', { name: c.owner }))),
+        h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))),
       h('div', { class: 'flex flex-wrap items-center gap-1' },
         c.hidden
-          ? action('Ne plus masquer', () => this.act(() => this.api.patch(path, { hidden: false }), 'Il revient sur vos appareils.'), 'tonal', 'show', 'sm')
-          : action('Masquer', () => this.act(() => this.api.patch(path, { hidden: true }), 'Masqué, ici et sur vos appareils.'), 'text', 'hide', 'sm'),
-        action('Ma couleur', () => this.editProps(c), 'text', 'palette', 'sm')));
+          ? action(t('showAgain'), () => this.act(() => this.api.patch(path, { hidden: false }), t('shownAgain')), 'tonal', 'show', 'sm')
+          : action(t('hide'), () => this.act(() => this.api.patch(path, { hidden: true }), t('hiddenDone')), 'text', 'hide', 'sm'),
+        action(t('customise'), () => this.editProps(c), 'text', 'palette', 'sm')));
   }
 
   private colorPicker(current: string): HTMLInputElement {
@@ -92,12 +107,12 @@ export class CalendarsPage extends AppPage {
   }
 
   private async create(): Promise<void> {
-    const name = h('input', { required: true, placeholder: 'Ex. École de Léa' });
+    const name = h('input', { required: true, placeholder: t('namePlaceholder') });
     const color = this.colorPicker(COLORS[Math.floor(Math.random() * COLORS.length)]!);
-    const v = await dialog(this.doc, 'Nouveau calendrier', [field('Nom', name), field('Couleur', color)],
-      [{ label: 'Annuler', value: '' }, { label: 'Créer', value: 'ok', kind: 'filled' }]);
+    const v = await dialog(this.doc, t('newCalendar'), [field(t('name'), name), field(t('color'), color)],
+      [{ label: t('cancel'), value: '' }, { label: t('createCalendarButton'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok' || name.value.trim() === '') return;
-    await this.act(() => this.api.post('/calendars', { name: name.value.trim(), color: color.value }), 'Calendrier créé.');
+    await this.act(() => this.api.post('/calendars', { name: name.value.trim(), color: color.value }), t('calendarCreated'));
   }
 
   private async editProps(c: Calendar): Promise<void> {
@@ -106,55 +121,57 @@ export class CalendarsPage extends AppPage {
     const color = this.colorPicker(c.color);
     const desc = h('textarea', { rows: 2 });
     desc.value = c.description;
-    const v = await dialog(this.doc, owner ? 'Modifier le calendrier' : 'Chez moi', [
-      field(owner ? 'Nom' : 'Nom (pour moi)', name), field('Couleur', color), owner ? field('Description', desc) : null,
-    ], [{ label: 'Annuler', value: '' }, { label: 'Enregistrer', value: 'ok', kind: 'filled' }]);
+    const v = await dialog(this.doc, owner ? t('editCalendar') : t('customiseCalendar'), [
+      field(owner ? t('name') : t('nameForMe'), name), field(t('color'), color), owner ? field(t('description'), desc) : null,
+    ], [{ label: t('cancel'), value: '' }, { label: t('save'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
     const body: Record<string, string> = { name: name.value.trim(), color: color.value };
     if (owner) body['description'] = desc.value;
-    await this.act(() => this.api.patch(`/calendars/${seg(c.ref)}`, body), 'Enregistré.');
+    await this.act(() => this.api.patch(`/calendars/${seg(c.ref)}`, body), t('saved'));
   }
 
   private async share(c: Calendar, people: People): Promise<void> {
     const options = [
-      ...people.groups.map((g) => h('option', { value: `g:${g.name}` }, `Groupe ${g.display_name || g.name}`)),
+      ...people.groups.map((g) => h('option', { value: `g:${g.name}` }, t('groupOption', { name: g.display_name || g.name }))),
       ...people.users.map((u) => h('option', { value: `u:${u.name}` }, u.display_name || u.name)),
     ];
     if (options.length === 0) {
-      this.toasts.show("Il n'y a personne dans vos groupes : l'administrateur vous en ajoute.", 'error');
+      this.toasts.show(t('nobodyToShare'), 'error');
       return;
     }
     const who = h('select', {}, ...options);
-    const access = h('select', {}, h('option', { value: 'read' }, 'Lecture seule'), h('option', { value: 'readwrite' }, 'Lecture et écriture'));
-    const v = await dialog(this.doc, `Partager « ${c.name} »`, [field('Avec', who), field('Accès', access)],
-      [{ label: 'Annuler', value: '' }, { label: 'Partager', value: 'ok', kind: 'filled' }]);
+    const access = h('select', {}, h('option', { value: 'read' }, t('accessRead')), h('option', { value: 'readwrite' }, t('accessReadwrite')));
+    const v = await dialog(this.doc, t('shareTitle', { name: c.name }), [field(t('shareWith'), who), field(t('access'), access)],
+      [{ label: t('cancel'), value: '' }, { label: t('shareButton'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
-    await this.act(() => this.api.put(`/calendars/${seg(c.ref)}/shares/${seg(who.value)}`, { access: access.value }), 'Partagé.');
+    await this.act(() => this.api.put(`/calendars/${seg(c.ref)}/shares/${seg(who.value)}`, { access: access.value }), t('shared'));
   }
 
   private async transfer(c: Calendar, people: People): Promise<void> {
     if (people.users.length === 0) return;
     const who = h('select', {}, ...people.users.map((u) => h('option', { value: u.name }, u.display_name || u.name)));
-    const v = await dialog(this.doc, `Donner « ${c.name} »`, [
-      h('p', {}, "Le calendrier devient le sien ; vous le gardez en lecture et écriture. L'adresse change : vos appareils le retrouvent seuls."),
-      field('À', who),
-    ], [{ label: 'Annuler', value: '' }, { label: 'Donner', value: 'ok', kind: 'filled' }]);
+    const v = await dialog(this.doc, t('giveTitle', { name: c.name }), [
+      h('p', {}, t('giveText')),
+      field(t('giveTo'), who),
+    ], [{ label: t('cancel'), value: '' }, { label: t('giveButton'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
-    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: who.value }), 'Calendrier donné.');
+    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: who.value }), t('given'));
   }
 
   private async importInto(c: Calendar): Promise<void> {
     const file = h('input', { type: 'file', accept: '.ics,text/calendar' });
     const replace = h('input', { type: 'checkbox' });
-    const v = await dialog(this.doc, `Importer dans « ${c.name} »`, [
-      styleControl(file), check(replace, 'Remplacer les événements déjà là (même UID)'),
-    ], [{ label: 'Annuler', value: '' }, { label: 'Importer', value: 'ok', kind: 'filled' }]);
+    const v = await dialog(this.doc, t('importTitle', { name: c.name }), [
+      styleControl(file), check(replace, t('importReplace')),
+    ], [{ label: t('cancel'), value: '' }, { label: t('importButton'), value: 'ok', kind: 'filled' }]);
     const f = file.files?.[0];
     if (v !== 'ok' || f === undefined) return;
+    // Replacing overwrites events already there: ask first.
+    if (replace.checked && !(await confirmDialog(this.doc, t('importReplaceTitle', { name: c.name }), t('importReplaceText'), t('importReplaceButton'), true))) return;
     try {
       const r = await this.api.upload<{ added: number; replaced: number; skipped: number; errors: string[] }>(
         `/calendars/${seg(c.ref)}/import`, f, { replace: replace.checked ? '1' : undefined });
-      this.toasts.show(`${r.added} ajoutés, ${r.replaced} remplacés, ${r.skipped} ignorés.`);
+      this.toasts.show(t('imported', { added: r.added, replaced: r.replaced, skipped: r.skipped }));
       await this.refresh();
     } catch (e) {
       this.toasts.error(e);
@@ -162,8 +179,8 @@ export class CalendarsPage extends AppPage {
   }
 
   private async remove(c: Calendar): Promise<void> {
-    if (!(await confirmDialog(this.doc, `Supprimer « ${c.name} » ?`, 'Ses événements disparaissent pour tout le monde, sur tous les appareils.', 'Supprimer', true))) return;
-    await this.act(() => this.api.delete(`/calendars/${seg(c.ref)}`), 'Calendrier supprimé.');
+    await this.confirmed(t('deleteCalendarTitle', { name: c.name }), t('deleteCalendarText'), t('deleteCalendarButton'),
+      () => this.api.delete(`/calendars/${seg(c.ref)}`), t('calendarDeleted'));
   }
 }
 
@@ -213,7 +230,23 @@ interface Session {
   current: boolean;
 }
 
-const KINDS: Record<string, string> = { davx5: 'DAVx5 (Android)', ios: 'iPhone, iPad, Mac', thunderbird: 'Thunderbird', other: 'Autre', app: "L'app agendouille" };
+/** A kind of device, as the person reads it (product names stay as they are). */
+function kindLabel(kind: string): string {
+  switch (kind) {
+    case 'davx5':
+      return 'DAVx5 (Android)';
+    case 'ios':
+      return 'iPhone, iPad, Mac';
+    case 'thunderbird':
+      return 'Thunderbird';
+    case 'other':
+      return t('kindOther');
+    case 'app':
+      return t('kindApp');
+    default:
+      return kind;
+  }
+}
 
 /** Appareils (PLAN.md 9.3, 8.4): phones and computers that sync, links, browsers. */
 export class DevicesPage extends AppPage {
@@ -225,46 +258,45 @@ export class DevicesPage extends AppPage {
     const name = (ref: string): string => cals.calendars.find((c) => c.ref === ref)?.name ?? ref;
     const mode: DavAuth = devices.dav_auth ?? 'password';
     return [
-      section('Synchroniser un appareil',
-        h('p', { class: 'text-sm text-on-surface-variant' }, mode === 'password'
-          ? 'Chaque appareil a son propre mot de passe, que vous pouvez retirer seul.'
-          : mode === 'both' ? 'Chaque appareil a son mot de passe et son certificat : il lui faut les deux pour synchroniser.'
-            : 'Chaque appareil se connecte avec son certificat, sans mot de passe.'),
+      section(t('syncDevice'),
+        h('p', { class: 'text-sm text-on-surface-variant' }, mode === 'password' ? t('modePassword') : mode === 'both' ? t('modeBoth') : t('modeKeys')),
         h('div', { class: 'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap' },
           action('Android (DAVx5)', () => this.add('davx5', mode), 'filled', 'phone'),
-          action('iPhone, iPad, Mac', () => this.add('ios', mode), 'tonal', 'phone'),
-          action('Thunderbird', () => this.add('thunderbird', mode), 'tonal', 'laptop'),
-          action('Autre', () => this.add('other', mode), 'outlined', 'devices')),
+          action(kindLabel('ios'), () => this.add('ios', mode), 'tonal', 'phone'),
+          action(kindLabel('thunderbird'), () => this.add('thunderbird', mode), 'tonal', 'laptop'),
+          action(kindLabel('other'), () => this.add('other', mode), 'outlined', 'devices')),
         mode !== 'password' && devices.devices.some((d) => !d.has_certificate)
-          ? h('p', { class: ui.notice }, icon('warn'), 'Un appareil sans certificat ne synchronise plus : touchez « Certificat » sur sa ligne pour lui en donner un.')
+          ? h('p', { class: ui.notice }, icon('warn'), t('noCertificateNotice'))
           : null,
-        table(['Appareil', 'Accès', 'Dernière synchro', ''], devices.devices.map((d) => [
-          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' }, KINDS[d.kind] ?? d.kind,
-            mode !== 'password' ? (d.has_certificate ? ' · certificat' : ' · sans certificat') : '')),
-          d.cap === 'read' ? 'lecture seule' : 'lecture et écriture',
-          d.last_used_at ? ago(d.last_used_at) : 'jamais',
+        table([t('device'), t('access'), t('lastSync'), ''], devices.devices.map((d) => [
+          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' },
+            mode === 'password' ? kindLabel(d.kind)
+              : d.has_certificate ? t('kindWithCertificate', { kind: kindLabel(d.kind) }) : t('kindWithoutCertificate', { kind: kindLabel(d.kind) }))),
+          d.cap === 'read' ? t('accessRead') : t('accessReadwrite'),
+          ago(d.last_used_at),
           h('span', { class: 'flex flex-wrap justify-end gap-1' },
-            mode !== 'password' ? action('Certificat', () => this.newCertificate(d), d.has_certificate ? 'text' : 'tonal', 'lock', 'sm') : null,
-            action('Retirer', () => this.revoke(`/devices/${d.id}`, `Retirer « ${d.label} » ?`, 'Il ne pourra plus synchroniser.'), 'danger-text', 'trash', 'sm')),
-        ]), "Aucun appareil pour l'instant.")),
-      card("Liens d'abonnement", [action('Nouveau lien', () => this.addLink(cals.calendars), 'tonal', 'link', 'sm')],
-        h('p', { class: 'text-sm text-on-surface-variant' }, 'Une adresse .ics en lecture seule, pour une télé ou un agenda qui ne sait pas CalDAV. Qui a le lien voit les calendriers choisis.'),
-        table(['Lien', 'Calendriers', 'Dernière lecture', ''], links.links.map((l) => [
-          l.label, l.calendars.map(name).join(', '), l.last_used_at ? ago(l.last_used_at) : 'jamais',
-          action('Retirer', () => this.revoke(`/links/${l.id}`, `Retirer le lien « ${l.label} » ?`, "L'adresse cesse de marcher."), 'danger-text', 'trash', 'sm'),
-        ]), 'Aucun lien.')),
-      section('Navigateurs connectés',
-        table(['Navigateur', 'Vu', ''], sessions.sessions.map((s) => [
-          h('span', {}, s.app ? "L'app agendouille" : browserName(s.user_agent), s.current ? h('span', { class: `${ui.pill.ok} ml-2` }, 'celui-ci') : null),
-          ago(s.seen_at),
-          s.current ? null : action('Déconnecter', () => this.revoke(`/sessions/${s.id}`, 'Déconnecter ce navigateur ?', 'Il faudra le reconnecter.'), 'danger-text', 'logout', 'sm'),
-        ]))),
+            mode !== 'password' ? action(t('certificate'), () => this.newCertificate(d), d.has_certificate ? 'text' : 'tonal', 'lock', 'sm') : null,
+            action(t('removeDevice'), () => this.confirmed(t('removeDeviceTitle', { name: d.label }), t('removeDeviceText'), t('removeDeviceButton'),
+              () => this.api.delete(`/devices/${d.id}`), t('deviceRemoved')), 'danger-text', 'trash', 'sm')),
+        ]), t('noDevice'))),
+      card(t('subscriptionLinks'), [action(t('createLink'), () => this.addLink(cals.calendars), 'tonal', 'link', 'sm')],
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('linksIntro')),
+        table([t('link'), t('calendars'), t('lastRead'), ''], links.links.map((l) => [
+          l.label, l.calendars.map(name).join(', '), ago(l.last_used_at),
+          action(t('removeLink'), () => this.confirmed(t('removeLinkTitle', { name: l.label }), t('removeLinkText'), t('removeLinkButton'),
+            () => this.api.delete(`/links/${l.id}`), t('linkRemoved')), 'danger-text', 'trash', 'sm'),
+        ]), t('noLink'))),
+      section(t('browsers'),
+        table([t('browser'), t('lastSeen'), ''], sessions.sessions.map((s) => {
+          const label = s.app ? t('kindApp') : browserName(s.user_agent);
+          return [
+            h('span', {}, label, s.current ? h('span', { class: `${ui.pill.ok} ml-2` }, t('thisBrowser')) : null),
+            ago(s.seen_at),
+            s.current ? null : action(t('signOutBrowser'), () => this.confirmed(t('signOutBrowserTitle', { name: label }), t('signOutBrowserText'),
+              t('signOutBrowserButton'), () => this.api.delete(`/sessions/${s.id}`), t('browserSignedOut')), 'danger-text', 'logout', 'sm'),
+          ];
+        }))),
     ];
-  }
-
-  private async revoke(path: string, title: string, text: string): Promise<void> {
-    if (!(await confirmDialog(this.doc, title, text, 'Retirer', true))) return;
-    await this.act(() => this.api.delete(path), 'Retiré.');
   }
 
   /**
@@ -274,29 +306,28 @@ export class DevicesPage extends AppPage {
   private certificateBlock(c: CertificateHandover, server: string): Child[] {
     if (c.certificate_url === undefined) return [];
     return [
-      h('h3', { class: 'text-base font-semibold text-on-surface' }, 'Son certificat'),
-      h('p', { class: 'flex justify-center' }, h('a', { class: ui.btn('filled'), href: c.certificate_url, download: 'agendouille-appareil.p12' }, icon('download'), 'Télécharger le certificat (.p12)')),
-      h('p', { class: 'text-sm' }, 'Mot de passe du certificat, demandé à son installation :'),
-      secretField(c.certificate_password ?? '', 'Mot de passe du certificat'),
+      h('h3', { class: 'text-base font-semibold text-on-surface' }, t('certificateHeading')),
+      h('p', { class: 'flex justify-center' }, h('a', { class: ui.btn('filled'), href: c.certificate_url, download: 'agendouille-appareil.p12' }, icon('download'), t('downloadCertificate'))),
+      h('p', { class: 'text-sm' }, t('certificatePasswordIntro')),
+      secretField(c.certificate_password ?? '', t('certificatePassword')),
       h('ol', { class: 'm-0 list-decimal space-y-1 pl-5 text-sm' },
-        h('li', {}, 'Ouvrez ce fichier sur le téléphone (le lien ne marche qu’une fois, dix minutes), ou dans Réglages, Sécurité, Chiffrement et identifiants, Installer un certificat, « Certificat utilisateur d’appli et de VPN ».'),
-        h('li', {}, 'Donnez-lui le mot de passe ci-dessus.'),
-        h('li', {}, c.dav_auth === 'keys'
-          ? `Dans DAVx5 : ajouter un compte, « Se connecter avec une URL et un certificat client », l’adresse ${server}, puis choisissez ce certificat.`
-          : `Dans DAVx5 : ajouter un compte avec l’adresse, l’utilisateur et le mot de passe, et choisissez ce certificat comme certificat client.`)),
+        h('li', {}, t('certificateStep1')),
+        h('li', {}, t('certificateStep2')),
+        h('li', {}, c.dav_auth === 'keys' ? t('certificateStep3Keys', { server }) : t('certificateStep3Both'))),
     ];
   }
 
   private async newCertificate(d: Device): Promise<void> {
-    const ok = await confirmDialog(this.doc, `Nouveau certificat pour « ${d.label} » ?`,
-      d.has_certificate ? 'Le certificat qu’il a cessera de marcher : il faudra installer le nouveau.' : 'Il en a besoin pour synchroniser.', 'Créer', false);
+    // A new certificate ends the one the device has: danger style then.
+    const ok = await confirmDialog(this.doc, t('newCertificateTitle', { name: d.label }),
+      d.has_certificate ? t('newCertificateReplaces') : t('newCertificateNeeded'), t('newCertificateButton'), d.has_certificate === true);
     if (!ok) return;
     try {
       const c = await this.api.post<CertificateHandover>(`/devices/${d.id}/certificate`);
       const server = `${this.doc.location.origin}/dav/`;
-      await dialog(this.doc, `Certificat de « ${d.label} »`, [...this.certificateBlock(c, server),
-        h('p', { class: ui.notice }, icon('warn'), 'Ce certificat ne sera plus proposé : en cas de perte, créez-en un autre.')],
-      [{ label: "C'est fait", value: 'ok', kind: 'filled' }]);
+      await dialog(this.doc, t('certificateOf', { name: d.label }), [...this.certificateBlock(c, server),
+        h('p', { class: ui.notice }, icon('warn'), t('certificateOnce'))],
+      [{ label: t('done'), value: 'ok', kind: 'filled' }]);
       await this.refresh();
     } catch (e) {
       this.toasts.error(e);
@@ -304,10 +335,10 @@ export class DevicesPage extends AppPage {
   }
 
   private async add(kind: string, mode: DavAuth = 'password'): Promise<void> {
-    const label = h('input', { required: true, value: kind === 'ios' ? 'iPhone' : kind === 'davx5' ? 'Téléphone' : 'Ordinateur' });
-    const cap = h('select', {}, h('option', { value: 'readwrite' }, 'Lecture et écriture'), h('option', { value: 'read' }, 'Lecture seule'));
-    const v = await dialog(this.doc, `Ajouter : ${KINDS[kind] ?? kind}`, [field('Nom', label), field('Accès', cap)],
-      [{ label: 'Annuler', value: '' }, { label: 'Ajouter', value: 'ok', kind: 'filled' }]);
+    const label = h('input', { required: true, value: kind === 'ios' ? 'iPhone' : kind === 'davx5' ? t('defaultPhone') : t('defaultComputer') });
+    const cap = h('select', {}, h('option', { value: 'readwrite' }, t('accessReadwrite')), h('option', { value: 'read' }, t('accessRead')));
+    const v = await dialog(this.doc, t('addDeviceTitle', { kind: kindLabel(kind) }), [field(t('name'), label), field(t('access'), cap)],
+      [{ label: t('cancel'), value: '' }, { label: t('addDeviceButton'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
     let d: NewDevice;
     try {
@@ -317,44 +348,43 @@ export class DevicesPage extends AppPage {
       return;
     }
     const manual = h('dl', { class: ui.kv },
-      h('dt', {}, 'Serveur'), h('dd', {}, h('code', {}, d.manual.server)),
-      h('dt', {}, 'Utilisateur'), h('dd', {}, h('code', {}, d.username)),
-      h('dt', {}, 'Mot de passe'), h('dd', {}, secretField(d.secret, 'Mot de passe de l’appareil')));
+      h('dt', {}, t('server')), h('dd', {}, h('code', {}, d.manual.server)),
+      h('dt', {}, t('username')), h('dd', {}, h('code', {}, d.username)),
+      h('dt', {}, t('password')), h('dd', {}, secretField(d.secret, t('devicePassword'))));
     const body: Child[] = [];
     const keysOnly = (d.dav_auth ?? mode) === 'keys';
     if (d.davx5_uri !== undefined && !keysOnly) {
-      body.push(h('p', {}, 'Sur le téléphone, installez DAVx5, puis scannez ce code avec l’appareil photo, ou touchez le lien depuis le téléphone.'));
-      if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(d.qr_svg), alt: 'QR code pour DAVx5', width: 240, height: 240 }));
-      body.push(h('p', { class: 'flex justify-center' }, h('a', { href: d.davx5_uri, class: ui.btn('tonal') }, icon('phone'), 'Ouvrir dans DAVx5')));
+      body.push(h('p', {}, t('davx5Intro')));
+      if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(d.qr_svg), alt: t('davx5QrAlt'), width: 240, height: 240 }));
+      body.push(h('p', { class: 'flex justify-center' }, h('a', { href: d.davx5_uri, class: ui.btn('tonal') }, icon('phone'), t('openInDavx5'))));
     }
     if (d.mobileconfig_url !== undefined) {
-      body.push(h('p', {}, 'Ouvrez cette page sur l’iPhone, touchez le bouton, puis Réglages, Profil téléchargé, Installer. Le lien ne marche qu’une fois, dix minutes.'),
-        h('p', {}, h('a', { class: ui.btn('filled'), href: d.mobileconfig_url }, 'Installer le profil')));
+      body.push(h('p', {}, t('iosIntro')),
+        h('p', {}, h('a', { class: ui.btn('filled'), href: d.mobileconfig_url }, t('installProfile'))));
     }
     if (keysOnly) {
       body.push(...this.certificateBlock(d, d.manual.server),
-        h('p', { class: 'text-sm' }, 'Adresse du serveur : ', h('code', {}, d.manual.server)));
+        h('p', { class: 'text-sm' }, t('serverAddress'), ' ', h('code', {}, d.manual.server)));
     } else {
-      body.push(h('p', { class: 'text-sm' }, 'Ou à la main, dans un compte CalDAV :'), manual, ...this.certificateBlock(d, d.manual.server));
+      body.push(h('p', { class: 'text-sm' }, t('byHand')), manual, ...this.certificateBlock(d, d.manual.server));
     }
-    body.push(h('p', { class: ui.notice }, icon('warn'), keysOnly ? 'Le certificat ne sera plus proposé. Retirez l’appareil pour en refaire un.'
-      : 'Le mot de passe ne sera plus affiché. Retirez l’appareil pour en refaire un.'));
-    await dialog(this.doc, `« ${d.label} » ajouté`, body, [{ label: "C'est fait", value: 'ok', kind: 'filled' }]);
+    body.push(h('p', { class: ui.notice }, icon('warn'), keysOnly ? t('certificateOnceRemove') : t('passwordOnceRemove')));
+    await dialog(this.doc, t('deviceAdded', { name: d.label }), body, [{ label: t('done'), value: 'ok', kind: 'filled' }]);
     await this.refresh();
   }
 
   private async addLink(cals: Calendar[]): Promise<void> {
-    const label = h('input', { required: true, value: 'Télé du salon' });
+    const label = h('input', { required: true, value: t('defaultLinkName') });
     const boxes = cals.map((c) => ({ c, box: h('input', { type: 'checkbox', checked: c.shown }) }));
-    const v = await dialog(this.doc, "Nouveau lien d'abonnement", [field('Nom', label),
+    const v = await dialog(this.doc, t('newLinkTitle'), [field(t('name'), label),
       h('div', { class: 'flex flex-col gap-3' }, ...boxes.map(({ c, box }) => check(box, swatch(c.color), h('span', { class: 'text-on-surface' }, c.name))))],
-    [{ label: 'Annuler', value: '' }, { label: 'Créer', value: 'ok', kind: 'filled' }]);
+    [{ label: t('cancel'), value: '' }, { label: t('createLinkButton'), value: 'ok', kind: 'filled' }]);
     const chosen = boxes.filter((b) => b.box.checked).map((b) => b.c.ref);
     if (v !== 'ok' || chosen.length === 0) return;
     try {
       const l = await this.api.post<Link>('/links', { label: label.value.trim(), calendars: chosen });
-      await dialog(this.doc, 'Lien créé', [h('p', {}, "Copiez l'adresse maintenant : elle ne sera plus affichée."), secretField(l.url ?? '', 'Adresse du lien')],
-        [{ label: "C'est copié", value: 'ok', kind: 'filled' }]);
+      await dialog(this.doc, t('linkCreated'), [h('p', {}, t('copyNow')), secretField(l.url ?? '', t('linkAddress'))],
+        [{ label: t('done'), value: 'ok', kind: 'filled' }]);
       await this.refresh();
     } catch (e) {
       this.toasts.error(e);
@@ -365,7 +395,7 @@ export class DevicesPage extends AppPage {
 /** A browser's name from its user agent, roughly. */
 export function browserName(ua: string): string {
   const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
-  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navigateur';
+  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : t('browser');
   return os === '' ? b : `${b}, ${os}`;
 }
 
@@ -375,24 +405,27 @@ export class MePage extends AppPage {
     const me = await this.api.get<Me>('/me');
     const name = h('input', { value: me.display_name, required: true });
     const color = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(me.color) ? me.color : '#1e88e5' });
+    const language = langChoice(this.doc);
+    language.classList.add('self-start'); // as wide as its choices, not the field
     return [
-      section('Moi',
-        field('Nom affiché', name), field('Couleur', color),
-        h('div', { class: 'flex justify-end' }, action('Enregistrer', () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), 'Enregistré.'), 'filled'))),
-      section('Apparence',
-        h('p', { class: 'text-sm text-on-surface-variant' }, 'Automatique suit le réglage de l’appareil. Avec Dark Reader, choisissez « Sombre » : agendouille a son propre thème sombre.'),
-        h('div', {}, themeChoice(this.doc))),
-      section('Mes groupes',
-        me.groups.length === 0 ? h('p', { class: ui.empty }, "Aucun groupe : l'administrateur vous en ajoute.")
+      section(t('profile'),
+        field(t('displayName'), name), field(t('color'), color),
+        h('div', { class: 'flex justify-end' }, action(t('save'), () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), t('saved')), 'filled'))),
+      section(t('appearance'),
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')),
+        h('div', {}, themeChoice(this.doc)),
+        field(t('language'), language)),
+      section(t('myGroups'),
+        me.groups.length === 0 ? h('p', { class: ui.empty }, t('noGroup'))
           : h('div', { class: 'flex flex-wrap gap-2' }, ...me.groups.map((g) => h('span', { class: ui.chip }, icon('group'), g.display_name || g.name))),
-        h('p', { class: 'text-sm text-on-surface-variant' }, 'Vous voyez les gens de vos groupes, et pouvez partager vos calendriers avec eux.')),
-      section('Connecter un autre téléphone',
-        h('p', {}, "Un code valable dix minutes, à scanner avec l'appareil photo du nouveau téléphone."),
-        h('div', {}, action('Afficher le code', () => this.enrol(), 'tonal', 'qr'))),
-      section('Ce navigateur',
-        h('p', { class: 'text-sm text-on-surface-variant' }, "Se déconnecter ici ne touche pas aux téléphones qui synchronisent avec leur propre mot de passe (Appareils)."),
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('groupsHint'))),
+      section(t('otherPhone'),
+        h('p', {}, t('otherPhoneIntro')),
+        h('div', {}, action(t('showCode'), () => this.enrol(), 'tonal', 'qr'))),
+      section(t('thisBrowser'),
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('signOutHint')),
         h('form', { method: 'post', action: '/signout' },
-          h('button', { type: 'submit', class: ui.btn('danger-text') }, icon('logout'), 'Se déconnecter'))),
+          h('button', { type: 'submit', class: ui.btn('danger-text') }, icon('logout'), t('signOut')))),
     ];
   }
 
@@ -402,7 +435,7 @@ export class MePage extends AppPage {
    * dialog stays open.
    */
   private async enrol(): Promise<void> {
-    const img = h('img', { class: 'qr mx-auto rounded-md3-l p-2', alt: 'QR code de connexion', width: 240, height: 240 });
+    const img = h('img', { class: 'qr mx-auto rounded-md3-l p-2', alt: t('signinQrAlt'), width: 240, height: 240 });
     const timer = h('div', {});
     let countdown: Countdown | null = null;
     let open = true;
@@ -420,11 +453,11 @@ export class MePage extends AppPage {
       this.toasts.error(e);
       return;
     }
-    await dialog(this.doc, 'Scannez avec le nouveau téléphone', [
+    await dialog(this.doc, t('signinCode'), [
       img,
       timer,
-      h('p', { class: 'text-center text-sm' }, "Avec l'appareil photo du nouveau téléphone. Chaque code ne sert qu'une fois."),
-    ], [{ label: 'Fermer', value: '', kind: 'filled' }]);
+      h('p', { class: 'text-center text-sm' }, t('signinCodeHint')),
+    ], [{ label: t('close'), value: '', kind: 'filled' }]);
     open = false;
     (countdown as Countdown | null)?.dispose();
   }

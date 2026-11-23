@@ -2,16 +2,17 @@ import { ApiError, seg, type Api } from '@/shared/core/Api.ts';
 import { h } from '@/shared/core/Dom.ts';
 import { DisposableBag } from '@/shared/core/Disposable.ts';
 import type { Page } from '@/shared/core/Pages.ts';
-import { Toasts, check, confirmDialog, dialog, iconButton, swatch } from '@/shared/components/Ui.ts';
+import { Toasts, check, dialog, iconButton, swatch } from '@/shared/components/Ui.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import {
   addDays, addMinutes, addMonths, formatDate, formatLocal, labelDay, labelMonth, nowIn, parseLocal, startOfMonth, startOfWeek, toNaive, day,
   type Wall,
 } from '@/shared/core/Dates.ts';
-import { appApi, canWrite, type Calendar, type Calendars, type EventView, type Occurrence } from '@/app/api.ts';
+import { appApi, canWrite, type Calendar, type Calendars, type EventView, type Occurrence, type Scope } from '@/app/api.ts';
 import { agenda, month, week, type ViewContext } from '@/app/components/views.ts';
-import { askScope, editEvent, showEvent } from '@/app/components/Editor.ts';
+import { askScope, confirmDelete, editEvent, showEvent } from '@/app/components/Editor.ts';
+import { t } from '@/app/pages/CalendarPage.msg.ts';
 
 type View = 'agenda' | 'week' | 'month';
 
@@ -66,8 +67,8 @@ export class CalendarPage implements Page {
       b.addEventListener('click', run);
       return b;
     };
-    const seg_ = h('div', { class: ui.seg, role: 'group', 'aria-label': 'Vue' });
-    for (const [v, l] of [['agenda', 'Agenda'], ['week', 'Semaine'], ['month', 'Mois']] as const) {
+    const seg_ = h('div', { class: ui.seg, role: 'group', 'aria-label': t('view') });
+    for (const [v, l] of [['agenda', t('agenda')], ['week', t('week')], ['month', t('month')]] as const) {
       const b = btn(l, () => {
         this.view = v;
         try {
@@ -80,19 +81,19 @@ export class CalendarPage implements Page {
       b.dataset['view'] = v;
       seg_.append(b);
     }
-    const fab = h('button', { class: ui.fab, type: 'button' }, icon('plus'), 'Événement');
+    const fab = h('button', { class: ui.fab, type: 'button' }, icon('plus'), t('newEvent'));
     fab.addEventListener('click', () => void this.create(this.anchorStart(), false));
     return h('div', { class: 'cal-toolbar mb-3 flex flex-wrap items-center gap-x-2 gap-y-3' },
-      btn("Aujourd'hui", () => {
+      btn(t('today'), () => {
         this.anchor = day(nowIn(this.zone));
         void this.load();
       }, ui.btn('outlined', 'sm')),
-      iconButton('left', 'Précédent', () => this.step(-1)),
-      iconButton('right', 'Suivant', () => this.step(1)),
+      iconButton('left', t('previous'), () => this.step(-1)),
+      iconButton('right', t('next'), () => this.step(1)),
       this.title,
       h('div', { class: 'flex w-full items-center gap-2 sm:w-auto' },
         seg_,
-        iconButton('calendars', 'Calendriers affichés', () => void this.pickCalendars()),
+        iconButton('calendars', t('shownCalendars'), () => void this.pickCalendars()),
         h('span', { class: 'ml-auto' }),
         fab),
     );
@@ -129,7 +130,7 @@ export class CalendarPage implements Page {
     const { from, days, first } = this.range();
     for (const b of this.root.querySelectorAll<HTMLElement>('.seg')) b.setAttribute('aria-pressed', String(b.dataset['view'] === this.view));
     this.title.textContent = this.view === 'month' ? labelMonth(first) : this.view === 'week'
-      ? `Semaine du ${labelDay(from)}` : `À partir du ${labelDay(from)}`;
+      ? t('weekOf', { day: labelDay(from) }) : t('from', { day: labelDay(from) });
     try {
       const [cals, occ] = await Promise.all([
         this.api.get<Calendars>('/calendars'),
@@ -148,7 +149,7 @@ export class CalendarPage implements Page {
       else content = agenda(occ.occurrences, from, days, ctx);
       const notes: HTMLElement[] = [];
       if (this.calendars.length === 0) {
-        notes.push(h('p', { class: ui.info }, icon('info'), h('span', {}, "Vous n'avez pas encore de calendrier. ", h('a', { href: '/calendars', class: ui.link }, 'En créer un'))));
+        notes.push(h('p', { class: ui.info }, icon('info'), h('span', {}, t('noCalendar'), ' ', h('a', { href: '/calendars', class: ui.link }, t('createOne')))));
       }
       this.body.replaceChildren(...notes, content);
     } catch (e) {
@@ -172,11 +173,11 @@ export class CalendarPage implements Page {
 
   private async pickCalendars(): Promise<void> {
     const boxes = this.calendars.filter((c) => !c.hidden).map((c) => ({ c, box: h('input', { type: 'checkbox', checked: c.shown }) }));
-    const v = await dialog(this.doc, 'Calendriers affichés', [
+    const v = await dialog(this.doc, t('shownCalendars'), [
       h('div', { class: 'flex flex-col gap-3' }, ...boxes.map(({ c, box }) => check(box, swatch(c.color), h('span', { class: 'text-on-surface' }, c.name),
         c.access !== 'owner' ? h('span', { class: 'text-xs text-on-surface-variant' }, c.owner) : null,
-        canWrite(c) ? null : h('span', { class: ui.pill.muted }, 'lecture')))),
-    ], [{ label: 'Annuler', value: '' }, { label: 'Afficher', value: 'ok', kind: 'filled' }]);
+        canWrite(c) ? null : h('span', { class: ui.pill.muted }, t('readOnly'))))),
+    ], [{ label: t('cancel'), value: '' }, { label: t('show'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
     for (const { c, box } of boxes) {
       if (box.checked !== c.shown) {
@@ -193,7 +194,7 @@ export class CalendarPage implements Page {
   private async create(start: Wall, allDay: boolean): Promise<void> {
     const target = this.calendars.find((c) => canWrite(c) && c.shown) ?? this.calendars.find(canWrite);
     if (target === undefined) {
-      this.toasts.show('Créez d’abord un calendrier (page Calendriers).');
+      this.toasts.show(t('noWritable'));
       return;
     }
     const res = await editEvent(this.doc, this.calendars, {
@@ -203,7 +204,7 @@ export class CalendarPage implements Page {
     if (res === null) return;
     try {
       await this.api.post(`/calendars/${seg(res.calendar)}/events`, res.input);
-      this.toasts.show('Événement ajouté.');
+      this.toasts.show(t('added'));
       await this.load();
     } catch (e) {
       this.toasts.error(e);
@@ -260,7 +261,7 @@ export class CalendarPage implements Page {
         ev = await this.api.get<EventView>(this.path(o));
       }
       await this.api.put(`${this.path(o)}`, input, ev.etag, { scope, occurrence });
-      this.toasts.show('Enregistré.');
+      this.toasts.show(t('saved'));
     } catch (e) {
       this.changedMeanwhile(e);
     }
@@ -269,27 +270,29 @@ export class CalendarPage implements Page {
 
   private changedMeanwhile(e: unknown): void {
     if (e instanceof ApiError && e.code === 'precondition_failed') {
-      const by = typeof e.body['by'] === 'string' && e.body['by'] !== '' ? ` par ${e.body['by']}` : '';
-      this.toasts.show(`Modifié entre-temps${by} : rouvrez-le pour voir la nouvelle version.`, 'error');
+      const by = e.body['by'];
+      this.toasts.show(typeof by === 'string' && by !== '' ? t('changedBy', { name: by }) : t('changed'), 'error');
       return;
     }
     this.toasts.error(e);
   }
 
-  private async remove(o: Occurrence, ev: EventView): Promise<void> {
-    let scope = 'all';
+  /** Deletes an event, or the occurrences chosen, once confirmed. */
+  async remove(o: Occurrence, ev: EventView): Promise<void> {
+    let scope: Scope = 'all';
     let occurrence = '';
     if (o.recurring && o.recurrence_id !== null) {
       const s = await askScope(this.doc, 'delete');
       if (s === null) return;
+      if (!(await confirmDelete(this.doc, o.summary, s))) return;
       scope = s;
       occurrence = o.recurrence_id;
-    } else if (!(await confirmDialog(this.doc, `Supprimer « ${o.summary} » ?`, 'Il disparaît pour tous ceux qui voient ce calendrier.', 'Supprimer', true))) {
+    } else if (!(await confirmDelete(this.doc, o.summary, null))) {
       return;
     }
     try {
       await this.api.deleteIf(this.path(o), ev.etag, { scope, occurrence });
-      this.toasts.show('Supprimé.');
+      this.toasts.show(scope === 'this' ? t('deletedThis') : scope === 'following' ? t('deletedFollowing') : t('deleted'));
     } catch (e) {
       this.changedMeanwhile(e);
     }

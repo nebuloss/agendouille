@@ -9,6 +9,9 @@ const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', ar
 const errors = [];
 for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 390, height: 844, isMobile: true }]]) {
   const page = await browser.newPage();
+// The pages follow Accept-Language; the shots are of the French UI unless
+// SHOTS_LANG says otherwise (the English pass in run.sh).
+await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'fr' });
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${label} console: ${m.text()}`); });
   page.on('pageerror', (e) => errors.push(`${label} page: ${e.message}`));
   await page.setViewport(viewport);

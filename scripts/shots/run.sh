@@ -72,4 +72,7 @@ node scripts/shots/shoot-app.mjs "$enrol2" "$out" certs
 # The calendar's hover states and the event editor, light and dark.
 enrol3=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
 node scripts/shots/shoot-editor.mjs "$enrol3" "$out"
+# The English pass, both UIs.
+enrol4=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
+node scripts/shots/shoot-en.mjs "$enrol4" "$out" "$jar"
 ls "$out"

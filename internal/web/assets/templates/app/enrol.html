@@ -3,15 +3,15 @@
   <div class="flex items-center gap-3">
     <img src="/static/shared/icon.svg" alt="" width="44" height="44" class="rounded-md3-m">
     <div><p class="text-xs font-semibold tracking-wider text-on-surface-variant uppercase">agendouille</p>
-    <h1 class="text-2xl font-normal">Bienvenue</h1></div>
+    <h1 class="text-2xl font-normal">{{t "app.enrol.title"}}</h1></div>
   </div>
   {{if .Error}}
   <p role="alert" class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">{{.Error}}</p>
-  <p class="text-on-surface-variant">Demandez un nouveau lien à la personne qui gère agendouille.</p>
+  <p class="text-on-surface-variant">{{t "app.enrol.askNew"}}</p>
   {{else}}
-  <p class="text-on-surface-variant">Ce lien connecte cet appareil aux calendriers de la famille. Il ne marche qu'une fois.</p>
+  <p class="text-on-surface-variant">{{t "app.enrol.intro"}}</p>
   <form method="post" action="/enrol/{{.Token}}" class="flex justify-end">
-    <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-6 text-sm font-medium text-on-primary">Continuer</button>
+    <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-6 text-sm font-medium text-on-primary">{{t "app.enrol.continue"}}</button>
   </form>
   {{end}}
 </div>

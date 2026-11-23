@@ -57,11 +57,22 @@ describe('Recurrence', () => {
   });
 
   it('says them in words', () => {
-    expect(words('FREQ=WEEKLY;BYDAY=WE;UNTIL=20270630T215959Z')).toBe("Chaque semaine le mercredi, jusqu'au 30 juin 2027");
+    expect(words('FREQ=WEEKLY;BYDAY=WE;UNTIL=20270630T215959Z')).toBe('Chaque semaine le mercredi, jusqu’au 30 juin 2027');
     expect(words('FREQ=WEEKLY;BYDAY=TU,TH')).toBe('Chaque semaine les mardi et jeudi');
     expect(words('FREQ=DAILY;INTERVAL=2;COUNT=5')).toBe('Tous les 2 jours, 5 fois');
     expect(words('FREQ=YEARLY')).toBe('Chaque année');
     expect(words(null)).toBe('Ne se répète pas');
     expect(words('FREQ=MONTHLY;BYDAY=-1FR')).toBe('Se répète (règle avancée)');
+    expect(words('FREQ=MONTHLY;COUNT=1')).toBe('Chaque mois, une fois');
+  });
+
+  it('says them in English too', () => {
+    document.documentElement.lang = 'en';
+    try {
+      expect(words('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR;COUNT=8')).toBe('Every 2 weeks on Monday, Wednesday and Friday, 8 times');
+      expect(words('FREQ=DAILY')).toBe('Every day');
+    } finally {
+      document.documentElement.lang = '';
+    }
   });
 });

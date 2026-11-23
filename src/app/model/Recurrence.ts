@@ -1,4 +1,6 @@
 import { labelDate, parseLocal, weekday, type Wall } from '@/shared/core/Dates.ts';
+import { locale } from '@/shared/i18n/i18n.ts';
+import { t } from '@/app/model/Recurrence.msg.ts';
 
 /**
  * The editor's repeat fields <-> an RRULE value (PLAN.md 9.4): none, daily,
@@ -20,7 +22,15 @@ export interface Repeat {
 }
 
 export const DAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
-const DAY_NAMES: Record<string, string> = { MO: 'lundi', TU: 'mardi', WE: 'mercredi', TH: 'jeudi', FR: 'vendredi', SA: 'samedi', SU: 'dimanche' };
+
+/** A weekday code's name in the page's language: "mercredi", "Wednesday"; "M", "W" when narrow. */
+export function dayName(code: string, width: 'long' | 'narrow' = 'long'): string {
+  const i = (DAYS as readonly string[]).indexOf(code);
+  if (i < 0) return code;
+  // 23 November 2026 is a Monday.
+  return new Intl.DateTimeFormat(locale(), { weekday: width, timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 23 + i)));
+}
+
 const FREQS: Record<string, Freq> = { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly', YEARLY: 'yearly' };
 
 export function none(): Repeat {
@@ -77,33 +87,30 @@ export function dayOf(w: Wall): string {
   return DAYS[weekday(w)]!;
 }
 
-/** A rule in words: "Chaque semaine le mercredi, jusqu'au 30 juin 2027". */
+/** A rule in words: "Chaque semaine le mercredi, jusqu’au 30 juin 2027". */
 export function describe(rule: string | null | undefined): string {
-  if (rule === null || rule === undefined || rule === '') return 'Ne se répète pas';
+  if (rule === null || rule === undefined || rule === '') return t('never');
   const r = fromRule(rule);
-  if (r === null) return 'Se répète (règle avancée)';
-  const n = r.interval;
+  if (r === null) return t('advanced');
+  const count = r.interval;
   let s: string;
   switch (r.freq) {
     case 'daily':
-      s = n === 1 ? 'Chaque jour' : `Tous les ${n} jours`;
+    case 'monthly':
+    case 'yearly':
+      s = t(r.freq, { count });
       break;
     case 'weekly': {
-      s = n === 1 ? 'Chaque semaine' : `Toutes les ${n} semaines`;
-      const names = r.days.map((d) => DAY_NAMES[d]);
-      if (names.length > 0) s += names.length === 1 ? ` le ${names[0]}` : ` les ${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
+      const names = r.days.map((d) => dayName(d));
+      if (names.length === 0) s = t('weekly', { count });
+      else if (names.length === 1) s = t('weeklyOnDay', { count, day: names[0]! });
+      else s = t('weeklyOnDays', { count, days: new Intl.ListFormat(locale(), { type: 'conjunction' }).format(names) });
       break;
     }
-    case 'monthly':
-      s = n === 1 ? 'Chaque mois' : `Tous les ${n} mois`;
-      break;
-    case 'yearly':
-      s = n === 1 ? 'Chaque année' : `Tous les ${n} ans`;
-      break;
     default:
-      s = 'Ne se répète pas';
+      s = t('never');
   }
-  if (r.end === 'until' && r.until !== '') s += `, jusqu'au ${labelDate(parseLocal(r.until))}`;
-  if (r.end === 'count') s += `, ${r.count} fois`;
+  if (r.end === 'until' && r.until !== '') s = t('until', { rule: s, date: labelDate(parseLocal(r.until)) });
+  if (r.end === 'count') s = t('times', { rule: s, count: r.count });
   return s;
 }

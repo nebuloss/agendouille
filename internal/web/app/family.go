@@ -17,6 +17,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
+	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/ical"
 	"github.com/nebuloss/agendouille/internal/sharing"
 	"github.com/nebuloss/agendouille/internal/store"
@@ -86,42 +87,96 @@ func (h *handlers) family() *time.Location {
 	return time.UTC
 }
 
-// fail maps the services' errors onto CONTRACTS.md 3.1.
-func (h *handlers) fail(w http.ResponseWriter, err error) {
-	var conflict *calendar.UIDConflict
-	switch {
-	case errors.As(err, &conflict):
-		webx.Fail(w, http.StatusConflict, "uid_conflict", "cet événement existe déjà dans ce calendrier")
-	case errors.Is(err, calendar.ErrNotFound), errors.Is(err, directory.ErrNotFound), errors.Is(err, sharing.ErrNotFound), errors.Is(err, auth.ErrInvalid):
-		webx.Fail(w, http.StatusNotFound, "not_found", "introuvable")
-	case errors.Is(err, calendar.ErrForbidden), errors.Is(err, calendar.ErrNotOwner):
-		webx.Fail(w, http.StatusForbidden, "forbidden", "vous ne pouvez pas modifier ce calendrier")
-	case errors.Is(err, sharing.ErrNotVisible):
-		webx.Fail(w, http.StatusForbidden, "not_visible", "vous ne pouvez partager qu'avec les gens de vos groupes")
-	case errors.Is(err, calendar.ErrPrecondition):
-		webx.Fail(w, http.StatusPreconditionFailed, "precondition_failed", "modifié entre-temps")
-	case errors.Is(err, ical.ErrInvalid), errors.Is(err, ical.ErrUnsupported), errors.Is(err, calendar.ErrBadSlug), errors.Is(err, directory.ErrBadName):
-		webx.Fail(w, http.StatusUnprocessableEntity, "invalid_event", err.Error())
-	case errors.Is(err, ical.ErrTooLarge):
-		webx.Fail(w, http.StatusRequestEntityTooLarge, "too_large", "trop gros")
-	case errors.Is(err, calendar.ErrQuota), errors.Is(err, auth.ErrTooMany):
-		webx.Fail(w, http.StatusInsufficientStorage, "quota", err.Error())
-	case errors.Is(err, calendar.ErrExists):
-		webx.Fail(w, http.StatusConflict, "slug_taken", err.Error())
-	default:
-		var bad badRequest
-		if errors.As(err, &bad) {
-			webx.Fail(w, http.StatusBadRequest, "bad_request", bad.msg)
-			return
-		}
+// fail maps the services' errors onto CONTRACTS.md 3.1. The code is for
+// programs and never changes; the message is for the person, in their
+// language (internal/i18n, the error. keys). The services' own texts stay
+// in the log.
+func (h *handlers) fail(w http.ResponseWriter, r *http.Request, err error) {
+	e := h.explain(err)
+	if e.status == http.StatusInternalServerError {
 		h.d.Log.Error("family api", "err", err)
-		webx.Fail(w, http.StatusInternalServerError, "error", "")
 	}
+	webx.FailT(w, r, e.status, e.code, e.key, e.args...)
 }
 
-type badRequest struct{ msg string }
+// apiError is an answer chosen in a handler: a status, a code, and the
+// catalog key of its message.
+type apiError struct {
+	status    int
+	code, key string
+	args      []string
+}
 
-func (b badRequest) Error() string { return b.msg }
+func (e apiError) Error() string { return e.code + ": " + e.key }
+
+// badRequest is a 400 whose message is the catalog's key.
+func badRequest(key string, args ...string) apiError {
+	return apiError{http.StatusBadRequest, "bad_request", key, args}
+}
+
+func (h *handlers) explain(err error) apiError {
+	var given apiError
+	var conflict *calendar.UIDConflict
+	var quota *calendar.QuotaError
+	var bad directory.Invalid
+	switch {
+	case errors.As(err, &given):
+		return given
+	case errors.As(err, &conflict):
+		return apiError{http.StatusConflict, "uid_conflict", "error.event.uidConflict", nil}
+	case errors.Is(err, calendar.ErrNotFound), errors.Is(err, directory.ErrNotFound), errors.Is(err, sharing.ErrNotFound), errors.Is(err, auth.ErrInvalid):
+		return apiError{http.StatusNotFound, "not_found", "error.notFound", nil}
+	case errors.Is(err, calendar.ErrNotOwner):
+		return apiError{http.StatusForbidden, "forbidden", "error.calendar.notOwner", nil}
+	case errors.Is(err, calendar.ErrForbidden):
+		return apiError{http.StatusForbidden, "forbidden", "error.calendar.readOnly", nil}
+	case errors.Is(err, sharing.ErrNotVisible):
+		return apiError{http.StatusForbidden, "not_visible", "error.share.notVisible", nil}
+	case errors.Is(err, sharing.ErrIsOwner):
+		return badRequest("error.share.owner")
+	case errors.Is(err, calendar.ErrPrecondition):
+		return apiError{http.StatusPreconditionFailed, "precondition_failed", "error.event.stale", nil}
+	case errors.Is(err, ical.ErrEndsBeforeStart):
+		return apiError{http.StatusUnprocessableEntity, "invalid_event", "error.event.endsBeforeStart", nil}
+	case errors.Is(err, ical.ErrFieldTooLong):
+		return apiError{http.StatusUnprocessableEntity, "invalid_event", "error.event.fieldTooLong", nil}
+	case errors.Is(err, ical.ErrUnsupported):
+		return apiError{http.StatusUnprocessableEntity, "invalid_event", "error.event.unsupported", nil}
+	case errors.Is(err, ical.ErrInvalid):
+		return apiError{http.StatusUnprocessableEntity, "invalid_event", "error.event.invalid", nil}
+	case errors.Is(err, calendar.ErrBadSlug):
+		return apiError{http.StatusUnprocessableEntity, "invalid_event", "error.calendar.badName", nil}
+	case errors.As(err, &bad):
+		return apiError{http.StatusUnprocessableEntity, "invalid_event", invalidKey(bad), nil}
+	case errors.Is(err, ical.ErrTooLarge):
+		return apiError{http.StatusRequestEntityTooLarge, "too_large", "error.event.tooLarge", nil}
+	case errors.As(err, &quota):
+		key := "error.quota.events"
+		if quota.Setting == "max_calendars_per_user" {
+			key = "error.quota.calendars"
+		}
+		return apiError{http.StatusInsufficientStorage, "quota", key, []string{"max", strconv.Itoa(quota.Limit)}}
+	case errors.Is(err, auth.ErrTooMany):
+		return apiError{http.StatusInsufficientStorage, "quota", "error.quota.devices",
+			[]string{"max", strconv.Itoa(h.d.Settings.Get().MaxDevicesPerUser)}}
+	case errors.Is(err, calendar.ErrQuota):
+		return apiError{http.StatusInsufficientStorage, "quota", "error.quota", nil}
+	case errors.Is(err, calendar.ErrExists):
+		return apiError{http.StatusConflict, "slug_taken", "error.calendar.exists", nil}
+	}
+	return apiError{http.StatusInternalServerError, "error", "error.internal", nil}
+}
+
+// invalidKey is the message of a bad name, display name or colour.
+func invalidKey(e directory.Invalid) string {
+	switch e.Field {
+	case "display_name":
+		return "error.displayName.invalid"
+	case "color":
+		return "error.color.invalid"
+	}
+	return "error.name.invalid"
+}
 
 func (h *handlers) ref(r *http.Request) (calendar.Ref, error) {
 	return calendar.ParseRef(r.PathValue("ref"))
@@ -145,7 +200,7 @@ func (h *handlers) patchMe(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		return
 	}
 	if err := h.d.Directory.UpdateUser(r.Context(), p.User.Name, p.User.Name, body.DisplayName, body.Color); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	p.User, _ = h.d.Directory.UserByID(r.Context(), p.User.ID)
@@ -157,13 +212,13 @@ func (h *handlers) patchMe(w http.ResponseWriter, r *http.Request, p *auth.Princ
 func (h *handlers) selfEnrolment(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	e, err := h.d.Auth.NewEnrolment(r.Context(), p.User.Name, p.User.ID, 10*time.Minute)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	link := h.d.PublicURL() + "/enrol/" + e.Token
 	qr, err := webx.QRSVG(link)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusCreated, map[string]any{"url": link, "qr_svg": qr, "expires_at": e.ExpiresAt,
@@ -180,12 +235,12 @@ func (h *handlers) people(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	ctx := r.Context()
 	users, err := h.d.Directory.Visible(ctx, p.User.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	groups, err := h.d.Directory.GroupsOf(ctx, p.User.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	us := []personView{}
@@ -230,14 +285,14 @@ func (h *handlers) calendarView(r *http.Request, i calendar.Info) (calendarView,
 func (h *handlers) calendars(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	infos, err := h.d.Calendar.Home(r.Context(), h.actor(p), true)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	out := []calendarView{}
 	for _, i := range infos {
 		v, err := h.calendarView(r, i)
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		out = append(out, v)
@@ -254,17 +309,17 @@ func (h *handlers) calendars(w http.ResponseWriter, r *http.Request, p *auth.Pri
 func (h *handlers) getCalendar(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	i, err := h.d.Calendar.Info(r.Context(), h.actor(p), ref)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	v, err := h.calendarView(r, i)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, v)
@@ -282,7 +337,7 @@ func (h *handlers) createCalendar(w http.ResponseWriter, r *http.Request, p *aut
 	}
 	body.Name = strings.TrimSpace(body.Name)
 	if body.Name == "" {
-		h.fail(w, badRequest{"un calendrier a un nom"})
+		h.fail(w, r, badRequest("error.calendar.nameRequired"))
 		return
 	}
 	base, err := calendar.NormalizeSlug(slugOf(body.Name))
@@ -306,7 +361,7 @@ func (h *handlers) createCalendar(w http.ResponseWriter, r *http.Request, p *aut
 			continue
 		}
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		v, _ := h.calendarView(r, i)
@@ -314,7 +369,7 @@ func (h *handlers) createCalendar(w http.ResponseWriter, r *http.Request, p *aut
 		webx.JSON(w, http.StatusCreated, v)
 		return
 	}
-	h.fail(w, calendar.ErrExists)
+	h.fail(w, r, calendar.ErrExists)
 }
 
 // slugOf turns a name into ASCII for a slug: "École de Léa" -> "ecole-de-lea".
@@ -327,7 +382,7 @@ func slugOf(name string) string {
 func (h *handlers) patchCalendar(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	var body struct {
@@ -345,12 +400,12 @@ func (h *handlers) patchCalendar(w http.ResponseWriter, r *http.Request, p *auth
 	a := h.actor(p)
 	i, err := h.d.Calendar.Info(ctx, a, ref)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	if body.Shown != nil || body.Hidden != nil {
 		if err := h.d.Calendar.Sharing().SetView(ctx, p.User.ID, i.ID, body.Shown, body.Hidden, nil, nil, nil); err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		if body.Hidden != nil {
@@ -359,23 +414,23 @@ func (h *handlers) patchCalendar(w http.ResponseWriter, r *http.Request, p *auth
 	}
 	if body.Name != nil || body.Color != nil || body.Timezone != nil || body.Description != nil {
 		if i.Access != sharing.Owner && (body.Timezone != nil || body.Description != nil) {
-			h.fail(w, calendar.ErrNotOwner)
+			h.fail(w, r, calendar.ErrNotOwner)
 			return
 		}
 		if _, err := h.d.Calendar.Update(ctx, a, ref, calendar.Props{Name: body.Name, Color: body.Color, Timezone: body.Timezone,
 			Description: body.Description}); err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 	}
 	i, err = h.d.Calendar.Info(ctx, a, ref)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	v, err := h.calendarView(r, i)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, v)
@@ -384,16 +439,16 @@ func (h *handlers) patchCalendar(w http.ResponseWriter, r *http.Request, p *auth
 func (h *handlers) deleteCalendar(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	i, err := h.d.Calendar.Info(r.Context(), h.actor(p), ref)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	if err := h.d.Calendar.DeleteCalendar(r.Context(), h.actor(p), ref); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	h.access(i)
@@ -404,16 +459,16 @@ func (h *handlers) deleteCalendar(w http.ResponseWriter, r *http.Request, p *aut
 func (h *handlers) owned(w http.ResponseWriter, r *http.Request, p *auth.Principal) (calendar.Info, bool) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return calendar.Info{}, false
 	}
 	i, err := h.d.Calendar.Info(r.Context(), h.actor(p), ref)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return calendar.Info{}, false
 	}
 	if i.Access != sharing.Owner {
-		h.fail(w, calendar.ErrNotOwner)
+		h.fail(w, r, calendar.ErrNotOwner)
 		return calendar.Info{}, false
 	}
 	return i, true
@@ -426,7 +481,7 @@ func (h *handlers) shares(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	}
 	s, err := h.d.Calendar.Sharing().Shares(r.Context(), i.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"shares": s})
@@ -439,7 +494,7 @@ func (h *handlers) share(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	}
 	t, err := sharing.ParseTarget(r.PathValue("target"))
 	if err != nil {
-		h.fail(w, badRequest{err.Error()})
+		h.fail(w, r, badRequest("error.share.invalid"))
 		return
 	}
 	var body struct {
@@ -450,11 +505,11 @@ func (h *handlers) share(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	}
 	a, err := sharing.ParseAccess(body.Access)
 	if err != nil {
-		h.fail(w, badRequest{err.Error()})
+		h.fail(w, r, badRequest("error.share.invalid"))
 		return
 	}
 	if err := h.d.Calendar.Sharing().ShareWith(r.Context(), p.User.Name, p.User.ID, true, i.ID, t, a, store.Time(h.d.Clock())); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	h.access(i)
@@ -468,11 +523,11 @@ func (h *handlers) unshare(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	}
 	t, err := sharing.ParseTarget(r.PathValue("target"))
 	if err != nil {
-		h.fail(w, badRequest{err.Error()})
+		h.fail(w, r, badRequest("error.share.invalid"))
 		return
 	}
 	if err := h.d.Calendar.Sharing().Unshare(r.Context(), p.User.Name, i.ID, t, store.Time(h.d.Clock())); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	h.access(i)
@@ -492,7 +547,7 @@ func (h *handlers) transfer(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	}
 	n, err := h.d.Calendar.Transfer(r.Context(), h.actor(p), i.Ref, body.To, true)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	h.access(i)
@@ -502,17 +557,20 @@ func (h *handlers) transfer(w http.ResponseWriter, r *http.Request, p *auth.Prin
 func (h *handlers) importICS(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	data, err := io.ReadAll(io.LimitReader(r.Body, 20<<20))
 	if err != nil {
-		h.fail(w, badRequest{"le fichier n'a pas pu être lu"})
+		h.fail(w, r, badRequest("error.import.unreadable"))
 		return
 	}
 	res, err := h.d.Calendar.Import(r.Context(), h.actor(p), ref, data, r.URL.Query().Get("replace") == "1")
+	if errors.Is(err, ical.ErrInvalid) {
+		err = apiError{http.StatusUnprocessableEntity, "invalid_event", "error.import.invalid", nil}
+	}
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, res)
@@ -521,12 +579,12 @@ func (h *handlers) importICS(w http.ResponseWriter, r *http.Request, p *auth.Pri
 func (h *handlers) exportICS(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	data, err := h.d.Calendar.Export(r.Context(), h.actor(p), ref)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
@@ -583,13 +641,13 @@ func (h *handlers) occurrences(w http.ResponseWriter, r *http.Request, p *auth.P
 	from, err1 := time.ParseInLocation("2006-01-02", q.Get("from"), fam)
 	to, err2 := time.ParseInLocation("2006-01-02", q.Get("to"), fam)
 	if err1 != nil || err2 != nil || !to.After(from) || to.Sub(from) > maxRange+2*time.Hour {
-		h.fail(w, badRequest{"from et to sont des dates, au plus 62 jours d'écart"})
+		h.fail(w, r, badRequest("error.occurrences.range", "days", "62"))
 		return
 	}
 	a := h.actor(p)
 	home, err := h.d.Calendar.Home(ctx, a, false)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	want := map[string]bool{}
@@ -607,7 +665,7 @@ func (h *handlers) occurrences(w http.ResponseWriter, r *http.Request, p *auth.P
 		}
 		objs, err := h.d.Calendar.Range(ctx, i, from, to)
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		loc := i.Location()
@@ -664,7 +722,7 @@ func (h *handlers) eventView(r *http.Request, i calendar.Info, o calendar.Object
 func (h *handlers) writeEvent(w http.ResponseWriter, r *http.Request, status int, i calendar.Info, o calendar.Object) {
 	v, err := h.eventView(r, i, o)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", o.ETag)
@@ -674,12 +732,12 @@ func (h *handlers) writeEvent(w http.ResponseWriter, r *http.Request, status int
 func (h *handlers) event(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	i, o, err := h.d.Calendar.Get(r.Context(), h.actor(p), ref, r.PathValue("name"))
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	h.writeEvent(w, r, http.StatusOK, i, o)
@@ -693,7 +751,7 @@ func nameFor(uid string) string {
 func (h *handlers) createEvent(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	var in ical.EventInput
@@ -702,12 +760,12 @@ func (h *handlers) createEvent(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	data, uid, err := ical.New(in, h.family(), h.d.Clock())
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	o, _, err := h.d.Calendar.Put(r.Context(), h.actor(p), ref, nameFor(uid), data, calendar.Precondition{IfNoneMatch: true})
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	i, _ := h.d.Calendar.Info(r.Context(), h.actor(p), ref)
@@ -718,24 +776,24 @@ func (h *handlers) createEvent(w http.ResponseWriter, r *http.Request, p *auth.P
 func (h *handlers) stale(w http.ResponseWriter, r *http.Request, o calendar.Object) {
 	nm := &names{h: h, r: r, seen: map[int64]string{}}
 	webx.JSON(w, http.StatusPreconditionFailed, map[string]string{"error": "precondition_failed",
-		"message": "modifié entre-temps", "by": nm.of(o.ModifiedBy)})
+		"message": i18n.T(i18n.FromRequest(r), "error.event.stale"), "by": nm.of(o.ModifiedBy)})
 }
 
 // editTarget reads the object an edit is about and checks If-Match.
 func (h *handlers) editTarget(w http.ResponseWriter, r *http.Request, p *auth.Principal) (calendar.Info, calendar.Object, string, bool) {
 	ref, err := h.ref(r)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return calendar.Info{}, calendar.Object{}, "", false
 	}
 	ifMatch := r.Header.Get("If-Match")
 	if ifMatch == "" {
-		webx.Fail(w, http.StatusPreconditionRequired, "precondition_required", "If-Match is required")
+		webx.FailT(w, r, http.StatusPreconditionRequired, "precondition_required", "error.event.versionMissing")
 		return calendar.Info{}, calendar.Object{}, "", false
 	}
 	i, o, err := h.d.Calendar.Get(r.Context(), h.actor(p), ref, r.PathValue("name"))
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return calendar.Info{}, calendar.Object{}, "", false
 	}
 	if ifMatch != o.ETag && ifMatch != "*" {
@@ -757,7 +815,7 @@ func (h *handlers) editEvent(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	q := r.URL.Query()
 	res, err := ical.Edit(o.Data, in, ical.Scope(q.Get("scope")), q.Get("occurrence"), i.Location(), h.family(), h.d.Clock())
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	ctx := r.Context()
@@ -768,26 +826,26 @@ func (h *handlers) editEvent(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		return
 	}
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	extra := map[string]any{}
 	if res.NewData != nil {
 		v, err := ical.View(res.NewData, i.Location(), h.family())
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		n, _, err := h.d.Calendar.Put(ctx, a, i.Ref, nameFor(v.UID), res.NewData, calendar.Precondition{IfNoneMatch: true})
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		extra["created"] = n.Name
 	}
 	v, err := h.eventView(r, i, saved)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", saved.ETag)
@@ -810,7 +868,7 @@ func (h *handlers) deleteEvent(w http.ResponseWriter, r *http.Request, p *auth.P
 	q := r.URL.Query()
 	res, err := ical.Remove(o.Data, ical.Scope(q.Get("scope")), q.Get("occurrence"), i.Location(), h.family(), h.d.Clock())
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	pre := calendar.Precondition{IfMatch: []string{etag}}
@@ -824,7 +882,7 @@ func (h *handlers) deleteEvent(w http.ResponseWriter, r *http.Request, p *auth.P
 		return
 	}
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -843,12 +901,12 @@ func (h *handlers) moveEvent(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	}
 	to, err := calendar.ParseRef(body.To)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	moved, err := h.d.Calendar.Move(r.Context(), h.actor(p), i.Ref, o.Name, to, calendar.Precondition{IfMatch: []string{etag}})
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	dst, _ := h.d.Calendar.Info(r.Context(), h.actor(p), to)
@@ -860,7 +918,7 @@ func (h *handlers) moveEvent(w http.ResponseWriter, r *http.Request, p *auth.Pri
 func (h *handlers) devices(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ds, err := h.d.Auth.Devices(r.Context(), p.User.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"devices": ds, "dav_auth": h.d.Auth.DavAuthMode(r.Context())})
@@ -926,10 +984,16 @@ func (h *handlers) addDevice(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	d, err := h.d.Auth.NewDevice(r.Context(), p.User.ID, body.Kind, body.Label, body.Cap)
 	if err != nil {
 		if errors.Is(err, auth.ErrTooMany) || errors.Is(err, auth.ErrInvalid) {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
-		h.fail(w, badRequest{err.Error()})
+		// The service's checks, in the order it makes them: which one
+		// failed picks the message (its own text stays for the log).
+		key := "error.device.invalid"
+		if label := strings.TrimSpace(body.Label); label == "" || len(label) > 100 {
+			key = "error.device.label"
+		}
+		h.fail(w, r, badRequest(key))
 		return
 	}
 	pub, _ := url.Parse(base)
@@ -954,7 +1018,7 @@ func (h *handlers) addDevice(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if mode != auth.DavPassword {
 		cert, err := h.certificateFor(r, p, d.ID)
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		for k, v := range cert {
@@ -985,12 +1049,12 @@ func (h *handlers) certificateFor(r *http.Request, p *auth.Principal, deviceID i
 func (h *handlers) newCertificate(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.fail(w, auth.ErrInvalid)
+		h.fail(w, r, auth.ErrInvalid)
 		return
 	}
 	out, err := h.certificateFor(r, p, id)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	out["dav_auth"] = h.d.Auth.DavAuthMode(r.Context())
@@ -1001,7 +1065,7 @@ func (h *handlers) certificateFile(w http.ResponseWriter, r *http.Request, p *au
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	body, ok := pending.take(r.URL.Query().Get("t"), "p12", p.User.ID, id, h.d.Clock())
 	if !ok {
-		http.Error(w, "ce lien a servi ou a expiré : demandez un nouveau certificat", http.StatusGone)
+		http.Error(w, i18n.T(i18n.FromRequest(r), "error.certificate.linkGone"), http.StatusGone)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-pkcs12")
@@ -1014,7 +1078,7 @@ func (h *handlers) mobileconfig(w http.ResponseWriter, r *http.Request, p *auth.
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	body, ok := pending.take(r.URL.Query().Get("t"), "mobileconfig", p.User.ID, id, h.d.Clock())
 	if !ok {
-		http.Error(w, "this profile link has been used or has expired; add the device again", http.StatusGone)
+		http.Error(w, i18n.T(i18n.FromRequest(r), "error.profile.linkGone"), http.StatusGone)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
@@ -1026,11 +1090,11 @@ func (h *handlers) mobileconfig(w http.ResponseWriter, r *http.Request, p *auth.
 func (h *handlers) revokeDevice(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.fail(w, auth.ErrInvalid)
+		h.fail(w, r, auth.ErrInvalid)
 		return
 	}
 	if err := h.d.Auth.RevokeDevice(r.Context(), p.User.Name, p.User.ID, id); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -1048,7 +1112,7 @@ type linkView struct {
 func (h *handlers) links(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ls, err := h.d.Auth.Links(r.Context(), p.User.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	out := []linkView{}
@@ -1078,12 +1142,12 @@ func (h *handlers) addLink(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	for _, c := range body.Calendars {
 		ref, err := calendar.ParseRef(c)
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		i, err := h.d.Calendar.Info(r.Context(), h.actor(p), ref)
 		if err != nil {
-			h.fail(w, err)
+			h.fail(w, r, err)
 			return
 		}
 		ids = append(ids, i.ID)
@@ -1091,7 +1155,14 @@ func (h *handlers) addLink(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	}
 	l, secret, err := h.d.Auth.NewLink(r.Context(), p.User.ID, body.Label, ids)
 	if err != nil {
-		h.fail(w, badRequest{err.Error()})
+		// The service's checks, in its order, pick the message.
+		switch label := strings.TrimSpace(body.Label); {
+		case label == "" || len(label) > 100:
+			err = badRequest("error.link.label")
+		case len(ids) == 0:
+			err = badRequest("error.link.noCalendar")
+		}
+		h.fail(w, r, err)
 		return
 	}
 	webx.JSON(w, http.StatusCreated, linkView{ID: l.ID, Label: l.Label, Calendars: refs, CreatedAt: l.CreatedAt,
@@ -1101,11 +1172,11 @@ func (h *handlers) addLink(w http.ResponseWriter, r *http.Request, p *auth.Princ
 func (h *handlers) revokeLink(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.fail(w, auth.ErrInvalid)
+		h.fail(w, r, auth.ErrInvalid)
 		return
 	}
 	if err := h.d.Auth.RevokeLink(r.Context(), p.User.ID, id); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -1114,7 +1185,7 @@ func (h *handlers) revokeLink(w http.ResponseWriter, r *http.Request, p *auth.Pr
 func (h *handlers) sessions(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	ss, err := h.d.Auth.Sessions(r.Context(), p.User.ID)
 	if err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	type view struct {
@@ -1131,11 +1202,11 @@ func (h *handlers) sessions(w http.ResponseWriter, r *http.Request, p *auth.Prin
 func (h *handlers) revokeSession(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.fail(w, auth.ErrInvalid)
+		h.fail(w, r, auth.ErrInvalid)
 		return
 	}
 	if err := h.d.Auth.RevokeSession(r.Context(), p.User.ID, id); err != nil {
-		h.fail(w, err)
+		h.fail(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -7,6 +7,9 @@ const base = new URL(enrol).origin;
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'], headless: true });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const page = await browser.newPage();
+// The pages follow Accept-Language; the shots are of the French UI unless
+// SHOTS_LANG says otherwise (the English pass in run.sh).
+await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'fr' });
 const errors = [];
 page.on('pageerror', (e) => errors.push(`page: ${e.message}`));
 await page.setViewport({ width: 1280, height: 860 });

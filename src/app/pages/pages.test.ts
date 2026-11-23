@@ -5,7 +5,7 @@ import { agenda, month, week, whenText, type ViewContext } from '@/app/component
 import { CalendarPage } from '@/app/pages/CalendarPage.ts';
 import { CalendarsPage, browserName } from '@/app/pages/Manage.ts';
 import { secretField } from '@/shared/components/Ui.ts';
-import type { Occurrence } from '@/app/api.ts';
+import type { EventView, Occurrence } from '@/app/api.ts';
 
 function shell(page: string): void {
   document.body.replaceChildren();
@@ -102,6 +102,45 @@ describe('app pages', () => {
     expect(seen.some((s) => /GET \/api\/occurrences\?from=\d{4}-\d{2}-\d{2}&to=/.test(s))).toBe(true);
     expect(document.querySelector('.cal-toolbar')).not.toBeNull();
     page.dispose();
+  });
+
+  it('asks before deleting an event, and deletes nothing when cancelled', async () => {
+    const seen: string[] = [];
+    const page = new CalendarPage(document, fakeApi({ '/calendars': { calendars: [] }, '/occurrences': { occurrences: [] } }, seen));
+    const ev = { etag: '"1"' } as EventView;
+    const deletes = (): string[] => seen.filter((s) => s.startsWith('DELETE'));
+
+    // One event: one question, which names it and the button's action.
+    let done = page.remove(occ('Judo', '2026-11-25T14:00:00', '2026-11-25T15:00:00'), ev);
+    await settle();
+    let dlg = document.querySelector('dialog')!;
+    expect(dlg.textContent).toContain('Supprimer « Judo » ?');
+    expect([...dlg.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Annuler', 'Supprimer l’événement']);
+    dlg.close('no');
+    await done;
+    expect(deletes()).toEqual([]);
+
+    // A recurring one: the scope, then a question that says which.
+    const series = occ('Piscine', '2026-11-25T14:00:00', '2026-11-25T15:00:00', { recurring: true, recurrence_id: '20261125T140000' });
+    done = page.remove(series, ev);
+    await settle();
+    document.querySelector('dialog')!.close('following');
+    await settle();
+    dlg = document.querySelector('dialog')!;
+    expect(dlg.textContent).toContain('Supprimer cette occurrence et les suivantes de « Piscine » ?');
+    dlg.close('no');
+    await done;
+    expect(deletes()).toEqual([]);
+
+    // Confirmed, it deletes.
+    done = page.remove(series, ev);
+    await settle();
+    document.querySelector('dialog')!.close('this');
+    await settle();
+    document.querySelector('dialog')!.close('yes');
+    await done;
+    expect(deletes()).toHaveLength(1);
+    expect(deletes()[0]).toContain('scope=this');
   });
 
   it('the calendars page splits mine and shared, as text', async () => {

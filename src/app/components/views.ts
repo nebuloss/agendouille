@@ -6,6 +6,7 @@ import {
   type Wall,
 } from '@/shared/core/Dates.ts';
 import type { Occurrence } from '@/app/api.ts';
+import { t } from '@/app/components/views.msg.ts';
 
 /**
  * The three calendar views (PLAN.md 9.4) as pure renderers: occurrences
@@ -44,7 +45,7 @@ function chip(p: Placed, ctx: ViewContext, withTime: boolean): HTMLElement {
     withTime && !p.o.all_day ? h('span', { class: 'event-time' }, formatTime(p.start)) : null,
     h('span', { class: 'event-title' }, p.o.summary),
     p.o.location !== '' ? h('span', { class: 'event-place' }, p.o.location) : null,
-    p.o.created_by !== '' ? h('span', { class: 'event-who', 'aria-label': `ajouté par ${p.o.created_by}` }, p.o.created_by.slice(0, 1).toUpperCase()) : null,
+    p.o.created_by !== '' ? h('span', { class: 'event-who', 'aria-label': t('addedBy', { name: p.o.created_by }) }, p.o.created_by.slice(0, 1).toUpperCase()) : null,
   );
   b.style.setProperty('--cal', ctx.colorOf(p.o.calendar));
   if (p.o.all_day) b.classList.add('all-day');
@@ -73,13 +74,13 @@ export function agenda(occ: Occurrence[], from: Wall, days: number, ctx: ViewCon
       h('span', { class: isToday ? 'grid size-10 place-items-center rounded-full bg-primary text-lg font-semibold text-on-primary' : 'grid size-10 place-items-center rounded-full bg-surface-container text-lg font-semibold' }, String(d.d)),
       h('span', { class: isToday ? 'text-sm font-semibold text-primary first-letter:uppercase' : 'text-sm font-semibold text-on-surface-variant first-letter:uppercase' }, labelDay(d)));
     const list = h('div', { class: 'agenda-list flex min-w-0 flex-1 flex-col gap-1.5' }, ...todays.map((p) => chip(p, ctx, true)));
-    if (todays.length === 0) list.append(h('p', { class: 'py-2 text-sm text-on-surface-variant' }, "Rien aujourd'hui."));
-    const add = h('button', { class: ui.iconBtn, type: 'button', 'aria-label': `Nouvel événement le ${labelDay(d)}`, title: 'Nouvel événement' }, icon('plus'));
+    if (todays.length === 0) list.append(h('p', { class: 'py-2 text-sm text-on-surface-variant' }, t('nothingToday')));
+    const add = h('button', { class: ui.iconBtn, type: 'button', 'aria-label': t('newEventOn', { day: labelDay(d) }), title: t('newEvent') }, icon('plus'));
     add.addEventListener('click', () => ctx.onNew({ ...d, h: 9 }, false));
     root.append(h('section', { class: 'agenda-section flex flex-col gap-2 rounded-md3-xl bg-surface-container p-3 sm:p-4', 'data-date': formatDate(d) },
       h('div', { class: 'flex items-center justify-between gap-2' }, head, add), list));
   }
-  if (!any) root.append(h('p', { class: ui.empty }, 'Rien sur cette période.'));
+  if (!any) root.append(h('p', { class: ui.empty }, t('nothingInRange')));
   return root;
 }
 
@@ -124,7 +125,7 @@ export function week(occ: Occurrence[], monday: Wall, ctx: ViewContext): HTMLEle
     ...days.map((d, i) => h('div', { class: 'flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold tracking-wide text-on-surface-variant uppercase' },
       h('span', {}, names[i] ?? ''),
       h('strong', { class: sameDay(d, ctx.today) ? 'grid size-8 place-items-center rounded-full bg-primary text-base font-semibold text-on-primary normal-case' : 'grid size-8 place-items-center rounded-full text-base font-semibold text-on-surface normal-case' }, String(d.d)))));
-  const strip = h('div', { class: 'week-allday' }, h('div', { class: 'week-gutter px-1 pt-1.5 text-right text-[10px] text-on-surface-variant' }, 'jour'),
+  const strip = h('div', { class: 'week-allday' }, h('div', { class: 'week-gutter px-1 pt-1.5 text-right text-[10px] text-on-surface-variant' }, t('allDay')),
     ...days.map((d) => h('div', { class: 'week-allday-cell' }, ...placed.filter((p) => p.o.all_day && onDay(p, d)).map((p) => chip(p, ctx, false)))));
   const hours = h('div', { class: 'week-hours' });
   for (let hr = 0; hr < 24; hr++) hours.append(h('div', { class: 'week-hour' }, `${String(hr).padStart(2, '0')}:00`));
@@ -191,8 +192,8 @@ export function whenText(o: { start: string; end: string; all_day: boolean }): s
   const e = parseLocal(o.end);
   if (o.all_day) {
     const last = addDays(e, -1);
-    return daysBetween(s, last) <= 0 ? labelDay(s) : `du ${labelDay(s)} au ${labelDay(last)}`;
+    return daysBetween(s, last) <= 0 ? labelDay(s) : t('dayRange', { from: labelDay(s), to: labelDay(last) });
   }
-  if (sameDay(s, e)) return `${labelDay(s)}, ${formatTime(s)} – ${formatTime(e)}`;
-  return `${labelShortDay(s)} ${formatTime(s)} – ${labelShortDay(e)} ${formatTime(e)}`;
+  if (sameDay(s, e)) return t('timeRange', { day: labelDay(s), start: formatTime(s), end: formatTime(e) });
+  return t('acrossDays', { startDay: labelShortDay(s), start: formatTime(s), endDay: labelShortDay(e), end: formatTime(e) });
 }

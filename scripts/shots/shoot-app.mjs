@@ -10,6 +10,9 @@ const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', ar
 const errors = [];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const page = await browser.newPage();
+// The pages follow Accept-Language; the shots are of the French UI unless
+// SHOTS_LANG says otherwise (the English pass in run.sh).
+await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'fr' });
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 page.on('pageerror', (e) => errors.push(`page: ${e.message}`));
 await page.emulateTimezone('America/New_York'); // the family zone wins over the browser's
