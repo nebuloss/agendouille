@@ -3,6 +3,17 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: calendar ids in the admin
+
+The admin addressed a calendar as `owner~slug`, which changes on a
+transfer and reads as if the calendar belonged to a user's pages. Each
+calendar now has a random id (`calendars.uid`, a UUID, migration 0007,
+filled by a trigger for every insert). The admin's pages are
+`/calendars/{id}[/{page}]` and the admin API takes the id; both still
+accept `owner~slug`, and the pages redirect it to the id (old bookmarks,
+the activity log). CalDAV and the family app keep `owner~slug`: there it
+is the owner's own address for the calendar.
+
 ## 2026-11-23: our own dark theme, and Dark Reader told so
 
 Dark Reader inverted pages that already have a dark theme, badly. The

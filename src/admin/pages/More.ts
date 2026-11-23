@@ -65,6 +65,7 @@ export class GroupsPage extends AdminPage {
 }
 
 interface CalendarShared {
+  id: string;
   ref: string;
   name: string;
   owner: string;
@@ -173,12 +174,12 @@ export class GroupPage extends AdminPage {
       entries(shared.map((c) => {
         const s = c.shares.find((x) => x.target === target)!;
         return {
-          href: `/calendars/${seg(c.ref)}`,
+          href: `/calendars/${seg(c.id)}`,
           lead: calendarMark(c.color),
           title: c.name,
           sub: t('ownerEvents', { owner: c.owner, count: c.events }),
           tags: [h('span', { class: s.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(s.access))],
-          actions: [action(t('remove'), () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(target)}`), t('shareRemoved')), 'danger-text', 'close', 'sm')],
+          actions: [action(t('remove'), () => this.act(() => this.api.delete(`/calendars/${seg(c.id)}/shares/${seg(target)}`), t('shareRemoved')), 'danger-text', 'close', 'sm')],
         };
       }), t('noSharedCalendars')));
   }
@@ -334,7 +335,7 @@ interface Backup {
 export class BackupsPage extends AdminPage {
   protected async render(): Promise<Child[]> {
     const { backups } = await this.api.get<{ backups: Backup[] }>('/backups');
-    const { calendars } = await this.api.get<{ calendars: { ref: string; name: string; owner: string; color: string; events: number }[] }>('/calendars');
+    const { calendars } = await this.api.get<{ calendars: { id: string; ref: string; name: string; owner: string; color: string; events: number }[] }>('/calendars');
     const icsCard = card(t('icsTitle'), [
       h('a', { class: ui.btn('tonal'), href: this.api.url('/calendars/export.zip'), download: '' }, icon('download'), t('downloadAllZip')),
     ],
@@ -342,9 +343,9 @@ export class BackupsPage extends AdminPage {
     calendars.length === 0 ? h('p', { class: ui.empty }, t('noCalendars'))
       : h('div', { class: ui.well }, ...calendars.map((c) => h('div', { class: 'flex min-h-14 items-center gap-3 border-b border-outline-variant/50 px-4 py-2.5 last:border-0' },
         swatch(c.color, 'md'),
-        h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('a', { href: `/calendars/${seg(c.ref)}`, class: 'truncate font-semibold text-on-surface no-underline hover:underline' }, c.name),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('a', { href: `/calendars/${seg(c.id)}`, class: 'truncate font-semibold text-on-surface no-underline hover:underline' }, c.name),
           h('span', { class: 'text-xs text-on-surface-variant' }, t('ownerEvents', { owner: c.owner, count: c.events }))),
-        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`/calendars/${seg(c.ref)}/export`), download: `${c.ref}.ics` }, icon('download'), '.ics')))));
+        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`/calendars/${seg(c.id)}/export`), download: `${c.ref}.ics` }, icon('download'), '.ics')))));
     return [
       card(t('database'), [action(t('backUpNow'), () => this.act(() => this.api.post('/backups'), t('backupDone')), 'filled', 'disk')],
       h('p', { class: 'text-sm text-on-surface-variant' }, t('databaseIntro')),

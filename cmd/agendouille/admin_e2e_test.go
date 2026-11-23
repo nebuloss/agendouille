@@ -285,11 +285,27 @@ func TestM3AdminUI(t *testing.T) {
 	if a := A.call("GET", "/calendars/lea~nope/stats", nil); a.status != http.StatusNotFound {
 		t.Errorf("stats of no calendar: %d", a.status)
 	}
-	for _, p := range []string{"/calendars/lea~perso", "/calendars/lea~perso/shares", "/calendars/lea~perso/activity"} {
-		a := x.do("GET", x.admin+p, nil, cookie(auth.AdminCookie, A.session))
+	// The admin addresses a calendar by its id, not owner~slug (DECISIONS:
+	// calendar ids): the API answers to both, the pages redirect the old form.
+	calID, _ := A.json("GET", "/calendars/lea~perso/stats", nil, 200)["id"].(string)
+	if len(calID) != 36 {
+		t.Fatalf("the calendar has no id: %q", calID)
+	}
+	if st := A.json("GET", "/calendars/"+calID+"/stats", nil, 200); st["ref"] != "lea~perso" {
+		t.Errorf("stats by id: %v", st["ref"])
+	}
+	for _, sub := range []string{"", "/shares", "/activity"} {
+		a := x.do("GET", x.admin+"/calendars/"+calID+sub, nil, cookie(auth.AdminCookie, A.session))
 		if a.status != 200 || !strings.Contains(a.body, `<span>Calendriers</span>`) || !strings.Contains(a.body, "data-item-name") {
-			t.Errorf("calendar page %s: %d", p, a.status)
+			t.Errorf("calendar page %s: %d", sub, a.status)
 		}
+		old := x.do("GET", x.admin+"/calendars/lea~perso"+sub, nil, cookie(auth.AdminCookie, A.session))
+		if old.status != http.StatusMovedPermanently || old.header.Get("Location") != "/calendars/"+calID+sub {
+			t.Errorf("old address %s: %d %s", sub, old.status, old.header.Get("Location"))
+		}
+	}
+	if cs := A.json("GET", "/calendars", nil, 200); !strings.Contains(asJSON(cs), calID) {
+		t.Errorf("the list has no ids: %v", cs)
 	}
 	act := A.json("GET", "/activity?kind=event", nil, 200)
 	if !strings.Contains(asJSON(act["activity"]), `"lea~perso"`) {
@@ -304,9 +320,14 @@ func TestM3AdminUI(t *testing.T) {
 	if a := A.call("DELETE", "/calendars/lea~perso?confirm=nope", nil); a.status != http.StatusBadRequest {
 		t.Errorf("deleting without the name: %d", a.status)
 	}
-	A.json("POST", "/calendars/lea~perso/transfer", map[string]any{"to": "maman", "keep": true}, 200)
+	if tr := A.json("POST", "/calendars/"+calID+"/transfer", map[string]any{"to": "maman", "keep": true}, 200); tr["id"] != calID || tr["ref"] != "maman~perso" {
+		t.Errorf("a transfer changed the id: %v", tr)
+	}
 	if cs := A.json("GET", "/calendars", nil, 200); !strings.Contains(asJSON(cs), "maman~perso") {
 		t.Errorf("after the transfer: %v", cs)
+	}
+	if st := A.json("GET", "/calendars/"+calID+"/stats", nil, 200); st["owner"] != "maman" {
+		t.Errorf("the id after the transfer: %v", st["owner"])
 	}
 
 	// Backups: make one; the list has it.

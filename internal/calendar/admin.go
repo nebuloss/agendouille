@@ -2,6 +2,9 @@ package calendar
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +18,8 @@ import (
 
 // CalendarMeta is a calendar as the admin sees it.
 type CalendarMeta struct {
+	// ID never changes (a transfer changes Ref): the admin's addresses use it.
+	ID        string          `json:"id"`
 	Ref       string          `json:"ref"`
 	Owner     string          `json:"owner"`
 	Name      string          `json:"name"`
@@ -29,7 +34,7 @@ type CalendarMeta struct {
 // AdminCalendars lists every live calendar, or one user's when owner is
 // set.
 func (s *Service) AdminCalendars(ctx context.Context, owner string) ([]CalendarMeta, error) {
-	q := `SELECT c.id, u.name, c.slug, c.name, c.color, c.timezone, c.created_at,
+	q := `SELECT c.id, c.uid, u.name, c.slug, c.name, c.color, c.timezone, c.created_at,
 		(SELECT count(*) FROM objects o WHERE o.calendar_id = c.id),
 		(SELECT COALESCE(sum(length(o.data)), 0) FROM objects o WHERE o.calendar_id = c.id)
 		FROM calendars c JOIN users u ON u.id = c.owner_id WHERE c.deleted_at IS NULL`
@@ -50,7 +55,7 @@ func (s *Service) AdminCalendars(ctx context.Context, owner string) ([]CalendarM
 	for rows.Next() {
 		var r row
 		var slug, created string
-		if err := rows.Scan(&r.id, &r.m.Owner, &slug, &r.m.Name, &r.m.Color, &r.m.Timezone, &created, &r.m.Events, &r.m.Bytes); err != nil {
+		if err := rows.Scan(&r.id, &r.m.ID, &r.m.Owner, &slug, &r.m.Name, &r.m.Color, &r.m.Timezone, &created, &r.m.Events, &r.m.Bytes); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -74,6 +79,7 @@ func (s *Service) AdminCalendars(ctx context.Context, owner string) ([]CalendarM
 
 // SharedWith lists the calendars shared with a user, and through what.
 type SharedWith struct {
+	ID     string `json:"id"`
 	Ref    string `json:"ref"`
 	Name   string `json:"name"`
 	Access string `json:"access"`
@@ -83,14 +89,14 @@ type SharedWith struct {
 // AdminSharedWith is what is shared with a user (the admin's user page).
 func (s *Service) AdminSharedWith(ctx context.Context, userID int64) ([]SharedWith, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT u.name || '~' || c.slug, c.name, sh.access, 'u:' || me.name
+		SELECT c.uid, u.name || '~' || c.slug, c.name, sh.access, 'u:' || me.name
 		FROM shares sh JOIN calendars c ON c.id = sh.calendar_id JOIN users u ON u.id = c.owner_id JOIN users me ON me.id = sh.user_id
 		WHERE sh.user_id = ? AND c.deleted_at IS NULL
 		UNION ALL
-		SELECT u.name || '~' || c.slug, c.name, sh.access, 'g:' || g.name
+		SELECT c.uid, u.name || '~' || c.slug, c.name, sh.access, 'g:' || g.name
 		FROM shares sh JOIN calendars c ON c.id = sh.calendar_id JOIN users u ON u.id = c.owner_id JOIN groups g ON g.id = sh.group_id
 		WHERE sh.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?) AND c.deleted_at IS NULL AND c.owner_id <> ?
-		ORDER BY 1, 4`, userID, userID, userID)
+		ORDER BY 2, 5`, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +104,7 @@ func (s *Service) AdminSharedWith(ctx context.Context, userID int64) ([]SharedWi
 	out := []SharedWith{}
 	for rows.Next() {
 		var w SharedWith
-		if err := rows.Scan(&w.Ref, &w.Name, &w.Access, &w.Via); err != nil {
+		if err := rows.Scan(&w.ID, &w.Ref, &w.Name, &w.Access, &w.Via); err != nil {
 			return nil, err
 		}
 		out = append(out, w)
@@ -201,4 +207,35 @@ func (s *Service) AdminCounts(ctx context.Context) (Counts, error) {
 		(SELECT count(*) FROM objects),
 		(SELECT COALESCE(sum(length(data)), 0) FROM objects)`).Scan(&c.Calendars, &c.Events, &c.Bytes)
 	return c, err
+}
+
+var uidRule = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// IsID reports whether s looks like a calendar's id (a UUID).
+func IsID(s string) bool { return uidRule.MatchString(s) }
+
+// RefOf is the calendar a key names: its id (what the admin's addresses
+// use), or owner~slug (older links, the activity log).
+func (s *Service) RefOf(ctx context.Context, key string) (Ref, error) {
+	if !IsID(key) {
+		return ParseRef(key)
+	}
+	var r Ref
+	err := s.db.QueryRowContext(ctx, `SELECT u.name, c.slug FROM calendars c JOIN users u ON u.id = c.owner_id
+		WHERE c.uid = ? AND c.deleted_at IS NULL`, key).Scan(&r.Owner, &r.Slug)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Ref{}, ErrNotFound
+	}
+	return r, err
+}
+
+// IDOf is a live calendar's id.
+func (s *Service) IDOf(ctx context.Context, r Ref) (string, error) {
+	var id string
+	err := s.db.QueryRowContext(ctx, `SELECT c.uid FROM calendars c JOIN users u ON u.id = c.owner_id
+		WHERE u.name = ? AND c.slug = ? AND c.deleted_at IS NULL`, r.Owner, r.Slug).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return id, err
 }

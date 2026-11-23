@@ -19,6 +19,7 @@ import { t } from '@/admin/pages/Calendar.msg.ts';
  */
 
 export interface CalendarStats {
+  id: string;
   ref: string;
   owner: string;
   name: string;
@@ -89,7 +90,7 @@ export class CalendarPage extends AdminPage {
   }
 
   private overview(st: CalendarStats): Child[] {
-    const base = `/calendars/${seg(st.ref)}`;
+    const base = `/calendars/${seg(st.id)}`;
     const share = st.events === 0 ? 0 : Math.round((st.recurring / st.events) * 100);
     return [
       h('section', { class: `${ui.card} flex-row flex-wrap items-center gap-4` },
@@ -100,7 +101,7 @@ export class CalendarPage extends AdminPage {
             ...withElement('ownerIs', 'owner', h('a', { href: `/users/${seg(st.owner)}`, class: ui.link }, st.owner)),
             ` · ${st.ref} · ${st.timezone} · ${t('createdOn', { date: day(st.created_at) })}`),
           st.description !== '' ? h('p', { class: 'text-sm' }, st.description) : null),
-        h('a', { class: ui.btn('tonal', 'sm'), href: this.api.url(`/calendars/${seg(st.ref)}/export`), download: `${st.ref}.ics` }, icon('download'), t('download'))),
+        h('a', { class: ui.btn('tonal', 'sm'), href: this.api.url(`/calendars/${seg(st.id)}/export`), download: `${st.ref}.ics` }, icon('download'), t('download'))),
       h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
         tile(String(st.events), t('eventsTile', { count: st.events }), t('eventsSub', { recurring: st.recurring, share, allDay: st.all_day })),
         tile(bytes(st.bytes), t('dataTile'), t('dataSub', { size: bytes(st.events === 0 ? 0 : Math.round(st.bytes / st.events)) })),
@@ -144,7 +145,7 @@ export class CalendarPage extends AdminPage {
         h('option', { value: 'read', selected: current === 'read' }, t('read')),
         h('option', { value: 'readwrite', selected: current === 'readwrite' }, t('readwrite'))));
       sel.classList.add('!w-44', '!min-h-9', '!py-1');
-      sel.addEventListener('change', () => void this.act(() => this.api.put(`/calendars/${seg(st.ref)}/shares/${seg(target)}`, { access: sel.value }), t('accessChanged')));
+      sel.addEventListener('change', () => void this.act(() => this.api.put(`/calendars/${seg(st.id)}/shares/${seg(target)}`, { access: sel.value }), t('accessChanged')));
       return sel;
     };
     const owner = users.find((u) => u.name === st.owner);
@@ -169,7 +170,7 @@ export class CalendarPage extends AdminPage {
           title,
           sub: isGroup ? `${name} · ${g === undefined || g.members.length === 0 ? t('noMembers') : g.members.join(', ')}` : name,
           actions: [accessSelect(m.target, m.access, title),
-            action(t('remove'), () => this.act(() => this.api.delete(`/calendars/${seg(st.ref)}/shares/${seg(m.target)}`), t('memberRemoved')), 'danger-text', 'close', 'sm')],
+            action(t('remove'), () => this.act(() => this.api.delete(`/calendars/${seg(st.id)}/shares/${seg(m.target)}`), t('memberRemoved')), 'danger-text', 'close', 'sm')],
         };
       }),
     ];
@@ -192,7 +193,7 @@ export class CalendarPage extends AdminPage {
     const who = h('select', { required: true }, ...options);
     const access = h('select', {}, h('option', { value: 'read' }, t('read')), h('option', { value: 'readwrite' }, t('readwrite')));
     const ok = await formDialog(this.doc, t('addMemberTo', { name: st.name }), [field(t('member'), who), field(t('access'), access)], t('add'),
-      () => this.api.put(`/calendars/${seg(st.ref)}/shares/${seg(who.value)}`, { access: access.value }));
+      () => this.api.put(`/calendars/${seg(st.id)}/shares/${seg(who.value)}`, { access: access.value }));
     if (!ok) return;
     this.toasts.show(t('memberAdded'));
     this.doc.dispatchEvent(new Event('agd:changed'));
@@ -209,8 +210,8 @@ export class CalendarPage extends AdminPage {
     [{ label: t('cancel'), value: 'no' }, { label: t('transfer'), value: 'yes', kind: 'filled' }]);
     if (v !== 'yes' || select.value === '') return;
     try {
-      const r = await this.api.post<{ ref?: string }>(`/calendars/${seg(st.ref)}/transfer`, { to: select.value, keep: keep.checked });
-      this.doc.location.assign(r.ref !== undefined ? `/calendars/${seg(r.ref)}` : `/users/${seg(select.value)}/calendars`);
+      const r = await this.api.post<{ ref?: string; id?: string }>(`/calendars/${seg(st.id)}/transfer`, { to: select.value, keep: keep.checked });
+      this.doc.location.assign(r.id !== undefined ? `/calendars/${seg(r.id)}` : `/users/${seg(select.value)}/calendars`);
     } catch (e) {
       this.toasts.error(e);
     }
@@ -224,7 +225,7 @@ export class CalendarPage extends AdminPage {
     ], [{ label: t('cancel'), value: 'no' }, { label: t('delete'), value: 'yes', kind: 'danger' }]);
     if (v !== 'yes') return;
     try {
-      await this.api.delete(`/calendars/${seg(st.ref)}`, { confirm: typed.value });
+      await this.api.delete(`/calendars/${seg(st.id)}`, { confirm: typed.value });
       this.doc.location.assign('/calendars');
     } catch (e) {
       this.toasts.error(e);
@@ -240,6 +241,7 @@ function tile(n: string, label: string, sub: string): HTMLElement {
 }
 
 interface CalendarRow {
+  id: string;
   ref: string;
   owner: string;
   name: string;
@@ -268,7 +270,7 @@ export class CalendarsPage extends AdminPage {
       const shown = calendars.filter((c) => q === '' || [c.name, c.ref, c.owner, ...c.shares.map((s) => s.target)].some((x) => x.toLowerCase().includes(q)));
       count.textContent = t('shownOf', { shown: shown.length, total: calendars.length });
       list.replaceChildren(entries(shown.map((c) => ({
-        href: `/calendars/${seg(c.ref)}`,
+        href: `/calendars/${seg(c.id)}`,
         lead: calendarMark(c.color),
         title: c.name,
         sub: `${t('ownedBy', { owner: c.owner })} · ${c.shares.length === 0 ? t('noMembers') : c.shares.map((s) => s.target.startsWith('g:') ? t('memberGroup', { name: s.target.slice(2) }) : s.target.slice(2)).join(', ')}`,

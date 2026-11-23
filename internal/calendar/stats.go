@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/store"
@@ -63,20 +62,21 @@ const StatsDays = 90
 // AdminStats is a calendar's stats (the admin's calendar page), by ref
 // ("owner~slug").
 func (s *Service) AdminStats(ctx context.Context, ref string) (CalendarStats, error) {
-	owner, slug, ok := strings.Cut(ref, "~")
-	if !ok || owner == "" || slug == "" {
+	r, err := s.RefOf(ctx, ref)
+	if err != nil {
 		return CalendarStats{}, ErrNotFound
 	}
+	owner, slug := r.Owner, r.Slug
 	var st CalendarStats
 	var id int64
 	var created string
-	err := s.db.QueryRowContext(ctx, `SELECT c.id, c.name, c.color, c.timezone, c.description, c.created_at,
+	err = s.db.QueryRowContext(ctx, `SELECT c.id, c.uid, c.name, c.color, c.timezone, c.description, c.created_at,
 		(SELECT count(*) FROM objects o WHERE o.calendar_id = c.id),
 		(SELECT COALESCE(sum(length(o.data)), 0) FROM objects o WHERE o.calendar_id = c.id),
 		(SELECT count(*) FROM objects o WHERE o.calendar_id = c.id AND o.recurring = 1),
 		(SELECT count(*) FROM objects o WHERE o.calendar_id = c.id AND o.all_day = 1)
 		FROM calendars c JOIN users u ON u.id = c.owner_id WHERE u.name = ? AND c.slug = ? AND c.deleted_at IS NULL`, owner, slug).
-		Scan(&id, &st.Name, &st.Color, &st.Timezone, &st.Description, &created, &st.Events, &st.Bytes, &st.Recurring, &st.AllDay)
+		Scan(&id, &st.ID, &st.Name, &st.Color, &st.Timezone, &st.Description, &created, &st.Events, &st.Bytes, &st.Recurring, &st.AllDay)
 	if errors.Is(err, sql.ErrNoRows) {
 		return CalendarStats{}, ErrNotFound
 	}

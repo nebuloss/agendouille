@@ -748,7 +748,7 @@ func (h *handlers) calendars(w http.ResponseWriter, r *http.Request) {
 
 // exportCalendar is one calendar as .ics, a backup of it (recorded).
 func (h *handlers) exportCalendar(w http.ResponseWriter, r *http.Request) {
-	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	ref, err := h.d.Calendar.RefOf(r.Context(), r.PathValue("ref"))
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -812,7 +812,7 @@ func (h *handlers) calendarStats(w http.ResponseWriter, r *http.Request) {
 // user's call), so the owner's group visibility does not bound it; the
 // owner always has it, and is not a member.
 func (h *handlers) share(w http.ResponseWriter, r *http.Request) {
-	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	ref, err := h.d.Calendar.RefOf(r.Context(), r.PathValue("ref"))
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -864,7 +864,7 @@ func (h *handlers) accessChanged(i calendar.Info) {
 }
 
 func (h *handlers) unshare(w http.ResponseWriter, r *http.Request) {
-	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	ref, err := h.d.Calendar.RefOf(r.Context(), r.PathValue("ref"))
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -888,7 +888,7 @@ func (h *handlers) unshare(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) transfer(w http.ResponseWriter, r *http.Request) {
-	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	ref, err := h.d.Calendar.RefOf(r.Context(), r.PathValue("ref"))
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -905,11 +905,12 @@ func (h *handlers) transfer(w http.ResponseWriter, r *http.Request) {
 		h.failIn(w, r, err)
 		return
 	}
-	webx.JSON(w, http.StatusOK, map[string]string{"ref": i.Ref.String()})
+	id, _ := h.d.Calendar.IDOf(r.Context(), i.Ref)
+	webx.JSON(w, http.StatusOK, map[string]string{"ref": i.Ref.String(), "id": id})
 }
 
 func (h *handlers) deleteCalendar(w http.ResponseWriter, r *http.Request) {
-	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	ref, err := h.d.Calendar.RefOf(r.Context(), r.PathValue("ref"))
 	if err != nil {
 		h.failIn(w, r, err)
 		return

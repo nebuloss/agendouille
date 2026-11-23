@@ -62,6 +62,7 @@ interface Session {
 }
 
 interface CalendarMeta {
+  id: string;
   ref: string;
   name: string;
   color: string;
@@ -77,7 +78,7 @@ interface UserDetail {
   devices: Device[];
   sessions: Session[];
   calendars_owned: CalendarMeta[];
-  calendars_shared: { ref: string; name: string; access: string; via: string }[];
+  calendars_shared: { id: string; ref: string; name: string; access: string; via: string }[];
 }
 
 /** "vu il y a 3 jours", or "jamais vu". */
@@ -251,12 +252,12 @@ export class UserPage extends AdminPage {
       section(t('ownCalendars', { count: d.calendars_owned.length }),
         h('p', { class: 'text-sm text-on-surface-variant' }, t('adminNoEvents')),
         entries(d.calendars_owned.map((c) => ({
-          href: `/calendars/${seg(c.ref)}`, lead: calendarMark(c.color), title: c.name, sub: `${c.ref} · ${membersLine(c)}`,
+          href: `/calendars/${seg(c.id)}`, lead: calendarMark(c.color), title: c.name, sub: `${c.ref} · ${membersLine(c)}`,
           stats: [{ n: String(c.events), label: t('eventsStat', { count: c.events }) }, { n: bytes(c.bytes), label: t('size') }],
         })), t('noOwnCalendars'))),
       section(t('sharedCalendars', { count: d.calendars_shared.length }),
         entries(d.calendars_shared.map((c) => ({
-          href: `/calendars/${seg(c.ref)}`, lead: calendarMark(''), title: c.name,
+          href: `/calendars/${seg(c.id)}`, lead: calendarMark(''), title: c.name,
           sub: `${t('from', { owner: c.ref.split('~')[0] ?? '' })} · ${c.via.startsWith('g:') ? t('viaGroup', { group: c.via.slice(2) }) : t('viaDirect')}`,
           tags: [h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))],
         })), t('noShared'))));

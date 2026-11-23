@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"github.com/nebuloss/agendouille/internal/calendar"
 	"net/http"
 	"net/url"
 
@@ -38,8 +39,8 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.Handle("GET /users/{name}/{sub}", h.page(h.shell("user", "users", "")))
 	mux.Handle("GET /groups/{name}", h.page(h.shell("group", "groups", "")))
 	mux.Handle("GET /groups/{name}/{sub}", h.page(h.shell("group", "groups", "")))
-	mux.Handle("GET /calendars/{name}", h.page(h.shell("calendar", "calendars", "")))
-	mux.Handle("GET /calendars/{name}/{sub}", h.page(h.shell("calendar", "calendars", "")))
+	mux.Handle("GET /calendars/{name}", h.page(h.calendarByID(h.shell("calendar", "calendars", ""))))
+	mux.Handle("GET /calendars/{name}/{sub}", h.page(h.calendarByID(h.shell("calendar", "calendars", ""))))
 	// Links from before (/admin, /admin/users/lea, a bookmark) land on the
 	// same page without the prefix.
 	legacy := func(w http.ResponseWriter, r *http.Request) {
@@ -130,4 +131,30 @@ func (h *handlers) signout(w http.ResponseWriter, r *http.Request) {
 	h.d.Auth.SignOut(r, auth.SurfaceAdmin)
 	auth.ClearCookie(w, auth.SurfaceAdmin, h.secure())
 	http.Redirect(w, r, "/signin", http.StatusSeeOther)
+}
+
+// calendarByID sends an address that names a calendar by owner~slug (before
+// calendars had ids, or a link from the activity log) to its id's address:
+// the one that survives a transfer (DECISIONS: calendar ids).
+func (h *handlers) calendarByID(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key := r.PathValue("name")
+		if calendar.IsID(key) {
+			next(w, r)
+			return
+		}
+		ref, err := h.d.Calendar.RefOf(r.Context(), key)
+		if err == nil {
+			var id string
+			if id, err = h.d.Calendar.IDOf(r.Context(), ref); err == nil {
+				to := "/calendars/" + id
+				if sub := r.PathValue("sub"); sub != "" {
+					to += "/" + url.PathEscape(sub)
+				}
+				http.Redirect(w, r, to, http.StatusMovedPermanently)
+				return
+			}
+		}
+		http.Redirect(w, r, "/calendars", http.StatusSeeOther)
+	}
 }
