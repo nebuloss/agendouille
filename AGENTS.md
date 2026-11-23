@@ -1,6 +1,6 @@
 # AGENTS.md: agendouille
 
-agendouille is one shared calendar for a family: a Go server with an
+agendouille is a family's shared calendars: a Go server with an
 embedded TypeScript web UI, read and written over CalDAV by phones
 (Android through DAVx5, iOS natively) and Thunderbird, reached from the
 internet through a reverse proxy.
@@ -39,7 +39,7 @@ scripts/remote.sh <cmd>  # run anything in the remote tree
   (it runs there through `rtk`). Never build on the editing machine. A pass
   on dev-build is the only pass that counts.
 - **No cgo, ever.** Releases cross-compile with `CGO_ENABLED=0`.
-- **No Android build on the editing machine.** If M7 happens, the APK is
+- **No Android build on the editing machine.** If M8 happens, the APK is
   built in a container on dev-build and in CI.
 
 ## Gotchas that will cost you an afternoon
@@ -57,5 +57,11 @@ scripts/remote.sh <cmd>  # run anything in the remote tree
   server host's (PLAN 4.4). Test across the DST change.
 - **Devices, not passwords, on CalDAV.** Basic auth takes device passwords
   only; the member's web password is refused there on purpose.
+- **Three surfaces, maybe on different listeners** (`dav`, `app`, `admin`;
+  PLAN 9.1). A handler belongs to exactly one, and its absolute URLs come
+  from that surface's listener, never from the request's `Host`. The admin
+  UI may be on a LAN address that the DMZ never sees.
+- **`src/app` and `src/admin` never import each other**; shared code goes
+  in `src/shared`. The admin bundle must not be served on the DMZ.
 - **Templates and static files live under `internal/web/assets/`**:
   `go:embed` cannot reach a parent directory.
