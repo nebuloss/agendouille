@@ -1,4 +1,5 @@
 import { ui } from '@/shared/components/recipes.ts';
+import { icon } from '@/shared/components/icons.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { ApiError, seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
@@ -299,8 +300,20 @@ interface Backup {
 export class BackupsPage extends AdminPage {
   protected async render(): Promise<Child[]> {
     const { backups } = await this.api.get<{ backups: Backup[] }>('/backups');
+    const { calendars } = await this.api.get<{ calendars: { ref: string; name: string; owner: string; color: string; events: number }[] }>('/calendars');
+    const icsCard = card('Calendriers en .ics', [
+      h('a', { class: ui.btn('tonal'), href: this.api.url('/calendars/export.zip'), download: '' }, icon('download'), 'Tous, en .zip'),
+    ],
+    h('p', { class: 'text-sm text-on-surface-variant' }, "Chaque calendrier dans un fichier que n'importe quelle application d'agenda relit, ou que son propriétaire réimporte. Ces fichiers contiennent les événements ; chaque téléchargement est noté dans l'activité."),
+    calendars.length === 0 ? h('p', { class: ui.empty }, 'Aucun calendrier.')
+      : h('div', { class: ui.well }, ...calendars.map((c) => h('div', { class: 'flex min-h-14 items-center gap-3 border-b border-outline-variant/50 px-4 py-2.5 last:border-0' },
+        swatch(c.color, 'md'),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('a', { href: `/calendars/${seg(c.ref)}`, class: 'truncate font-semibold text-on-surface no-underline hover:underline' }, c.name),
+          h('span', { class: 'text-xs text-on-surface-variant' }, `à ${c.owner} · ${c.events} événement${c.events === 1 ? '' : 's'}`)),
+        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`/calendars/${seg(c.ref)}/export`), download: `${c.ref}.ics` }, icon('download'), '.ics')))));
     return [
-      h('div', { class: 'flex flex-wrap items-center gap-2' }, action('Sauvegarder maintenant', () => this.act(() => this.api.post('/backups'), 'Sauvegarde faite.'), 'filled')),
+      card('Base de données', [action('Sauvegarder maintenant', () => this.act(() => this.api.post('/backups'), 'Sauvegarde faite.'), 'filled', 'disk')],
+      h('p', { class: 'text-sm text-on-surface-variant' }, "Tout agendouille en un fichier : utilisateurs, groupes, calendriers, appareils, réglages. Faite chaque jour à l'heure des réglages ; restaurer redémarre le serveur."),
       table(['Sauvegarde', 'Faite', 'Taille', ''],
         backups.map((b) => [
           h('span', { class: 'font-mono text-[13px]' }, b.name, b.before_restore ? h('span', { class: 'mr-1 inline-flex h-6 items-center gap-1 rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface' }, 'avant restauration') : null),
@@ -309,7 +322,8 @@ export class BackupsPage extends AdminPage {
           h('span', { class: 'flex flex-wrap items-center gap-2' },
             h('a', { class: ui.btn('text'), href: this.api.url(`/backups/${seg(b.name)}`), download: b.name }, 'Télécharger'),
             action('Restaurer…', () => this.restore(b), 'text')),
-        ]), 'Aucune sauvegarde pour le moment.'),
+        ]), 'Aucune sauvegarde pour le moment.')),
+      icsCard,
     ];
   }
 

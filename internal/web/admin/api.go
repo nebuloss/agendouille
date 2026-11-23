@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"archive/zip"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -48,6 +49,8 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("DELETE /api/admin/groups/{name}", h.deleteGroup)
 	api("GET /api/admin/calendars", h.calendars)
 	api("GET /api/admin/calendars/{ref}/stats", h.calendarStats)
+	api("GET /api/admin/calendars/{ref}/export", h.exportCalendar)
+	api("GET /api/admin/calendars/export.zip", h.exportCalendars)
 	api("PUT /api/admin/calendars/{ref}/shares/{target}", h.share)
 	api("DELETE /api/admin/calendars/{ref}/shares/{target}", h.unshare)
 	api("POST /api/admin/calendars/{ref}/transfer", h.transfer)
@@ -638,6 +641,56 @@ func (h *handlers) calendars(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"calendars": cs})
+}
+
+// exportCalendar is one calendar as .ics, a backup of it (recorded).
+func (h *handlers) exportCalendar(w http.ResponseWriter, r *http.Request) {
+	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	data, _, err := h.d.Calendar.AdminExport(r.Context(), "admin", ref)
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+ref.String()+`.ics"`)
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(data)
+}
+
+// exportCalendars is every calendar as .ics, one file each, in a zip
+// named for the day: a backup that any calendar app reads back.
+func (h *handlers) exportCalendars(w http.ResponseWriter, r *http.Request) {
+	cs, err := h.d.Calendar.AdminCalendars(r.Context(), "")
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	day := h.d.Clock().UTC().Format("2006-01-02")
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", `attachment; filename="agendouille-calendriers-`+day+`.zip"`)
+	w.Header().Set("Cache-Control", "no-store")
+	z := zip.NewWriter(w)
+	for _, c := range cs {
+		ref, err := calendar.ParseRef(c.Ref)
+		if err != nil {
+			continue
+		}
+		data, _, err := h.d.Calendar.AdminExport(r.Context(), "admin", ref)
+		if err != nil {
+			h.d.Log.Error("calendar export", "ref", c.Ref, "err", err)
+			continue
+		}
+		f, err := z.Create(c.Ref + ".ics")
+		if err != nil {
+			break
+		}
+		_, _ = f.Write(data)
+	}
+	_ = z.Close()
 }
 
 // calendarStats is one calendar's stats page: counts, times, who and from

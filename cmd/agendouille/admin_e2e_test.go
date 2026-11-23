@@ -228,6 +228,18 @@ func TestM3AdminUI(t *testing.T) {
 		t.Errorf("sharing with no one: %d", a.status)
 	}
 	A.call("DELETE", "/calendars/lea~perso/shares/u:maman", nil)
+	// A calendar as .ics, the admin's backup of it: the events are in it,
+	// and the download is in the activity.
+	if a := A.call("GET", "/calendars/lea~perso/export", nil); a.status != 200 || !strings.Contains(a.body, "SUMMARY:SECRET-DENTIST") ||
+		!strings.HasPrefix(a.header.Get("Content-Type"), "text/calendar") {
+		t.Errorf("calendar export: %d %s", a.status, a.header.Get("Content-Type"))
+	}
+	if act := A.json("GET", "/activity?kind=calendar", nil, 200); !strings.Contains(asJSON(act), `"action":"exported"`) {
+		t.Errorf("the export is not in the activity: %v", act)
+	}
+	if a := A.call("GET", "/calendars/export.zip", nil); a.status != 200 || a.header.Get("Content-Type") != "application/zip" || !strings.Contains(a.body, "lea~perso.ics") {
+		t.Errorf("calendars zip: %d %s", a.status, a.header.Get("Content-Type"))
+	}
 	if a := A.call("GET", "/calendars/lea~nope/stats", nil); a.status != http.StatusNotFound {
 		t.Errorf("stats of no calendar: %d", a.status)
 	}

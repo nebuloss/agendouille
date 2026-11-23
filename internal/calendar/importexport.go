@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/nebuloss/agendouille/internal/store"
 	"regexp"
 
 	"github.com/nebuloss/agendouille/internal/ical"
@@ -176,4 +177,22 @@ func (s *Service) ExportMany(ctx context.Context, infos []Info, name, zone, refr
 	}
 	out.Children = append(out.Children, events...)
 	return ical.Encode(out), nil
+}
+
+// AdminExport is a calendar as .ics for the admin's backups (the user's
+// call: the admin already downloads whole database backups). Unlike the
+// rest of the admin's calls it carries the events, so it is recorded in
+// the audit, where the activity log shows it.
+func (s *Service) AdminExport(ctx context.Context, actor string, r Ref) ([]byte, Info, error) {
+	i, err := s.lookup(ctx, Operator(actor), r)
+	if err != nil {
+		return nil, Info{}, err
+	}
+	data, err := s.ExportInfo(ctx, i)
+	if err != nil {
+		return nil, Info{}, err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, calendar_id, detail) VALUES (?, ?, 'calendar', 'exported', ?, ?)`,
+		store.Time(s.now()), actor, i.ID, r.String())
+	return data, i, err
 }

@@ -3,6 +3,19 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: calendars as .ics from the admin UI
+
+The user: "we should be able to backup calendar as ics in admin page".
+
+- A calendar's page has "Télécharger en .ics", and Sauvegardes has every
+  calendar as .ics, one by one or all in a zip
+  (`GET /api/admin/calendars/{ref}/export`, `.../calendars/export.zip`).
+- **This is the one admin call that carries events.** The admin already
+  downloads whole database backups, which hold them too, so it adds no
+  reach; what the UI shows stays metadata. Each download is recorded in
+  the audit ("calendar exported"), so the activity log shows who took
+  which calendar and when.
+
 ## 2026-11-23: calendars back at the top, with owner, members and stats
 
 The user: "activity should use relevant column that cover all type of

@@ -80,7 +80,7 @@ export class CalendarPage extends AdminPage {
             'À ', h('a', { href: `/users/${seg(st.owner)}`, class: ui.link }, st.owner),
             ` · ${st.ref} · ${st.timezone} · créé le ${day(st.created_at)}`),
           st.description !== '' ? h('p', { class: 'text-sm' }, st.description) : null),
-        h('span', { class: ui.pill.muted }, st.shares.length === 0 ? 'partagé avec personne' : `partagé ${st.shares.length} fois`)),
+        h('a', { class: ui.btn('tonal', 'sm'), href: this.api.url(`/calendars/${seg(st.ref)}/export`), download: `${st.ref}.ics` }, icon('download'), 'Télécharger en .ics')),
       h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
         tile(String(st.events), 'événements', `dont ${st.recurring} récurrents (${share} %), ${st.all_day} sur la journée`),
         tile(bytes(st.bytes), 'de données', `soit ${st.events === 0 ? 0 : Math.round(st.bytes / st.events)} o par événement`),

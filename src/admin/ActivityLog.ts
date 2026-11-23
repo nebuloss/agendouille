@@ -72,7 +72,7 @@ const ACCESS_WORD: Record<string, string> = { read: 'lecture', readwrite: 'lectu
 const VERBS: Record<string, string> = {
   'event created': 'a créé un événement', 'event changed': 'a modifié un événement', 'event deleted': 'a supprimé un événement',
   'calendar created': 'a créé un calendrier', 'calendar deleted': 'a supprimé un calendrier', 'calendar transferred': 'a donné un calendrier',
-  'calendar changed': 'a modifié un calendrier',
+  'calendar changed': 'a modifié un calendrier', 'calendar exported': 'a téléchargé un calendrier en .ics',
   'share shared': 'a partagé un calendrier', 'share unshared': 'a retiré un partage',
   'user added': 'a ajouté un utilisateur', 'user changed': 'a modifié un utilisateur', 'user removed': 'a supprimé un utilisateur',
   'user disabled': 'a désactivé un utilisateur', 'user enabled': 'a réactivé un utilisateur', 'user groups': 'a changé les groupes de',
