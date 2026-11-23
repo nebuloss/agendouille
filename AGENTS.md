@@ -12,12 +12,28 @@ the two disagree on. Record every deviation, with the reason, in
 
 ## Status
 
-M0 is done: `agendouille serve|config|version`, the bootstrap config
-(`internal/config`), the admin listener with `/healthz` and the admin
-bundle (`internal/web/assets`, one bundle per surface), the two Vite
-bundles, `src/shared/core` (Dom, Disposable, Clock, Backoff, Pages) with
-tests, the import-rule test, CI, release, `scripts/remote.sh`. Next is M1
-(PLAN section 15).
+M0 and M1 are done. What exists:
+- `cmd/agendouille`: `serve`, `config [set k v ...]`, `admin passwd
+  [--random]`, `user add|enrol|list|disable|enable|remove`, `group
+  add|list|remove|member`, `version`. `serve` refuses to start without an
+  admin password.
+- `internal/store` (migrations in `migrations/*.sql`, times as text in
+  `store.TimeFormat`), `internal/settings` (typed, validated together,
+  live: `Subscribe`, and `Watch` for changes another process made),
+  `internal/directory` (users, groups, `Sees`), `internal/auth` (admin
+  password with argon2id, sessions per surface, enrolment links,
+  approvals with number matching, device credentials and Basic auth,
+  `ClientIP`, `SameOrigin`), `internal/surface` (the admin listener from
+  the bootstrap file, the public one from `public_listen`, rebound live).
+- `internal/web/app`: `/signin` (QR, short code, number), `/signin/wait`,
+  `/enrol/{token}`, `/approve`, `/api/me`, `/api/approvals/{code}`,
+  `/api/app/enrol|session|config`. `internal/web/admin`: `/admin/signin`
+  and a placeholder home. `internal/dav`: only the Basic check (`501`
+  once signed in). `src/app/pages`: `SigninPage` (waits on the long-poll),
+  `ApprovePage` (reads the code from a scanned QR's fragment).
+- `cmd/agendouille/e2e_test.go` drives M1's "done when" over HTTP.
+
+Next is M2, CalDAV (PLAN section 15).
 
 ## Conventions come from cafard and claudication
 
@@ -80,5 +96,14 @@ install'`, and copy `package-lock.json` back with `scp`.
   translate their code (PLAN 7.3).
 - **iCalendar fixtures are shared** between Go and the Android JVM tests
   (`testdata/ical/`). Change one side, run both.
+- **No rate limits, on purpose** (DECISIONS 2026-11-23). Do not add one to
+  a route that checks a random secret; keep secrets random and long
+  instead.
+- **A setting changed from the CLI reaches a running server through
+  `settings.Watch`** (every 5 s), not through its own `Set`. Tests that
+  change settings from a second `services` lower `settingsPoll`.
+- **The remote tree is rsynced with `--delete`:** a `go get` or `npm
+  install` run there is undone by the next `scripts/remote.sh` unless
+  `go.mod`/`go.sum`/`package-lock.json` are copied back with `scp` first.
 - **Templates and static files live under `internal/web/assets/`**:
   `go:embed` cannot reach a parent directory.

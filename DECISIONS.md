@@ -3,6 +3,34 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M1 notes
+
+- **No rate limits** (the user: "rate limit is useless"). Every secret
+  agendouille checks but one is random and at least 128 bits (device
+  credentials 160, sessions and enrolment tokens 256), and an approval
+  needs a signed-in approver and dies on a wrong number. The exception,
+  the admin password, sits on the LAN-only listener behind argon2id.
+  What stays is resource protection, not guessing protection: at most two
+  argon2 derivations at once (64 MiB each), and at most 200 approvals
+  waiting, since `/signin` is open to anyone and stores a row. PLAN 10,
+  11.2 and CONTRACTS 3.1 lose their rate-limit entries.
+- **The short code is 6 characters**, not 7: "KQ4-7XM" as PLAN shows it,
+  about 28 bits from a 27-letter alphabet without look-alikes. Enough for
+  a code that lives two minutes and only signed-in users can try.
+- **Setting names carry their unit**: `session_ttl_days`,
+  `enrolment_link_ttl_hours`, `app_sync_interval_minutes`,
+  `sync_token_retention_days`. `config set session_ttl 90` cannot then mean
+  90 seconds to one reader and 90 days to another.
+- **Admin sessions are in the database** (cafard keeps them in memory), so
+  a restart does not sign the admin out; they still last 12 hours.
+- **`serve` watches the settings table** every five seconds, so `config
+  set` from a shell reaches a running server, as the admin UI's changes
+  will.
+- **The approval page works without the bundle**: `/approve` is a plain
+  form, and `/signin` has a "continue" button that collects the session
+  with `?then=redirect`. The bundle only reads a scanned QR's fragment
+  (which never reaches the server) and waits on the long-poll by itself.
+
 ## 2026-11-23: M0 notes
 
 - **No Node or Go on the editing machine.** AGENTS.md said npm checks run

@@ -20,8 +20,8 @@ A self-hosted calendar server for a family, at home, with nothing outside.
 Sync is standard CalDAV for everyone; sharing and sign-in go through an
 additional API. One Go binary, SQLite, behind a reverse proxy in the DMZ.
 
-**Status: M0, the skeleton.** It builds, runs and answers `/healthz` on
-the admin listener; nothing else yet. See `PLAN.md` for the design,
+**Status: M1.** Users, groups, settings, both listeners and signing in
+work; calendars do not exist yet (M2). See `PLAN.md` for the design,
 `CONTRACTS.md` for the interfaces and `DECISIONS.md` for what was decided
 and why.
 
@@ -42,11 +42,23 @@ bundles still runs.
 ## Run
 
 ```sh
-agendouille version
-agendouille config          # validate and print the bootstrap configuration
-agendouille serve -data-dir ./data
-curl http://127.0.0.1:8792/healthz   # ok dev
+agendouille admin passwd --random     # printed once; serve refuses to start without it
+agendouille serve                     # the admin UI on 127.0.0.1:8792
+curl http://127.0.0.1:8792/healthz    # ok dev
+
+# The public side (CalDAV and the family web app), for the DMZ proxy:
+agendouille config set public_listen 0.0.0.0:8791 public_url https://agenda.example.org
+
+agendouille group add famille
+agendouille user add lea --display-name Léa --group famille
+agendouille user enrol lea            # a one-time sign-in link and QR code, 72 hours
 ```
+
+Users have no password and no email. The enrolment QR signs in their first
+device; after that, any browser shows a QR code at `/signin` that a
+signed-in phone approves (`/approve`, or the agendouille app's scanner),
+picking the number the browser shows. `agendouille config` prints the
+settings; a running server picks up `config set` within seconds.
 
 The bootstrap file is `/etc/agendouille.yaml` (or `-config`, or
 `AGENDOUILLE_CONFIG`); every key is also a flag and an `AGENDOUILLE_*`

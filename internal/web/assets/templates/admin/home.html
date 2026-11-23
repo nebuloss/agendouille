@@ -1,0 +1,8 @@
+<h1>Administration</h1>
+{{with .Data}}
+<p>{{.Users}} utilisateur(s), {{.Groups}} groupe(s).</p>
+{{if .PublicURL}}<p>Accès public : {{.PublicURL}}</p>{{else}}<p role="alert">L'accès public n'est pas configuré (public_listen et public_url).</p>{{end}}
+<p>L'interface d'administration complète arrive bientôt (M3). En attendant : <code>agendouille user</code>,
+<code>agendouille group</code> et <code>agendouille config set</code>.</p>
+<form method="post" action="/admin/signout"><button type="submit">Se déconnecter</button></form>
+{{end}}

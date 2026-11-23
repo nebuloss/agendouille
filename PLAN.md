@@ -187,7 +187,7 @@ agendouille/
   internal/sharing/              calendar ownership, shares, effective access
   internal/auth/                 admin password, sessions, enrolment links, approvals,
                                  devices (credentials), subscription links, Basic auth,
-                                 rate limits, client IP, same-origin
+                                 client IP, same-origin
   internal/calendar/             calendars and objects: the one write path, changes,
                                  sync tokens, quotas, import/export
   internal/ical/                 parse, validate, index, expand, patch (pure)
@@ -300,7 +300,7 @@ The **etag** is the hex SHA-256 of the stored text, 16 bytes, quoted. The
 **ctag** is `<n>`.
 
 Tombstones (the `changes` rows of deletions) older than
-`sync_token_retention` (Default 180 days) are pruned; an older token gets
+`sync_token_retention_days` (Default 180) are pruned; an older token gets
 `403 DAV:valid-sync-token` and the client syncs in full (RFC 6578 3.2).
 
 Gaining access to a calendar (a new share, joining a group) makes it appear
@@ -594,7 +594,10 @@ outside.
    browser shows (`42`). A wrong pick cancels the request.
 4. The waiting browser is signed in within a second.
 
-Codes live **2 minutes**, are single use, and are rate limited per IP.
+Codes live **2 minutes** and are single use; at most 200 wait at once
+(the only cap: `/signin` is open to the internet and stores a row). The
+short code is 6 characters (about 28 bits), enough because only a
+signed-in user can try one, for two minutes, and a wrong number cancels it.
 Number matching stops an attacker who shows our QR on their own page from
 getting a blind "yes". The scanner is TypeScript (`BarcodeDetector`, else
 `jsqr`), so the same approval works from an iPhone's browser.
@@ -756,10 +759,12 @@ fixed palette of twelve checked for contrast (cafard's
 - **CSRF**: state-changing web requests need `Sec-Fetch-Site: same-origin`
   or an `Origin` equal to the listener's `public_url`. `/dav/` and
   `/api/app/*` (bearer credentials, no cookies) are exempt.
-- **Rate limits** (settings): failed device credentials, approvals,
-  enrolments and admin sign-ins, per client IP and per account, counted
-  apart (a phone retrying a revoked credential does not lock its user out
-  of approvals). `429` with `Retry-After`.
+- **No rate limits** (Decided, user: "rate limit is useless"): every
+  secret but the admin password is random and at least 128 bits, so there
+  is nothing to guess, and an approval needs a signed-in approver. The
+  admin password sits on the LAN-only listener and behind argon2, with at
+  most two derivations at once so the sign-in form cannot exhaust memory.
+  The pending approvals are capped (8.2).
 - **Client IP**: the TCP peer, or the last hop of `X-Forwarded-For` from a
   peer in `trusted_proxies`.
 - **Exposure guard**: a non-loopback listener needs a `public_url`; an
@@ -808,20 +813,23 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | | `trusted_proxies` | `[]` |
 | Storage and backups | `backup_schedule` (daily at) | `03:30` |
 | | `backup_keep` | 14 |
-| | `sync_token_retention` | 180 days |
+| | `sync_token_retention_days` | 180 |
 | | `max_object_bytes` | 256 KiB |
 | Limits | `max_calendars_per_user` | 50 |
 | | `max_events_per_calendar` | 50 000 |
 | | `max_devices_per_user` | 20 |
-| | `rate_limit_failures` (per 15 min) | 10 |
 | Defaults | `family_timezone` | `Europe/Paris` |
 | | `palette` | the twelve colours |
-| | `enrolment_link_ttl` | 72 h |
-| | `session_ttl` | 90 days |
-| | `app_sync_interval` | 30 min |
+| | `enrolment_link_ttl_hours` | 72 |
+| | `session_ttl_days` | 90 |
+| | `app_sync_interval_minutes` | 30 (at least 15: Android's floor) |
 
+- Setting names carry their unit (`_days`, `_hours`, `_minutes`), so a
+  value typed in a shell cannot be read in the wrong one.
 - Changing `public_listen` or `public_url` rebinds the public listener
-  without a restart (the old one drains for 10 s). The page says that
+  without a restart (the old one drains for 10 s). A change made with
+  `agendouille config set` while the server runs reaches it within five
+  seconds (it watches the table). The page says that
   phones keep their URL, so changing `public_url` means re-enrolling them
   (and App Links follow the new host only with an APK that knows it: open
   question 3).
@@ -925,7 +933,7 @@ cafard's: build on dev-build, copy the binary to the home server, restart.
 | Vite, tsconfig, vitest, embed placeholder, `bundleBuilt` | `~/misc/cafard/` |
 | `main.go` shape, bootstrap config loading | `~/misc/cafard/cmd/cafard/`, `internal/config/` |
 | Migrations runner | `~/misc/cafard/internal/store/` |
-| Same-origin check, rate limiter | `~/misc/cafard/internal/auth/`, `internal/ratelimit/` |
+| Same-origin check | `~/misc/cafard/internal/auth/` |
 | SSE | `~/misc/cafard/internal/web/`, `src/core/` |
 | Package import rules test | `~/misc/claudication/internal/arch/` |
 | TS class style, `render/`, sinks check | `~/misc/cafard/src/`, `scripts/check-sinks.sh` |
@@ -1057,7 +1065,7 @@ M6, M7).
 - **Access**: owner, user share, group share, highest wins, device cap,
   hidden calendars leave the home, leaving a group, transfer, removal of a
   user with transfer.
-- **Security**: CSRF, rate limits apart, `X-Forwarded-For` only from
+- **Security**: CSRF, `X-Forwarded-For` only from
   trusted proxies, surfaces `404` off their listener, cookies do not cross
   surfaces, single-use links and codes, number matching, no event data in
   admin answers.

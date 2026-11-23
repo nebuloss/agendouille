@@ -20,7 +20,12 @@ Usage:
 
 Commands:
   serve     run the server
-  config    validate and print the effective bootstrap configuration
+  config    print the bootstrap configuration and the settings;
+            config set <key> <value>... changes settings
+  admin     admin passwd [--random]: set the admin password
+  user      add, enrol (a one-time sign-in link and QR), list, disable,
+            enable, remove
+  group     add, list, remove, member add|remove
   version   print the version
 
 Run "agendouille <command> -h" for the flags of one command. Every key of
@@ -54,6 +59,9 @@ type command func(ctx context.Context, e env, args []string) error
 var commands = map[string]command{
 	"serve":   cmdServe,
 	"config":  cmdConfig,
+	"admin":   cmdAdmin,
+	"user":    cmdUser,
+	"group":   cmdGroup,
 	"version": cmdVersion,
 }
 

@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"html/template"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -20,8 +21,26 @@ import (
 	"time"
 )
 
-//go:embed static
+//go:embed static templates
 var files embed.FS
+
+// Templates parses every .html under templates/, each named by its path
+// relative to templates/ ("layout.html", "app/signin.html").
+func Templates(funcs template.FuncMap) (*template.Template, error) {
+	root := template.New("").Funcs(funcs)
+	err := fs.WalkDir(files, "templates", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || path.Ext(p) != ".html" {
+			return err
+		}
+		body, err := files.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		_, err = root.New(strings.TrimPrefix(p, "templates/")).Parse(string(body))
+		return err
+	})
+	return root, err
+}
 
 // Bundle names one of the two TypeScript bundles.
 type Bundle string

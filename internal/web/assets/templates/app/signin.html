@@ -1,0 +1,18 @@
+<h1>Se connecter</h1>
+{{with .Data}}
+{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+{{if .Approval}}
+<p>Sur un appareil déjà connecté (votre téléphone, dans l'application agendouille), touchez
+<strong>Scanner</strong> et visez ce code, ou ouvrez <em>Approuver une connexion</em> et tapez le code
+ci-dessous.</p>
+<p><img id="signin-qr" src="{{.QR}}" alt="QR code de connexion" width="240" height="240"></p>
+<p>Code : <strong id="signin-short-code">{{.Approval.ShortCode}}</strong></p>
+<p>Quand on vous le demande, choisissez le nombre <strong id="signin-number">{{.Approval.Number}}</strong>.</p>
+<p>Ce code est valable deux minutes.</p>
+<form method="get" action="/signin/wait/{{.Approval.ID}}" id="signin-wait">
+  <input type="hidden" name="then" value="redirect">
+  <button type="submit">C'est approuvé, continuer</button>
+</form>
+<p><a href="/signin">Nouveau code</a></p>
+{{end}}
+{{end}}

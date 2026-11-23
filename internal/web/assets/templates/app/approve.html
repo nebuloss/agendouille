@@ -1,0 +1,24 @@
+<h1>Approuver une connexion</h1>
+{{with .Data}}
+{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+{{if .Done}}
+<p>C'est fait : l'autre appareil est connecté.</p>
+<p><a href="/">Retour</a></p>
+{{else if .View}}
+<p>Connecter <strong>{{.View.UserAgent}}</strong>, depuis {{.View.IP}}, en tant que
+<strong>{{.User}}</strong> ?</p>
+<p>Choisissez le nombre affiché sur l'autre écran. Un mauvais choix annule la demande.</p>
+<form method="post" action="/approve" id="approve-confirm">
+  <input type="hidden" name="code" value="{{.Code}}">
+  {{range .View.Numbers}}<button type="submit" name="number" value="{{.}}">{{.}}</button> {{end}}
+</form>
+<p><a href="/approve">Ce n'est pas moi</a></p>
+{{else}}
+<form method="post" action="/approve" id="approve-lookup">
+  <label>Code affiché sur l'autre écran
+    <input name="code" autocomplete="off" autocapitalize="characters" required>
+  </label>
+  <button type="submit">Suivant</button>
+</form>
+{{end}}
+{{end}}

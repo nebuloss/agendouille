@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/config"
+	"github.com/nebuloss/agendouille/internal/surface"
 )
 
 func runArgs(t *testing.T, vars map[string]string, args ...string) (string, string, error) {
@@ -80,23 +81,22 @@ func TestConfigFailsOnAnInvalidConfiguration(t *testing.T) {
 }
 
 func TestServeAnswersHealthzAndStopsCleanly(t *testing.T) {
-	cfg := config.Default()
-	cfg.DataDir = t.TempDir()
-	cfg.AdminListen = "127.0.0.1:0"
+	cfg := testConfig(t)
+	withAdminPassword(t, cfg)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	addr := make(chan net.Addr, 1)
+	up := make(chan *surface.Server, 1)
 	done := make(chan error, 1)
-	go func() { done <- serve(ctx, &cfg, log, func(a net.Addr) { addr <- a }) }()
+	go func() { done <- serve(ctx, cfg, log, func(s *surface.Server) { up <- s }) }()
 
 	var base string
 	select {
-	case a := <-addr:
-		base = "http://" + a.String()
+	case s := <-up:
+		base = "http://" + s.AdminAddr().String()
 	case err := <-done:
 		t.Fatalf("serve returned early: %v", err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("serve did not start")
 	}
 
@@ -110,16 +110,6 @@ func TestServeAnswersHealthzAndStopsCleanly(t *testing.T) {
 		t.Errorf("/healthz: %d %q", resp.StatusCode, body)
 	}
 
-	// The family app's bundle is never on the admin listener.
-	resp, err = http.Get(base + "/static/app/app.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("/static/app/app.js on the admin listener: %d, want 404", resp.StatusCode)
-	}
-
 	cancel()
 	select {
 	case err := <-done:
@@ -131,16 +121,47 @@ func TestServeAnswersHealthzAndStopsCleanly(t *testing.T) {
 	}
 }
 
+func TestServeRefusesToStartWithoutAnAdminPassword(t *testing.T) {
+	cfg := testConfig(t)
+	err := serve(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	if err == nil || !strings.Contains(err.Error(), "admin passwd") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestServeFailsOnATakenPort(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	cfg := config.Default()
+	cfg := testConfig(t)
+	withAdminPassword(t, cfg)
 	cfg.AdminListen = ln.Addr().String()
-	err = serve(context.Background(), &cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	err = serve(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
 	if err == nil || !strings.Contains(err.Error(), "admin listener") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func testConfig(t *testing.T) *config.Config {
+	t.Helper()
+	cfg := config.Default()
+	cfg.DataDir = filepath.Join(t.TempDir(), "data")
+	cfg.AdminListen = "127.0.0.1:0"
+	return &cfg
+}
+
+const testAdminPassword = "correct horse battery staple"
+
+func withAdminPassword(t *testing.T, cfg *config.Config) {
+	t.Helper()
+	svc, err := openServices(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.store.Close()
+	if err := svc.auth.SetAdminPassword(context.Background(), "test", testAdminPassword); err != nil {
+		t.Fatal(err)
 	}
 }

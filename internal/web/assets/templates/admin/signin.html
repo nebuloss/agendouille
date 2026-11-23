@@ -1,0 +1,10 @@
+<h1>Administration</h1>
+{{with .Data}}
+{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
+<form method="post" action="/admin/signin">
+  <label>Mot de passe administrateur
+    <input type="password" name="password" autocomplete="current-password" required autofocus>
+  </label>
+  <button type="submit">Se connecter</button>
+</form>
+{{end}}

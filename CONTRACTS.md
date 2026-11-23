@@ -44,7 +44,7 @@ between its parts**:
 | `internal/store` | `*sql.DB`, migrations, `Tx` | sqlite |
 | `internal/directory` | users, groups, membership, `Sees(a, b)` | store |
 | `internal/sharing` | ownership, shares, hidden flags, `Access(user, cal)` | store, directory |
-| `internal/auth` | admin password and sessions, app sessions, enrolment links, approvals, devices, subscription links, Basic auth, rate limits, client IP, same-origin | store, directory, settings |
+| `internal/auth` | admin password and sessions, app sessions, enrolment links, approvals, devices, subscription links, Basic auth, client IP, same-origin | store, directory, settings |
 | `internal/ical` | parse, validate, index, expand, patch (pure) | go-ical, rrule-go |
 | `internal/calendar` | calendars and objects: the one write path (1.3), changes, tokens, quotas, import/export | store, ical, hub, sharing, settings |
 | `internal/hub` | in-process fan-out of `calendar.Change` and access events | — |
@@ -221,11 +221,12 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | Method | Path | Auth |
 |---|---|---|
 | GET | `/signin` | none (starts an approval) |
-| GET | `/signin/wait/{id}` | none; long-poll; sets `agd_app` when approved |
+| GET | `/signin/wait/{id}` | none; long-poll (25 s): `{"status": "approved"}` with the `agd_app` cookie, `pending`, or 410 `cancelled`/`expired`/`used`; `?then=redirect` answers 303 to `/` or back to `/signin` instead, for a browser without the bundle |
 | GET, POST | `/enrol/{token}` | the token (GET shows "Continue"; POST redeems for this browser, so link previews do not burn it) |
 | GET | `/.well-known/assetlinks.json` | none |
 | GET | `/app/agendouille.apk`, `/app/version` | none |
 | GET | `/`, `/calendars`, `/approve`, `/devices`, `/me` | `agd_app` (else to `/signin`) |
+| POST | `/approve` | `agd_app`, same-origin; the form flow of `/api/approvals/{code}`: `code` alone shows the three numbers, `code` and `number` approves |
 | GET | `/static/app/...`, `/static/shared/...` | none |
 | POST | `/signout` | `agd_app`, same-origin |
 | GET, PATCH | `/api/me` | `agd_app` (PATCH same-origin) |
@@ -262,7 +263,7 @@ no same-origin):
 
 | Method | Path | Auth |
 |---|---|---|
-| GET, POST | `/admin/signin` | none; rate limited; password |
+| GET, POST | `/admin/signin` | none; password (two argon2 derivations at once at most) |
 | POST | `/admin/signout` | `agd_admin`, same-origin |
 | GET | `/admin`, `/admin/users[/{name}]`, `/admin/groups`, `/admin/calendars`, `/admin/activity`, `/admin/settings`, `/admin/backups` | `agd_admin` |
 | GET | `/static/admin/...`, `/static/shared/...` | none |
@@ -287,13 +288,14 @@ cookie on the admin surface is ignored.
 | 400 | `bad_request` (`field`) |
 | 401 | `unauthenticated` |
 | 403 | `forbidden`, `cross_origin`, `not_visible` (share target the owner does not see) |
+| 410 | `cancelled` (an approval answered with the wrong number) |
+| 503 | `busy` (too many sign-ins waiting) |
 | 404 | `not_found` (also: no access) |
 | 409 | `uid_conflict`, `slug_taken` |
 | 410 | `expired`, `used` (enrolment, approval) |
 | 412 | `precondition_failed` (`by`) |
 | 413 | `too_large` |
 | 422 | `invalid_event` (`field`) |
-| 429 | `rate_limited` (`retry_after`) |
 | 507 | `quota` (`limit`) |
 
 ### 3.2 Calendars and occurrences

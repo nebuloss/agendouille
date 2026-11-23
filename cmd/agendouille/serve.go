@@ -6,13 +6,26 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"time"
 
+	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/config"
+	"github.com/nebuloss/agendouille/internal/dav"
+	"github.com/nebuloss/agendouille/internal/deps"
+	"github.com/nebuloss/agendouille/internal/directory"
+	"github.com/nebuloss/agendouille/internal/settings"
+	"github.com/nebuloss/agendouille/internal/store"
+	"github.com/nebuloss/agendouille/internal/surface"
+	"github.com/nebuloss/agendouille/internal/web/admin"
+	"github.com/nebuloss/agendouille/internal/web/app"
 	"github.com/nebuloss/agendouille/internal/web/assets"
+	"github.com/nebuloss/agendouille/internal/web/webx"
 )
+
+// settingsPoll is how often serve looks for settings another process
+// (agendouille config set) wrote.
+var settingsPoll = 5 * time.Second
 
 func cmdServe(ctx context.Context, e env, args []string) error {
 	set := flag.NewFlagSet("agendouille serve", flag.ContinueOnError)
@@ -46,67 +59,111 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintln(w, "ok "+version)
 }
 
-// adminMux is everything the admin listener serves. In M0 that is the
-// health check and the admin bundle; the admin UI arrives in M1 and M3.
-func adminMux() (*http.ServeMux, error) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", healthz)
-	if err := assets.Register(mux, assets.Admin); err != nil {
+// services is everything that reads and writes the database.
+type services struct {
+	store    *store.Store
+	settings *settings.Service
+	dir      *directory.Service
+	auth     *auth.Service
+}
+
+func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
+	st, err := store.OpenDir(ctx, cfg.DataDir)
+	if err != nil {
 		return nil, err
 	}
-	return mux, nil
+	set, err := settings.Open(ctx, st.DB(), time.Now)
+	if err != nil {
+		st.Close()
+		return nil, err
+	}
+	dir := directory.New(st.DB(), time.Now, func() []string { return set.Get().Palette })
+	return &services{store: st, settings: set, dir: dir, auth: auth.New(st.DB(), time.Now, set, dir)}, nil
+}
+
+// muxes builds each listener's routes once: the public one holds the dav
+// and app surfaces, the admin one the admin surface, and nothing is in
+// both but /healthz.
+func muxes(d *deps.Deps) (public, adminMux http.Handler, err error) {
+	pub := http.NewServeMux()
+	pub.HandleFunc("GET /healthz", healthz)
+	dav.Register(pub, d)
+	if err := app.Register(pub, d); err != nil {
+		return nil, nil, err
+	}
+	adm := http.NewServeMux()
+	adm.HandleFunc("GET /healthz", healthz)
+	if err := admin.Register(adm, d); err != nil {
+		return nil, nil, err
+	}
+	return webx.Headers(pub), webx.Headers(adm), nil
 }
 
 // serve runs the server until ctx is cancelled, then shuts it down within
-// ten seconds. ready, when set, gets the admin listener's bound address.
-//
-// M0 binds the admin listener only. The public listener (CalDAV and the
-// family web app) is a setting kept in the database and is started from it
-// in M1 (PLAN.md 11.2).
-func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func(admin net.Addr)) error {
-	mux, err := adminMux()
+// surface.DrainTimeout. ready, when set, gets the running listeners.
+func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func(*surface.Server)) error {
+	svc, err := openServices(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	ln, err := net.Listen("tcp", cfg.AdminListen)
+	defer svc.store.Close()
+	ok, err := svc.auth.HasAdminPassword(ctx)
 	if err != nil {
-		return fmt.Errorf("admin listener: %w", err)
+		return err
 	}
-	srv := &http.Server{
-		Handler: mux,
-		// No ReadTimeout or WriteTimeout: SSE streams stay open for
-		// minutes. Handlers that need a deadline set one through
-		// http.ResponseController.
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       2 * time.Minute,
-		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
-		BaseContext:       func(net.Listener) context.Context { return ctx },
+	if !ok {
+		return errors.New("no admin password is set: run `agendouille admin passwd` first (install.sh does it with --random)")
 	}
 
-	served := make(chan error, 1)
-	go func() { served <- srv.Serve(ln) }()
-	log.Info("listening", "surface", "admin", "addr", ln.Addr().String(), "url", cfg.AdminURL(),
-		"version", version, "app_bundle", assets.Built(assets.App), "admin_bundle", assets.Built(assets.Admin),
-		"data_dir", cfg.DataDir)
+	d := &deps.Deps{Config: cfg, Settings: svc.settings, Log: log, Store: svc.store, Directory: svc.dir, Auth: svc.auth,
+		Clock: time.Now, Version: version}
+	public, adminHandler, err := muxes(d)
+	if err != nil {
+		return err
+	}
+	srv := surface.New(ctx, log, public)
+	if _, err := srv.StartAdmin(cfg.AdminListen, adminHandler); err != nil {
+		return err
+	}
+	log.Info("admin UI", "url", cfg.AdminURL()+"/admin", "version", version,
+		"app_bundle", assets.Built(assets.App), "admin_bundle", assets.Built(assets.Admin), "data_dir", cfg.DataDir)
+
+	// The public listener follows the public_listen setting from now on.
+	// A failure to bind is logged and leaves the admin UI up to fix it.
+	apply := func(address string) {
+		if err := srv.ApplyPublic(address); err != nil {
+			log.Error("public listener", "err", err)
+		}
+	}
+	svc.settings.Subscribe(func(c settings.Change) {
+		if c.Old.PublicListen != c.New.PublicListen {
+			apply(c.New.PublicListen)
+		}
+	})
+	if address := svc.settings.Get().PublicListen; address != "" {
+		apply(address)
+	} else {
+		log.Warn("the public listener (CalDAV and the family web app) is off: set public_listen and public_url in the admin UI or with agendouille config set")
+	}
+	watchCtx, stopWatch := context.WithCancel(ctx)
+	defer stopWatch()
+	go svc.settings.Watch(watchCtx, settingsPoll, func(err error) { log.Error("reloading settings", "err", err) })
+
 	if ready != nil {
-		ready(ln.Addr())
+		ready(srv)
 	}
-
+	var runErr error
 	select {
-	case err := <-served:
-		// Serve returned on its own: the listener failed.
-		return err
+	case runErr = <-srv.Errors():
 	case <-ctx.Done():
 	}
 	log.Info("shutting down")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	err = srv.Shutdown(shutdownCtx)
-	if serr := <-served; serr != nil && !errors.Is(serr, http.ErrServerClosed) && err == nil {
-		err = serr
+	stopWatch()
+	if err := srv.Shutdown(); err != nil && runErr == nil {
+		runErr = err
 	}
-	if err == nil {
+	if runErr == nil {
 		log.Info("stopped")
 	}
-	return err
+	return runErr
 }
