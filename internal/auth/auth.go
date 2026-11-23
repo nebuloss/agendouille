@@ -36,7 +36,7 @@ const (
 	// AdminSessionTTL is fixed: an admin session is not renewed by use.
 	AdminSessionTTL = 12 * time.Hour
 	// MinAdminPassword counts characters, not bytes.
-	MinAdminPassword = 12
+	MinAdminPassword = 8
 )
 
 var (

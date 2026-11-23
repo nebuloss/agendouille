@@ -3,6 +3,13 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: admin password, 8 characters at least
+
+The minimum was 12. The operator wants a short one they choose
+(`Admin000`), and the admin UI is reachable from the LAN only (srv-npm),
+behind argon2id: the minimum is now 8 characters. `install.sh` still sets
+a random one, much longer; this only allows a shorter one by choice.
+
 ## 2026-11-23: calendar ids in the admin
 
 The admin addressed a calendar as `owner~slug`, which changes on a

@@ -746,7 +746,7 @@ fixed palette of twelve checked for contrast (cafard's
 
 ## 10. Security (Decided: the public side faces the internet)
 
-- **Admin password**: argon2id (time 2, memory 64 MiB), at least 12
+- **Admin password**: argon2id (time 2, memory 64 MiB), at least 8
   characters. Set by `agendouille admin passwd` (install.sh runs it with
   `--random` and prints the password once in the installer's terminal,
   never in a log). `serve` refuses to start without one.
