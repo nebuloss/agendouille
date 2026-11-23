@@ -1,6 +1,10 @@
 package admin
 
-import "net/url"
+import (
+	"net/url"
+
+	"github.com/nebuloss/agendouille/internal/i18n"
+)
 
 // The admin UI's page tree, as claudication's and cafard's: every page has
 // a path, and the path is the tree.
@@ -30,7 +34,9 @@ type nav struct {
 	Trail []navLink
 }
 
-type navPage struct{ id, label, icon string }
+// navPage is a page of the tree: its path segment, the catalog key of its
+// label (internal/i18n, catalog_admin.go), its icon.
+type navPage struct{ id, key, icon string }
 
 const (
 	icUsers    = "M9 11.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5 M16 5.5a3 3 0 010 5.8 M18 14c1.7.6 2.7 2.4 3 5"
@@ -46,31 +52,31 @@ const (
 )
 
 var sections = []navPage{
-	{"users", "Utilisateurs", icUsers},
-	{"groups", "Groupes", icGroups},
-	{"calendars", "Calendriers", icCalendar},
-	{"activity", "Activité", icActivity},
-	{"backups", "Sauvegardes", icBackups},
-	{"settings", "Réglages", icSettings},
+	{"users", "admin.nav.users", icUsers},
+	{"groups", "admin.nav.groups", icGroups},
+	{"calendars", "admin.nav.calendars", icCalendar},
+	{"activity", "admin.nav.activity", icActivity},
+	{"backups", "admin.nav.backups", icBackups},
+	{"settings", "admin.nav.settings", icSettings},
 }
 
 // itemPages are an item's pages beside its overview, in rail order.
 var itemPages = map[string][]navPage{
 	"users": {
-		{"devices", "Appareils", icDevices},
-		{"calendars", "Calendriers", icCalendar},
-		{"groups", "Groupes", icGroups},
-		{"activity", "Activité", icActivity},
+		{"devices", "admin.nav.devices", icDevices},
+		{"calendars", "admin.nav.calendars", icCalendar},
+		{"groups", "admin.nav.groups", icGroups},
+		{"activity", "admin.nav.activity", icActivity},
 	},
 	"groups": {
-		{"members", "Membres", icPerson},
-		{"calendars", "Calendriers", icCalendar},
+		{"members", "admin.nav.members", icPerson},
+		{"calendars", "admin.nav.calendars", icCalendar},
 	},
 	// A calendar is an item of its own, with an owner and members the admin
 	// manages (the user's call).
 	"calendars": {
-		{"shares", "Membres", icShare},
-		{"activity", "Activité", icActivity},
+		{"shares", "admin.nav.members", icShare},
+		{"activity", "admin.nav.activity", icActivity},
 	},
 }
 
@@ -90,40 +96,41 @@ func knownPage(section, sub string) bool {
 	return false
 }
 
-func labelOf(list []navPage, id string) (string, string) {
+// labelOf is a page's label in l, and its icon.
+func labelOf(l i18n.Lang, list []navPage, id string) (string, string) {
 	for _, p := range list {
 		if p.id == id {
-			return p.label, p.icon
+			return i18n.T(l, p.key), p.icon
 		}
 	}
 	return id, ""
 }
 
 // navOf is the rail and the trail of a page: section is the top level
-// ("" for the overview), name the item, sub the item's page.
-func navOf(section, name, sub string) nav {
-	n := nav{Trail: []navLink{{Href: "/", Label: "Vue d'ensemble", Current: section == ""}}}
+// ("" for the overview), name the item, sub the item's page; the labels
+// are in l.
+func navOf(l i18n.Lang, section, name, sub string) nav {
+	n := nav{Trail: []navLink{{Href: "/", Label: i18n.T(l, "admin.nav.overview"), Current: section == ""}}}
 	if section != "" {
-		label, icon := labelOf(sections, section)
+		label, icon := labelOf(l, sections, section)
 		n.Trail = append(n.Trail, navLink{Href: "/" + section, Label: label, Icon: icon, Current: name == ""})
 	}
 	if name != "" {
 		base := "/" + section + "/" + url.PathEscape(name)
-		label, icon := labelOf(sections, section)
+		label, _ := labelOf(l, sections, section)
 		n.Back = &navLink{Href: "/" + section, Label: label, Icon: icBack}
-		_ = icon
 		n.Trail = append(n.Trail, navLink{Href: base, Label: name, Name: true, Current: sub == ""})
 		for _, p := range itemPages[section] {
-			n.Items = append(n.Items, navLink{Href: base + "/" + p.id, Label: p.label, Icon: p.icon, Current: p.id == sub})
+			n.Items = append(n.Items, navLink{Href: base + "/" + p.id, Label: i18n.T(l, p.key), Icon: p.icon, Current: p.id == sub})
 		}
 		if sub != "" {
-			label, _ := labelOf(itemPages[section], sub)
+			label, _ := labelOf(l, itemPages[section], sub)
 			n.Trail = append(n.Trail, navLink{Href: base + "/" + sub, Label: label, Current: true})
 		}
 		return n
 	}
 	for _, s := range sections {
-		n.Items = append(n.Items, navLink{Href: "/" + s.id, Label: s.label, Icon: s.icon, Current: s.id == section})
+		n.Items = append(n.Items, navLink{Href: "/" + s.id, Label: i18n.T(l, s.key), Icon: s.icon, Current: s.id == section})
 	}
 	return n
 }

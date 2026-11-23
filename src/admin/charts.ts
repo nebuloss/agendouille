@@ -1,4 +1,6 @@
 import { h } from '@/shared/core/Dom.ts';
+import { locale } from '@/shared/i18n/i18n.ts';
+import { t } from '@/admin/charts.msg.ts';
 
 /**
  * The calendar stats page's two charts, drawn as SVG and DOM, on the shared
@@ -17,10 +19,13 @@ export interface DayCount {
 
 const NS = 'http://www.w3.org/2000/svg';
 const SERIES = [
-  { key: 'created', label: 'Créés', color: 'var(--color-series-1)' },
-  { key: 'changed', label: 'Modifiés', color: 'var(--color-series-2)' },
-  { key: 'deleted', label: 'Supprimés', color: 'var(--color-series-3)' },
+  { key: 'created', color: 'var(--color-series-1)' },
+  { key: 'changed', color: 'var(--color-series-2)' },
+  { key: 'deleted', color: 'var(--color-series-3)' },
 ] as const;
+
+/** The series' names, in the page's language. */
+const labelOf = (s: (typeof SERIES)[number]): string => t(s.key);
 
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>): SVGElementTagNameMap[K] {
   const el = document.createElementNS(NS, tag);
@@ -29,7 +34,7 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
 }
 
 const dayLabel = (iso: string): string =>
-  new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString(locale(),{ day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 /** Changes per day, stacked (created, changed, deleted), with a legend, a hover tooltip and a table. */
 export function dailyChart(days: DayCount[]): HTMLElement {
@@ -38,7 +43,7 @@ export function dailyChart(days: DayCount[]): HTMLElement {
     ...SERIES.map((s, i) => {
       const dot = h('span', { class: 'inline-block size-3 rounded-[3px]', 'aria-hidden': 'true' });
       dot.style.setProperty('background-color', s.color);
-      return h('span', { class: 'inline-flex items-center gap-2 text-on-surface-variant' }, dot, s.label,
+      return h('span', { class: 'inline-flex items-center gap-2 text-on-surface-variant' }, dot, labelOf(s),
         h('b', { class: 'font-semibold tabular-nums text-on-surface' }, String(totals[i])));
     }));
   const max = Math.max(1, ...days.map((d) => d.created + d.changed + d.deleted));
@@ -47,13 +52,13 @@ export function dailyChart(days: DayCount[]): HTMLElement {
   const step = (W - left) / Math.max(1, days.length);
   const barW = Math.max(2, step - 2); // a 2px gap between bars
   const chart = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'block h-auto w-full', role: 'img',
-    'aria-label': `Modifications par jour sur ${days.length} jours : ${totals.join(', ')} (créés, modifiés, supprimés)` });
+    'aria-label': t('chartLabel', { count: days.length, created: totals[0] ?? 0, changed: totals[1] ?? 0, deleted: totals[2] ?? 0 }) });
   // Recessive grid: the baseline and the top value only.
   for (const [v, y] of [[0, top + plotH], [max, top]] as const) {
     chart.append(svg('line', { x1: left, x2: W, y1: y, y2: y, stroke: 'var(--color-outline-variant)', 'stroke-width': v === 0 ? 1 : 0.5, 'stroke-dasharray': v === 0 ? '' : '3 4' }));
-    const t = svg('text', { x: left - 6, y: y + 3, 'text-anchor': 'end', 'font-size': 10, fill: 'var(--color-on-surface-variant)' });
-    t.textContent = String(v);
-    chart.append(t);
+    const tick = svg('text', { x: left - 6, y: y + 3, 'text-anchor': 'end', 'font-size': 10, fill: 'var(--color-on-surface-variant)' });
+    tick.textContent = String(v);
+    chart.append(tick);
   }
   const tip = h('div', { class: 'pointer-events-none absolute z-10 hidden rounded-md3-s bg-inverse px-3 py-2 text-xs whitespace-nowrap elevation-2', role: 'tooltip' });
   tip.style.setProperty('background-color', 'var(--color-on-surface)');
@@ -72,15 +77,15 @@ export function dailyChart(days: DayCount[]): HTMLElement {
     });
     if (i % 15 === 0 || i === days.length - 1) {
       const last = i === days.length - 1;
-      const t = svg('text', { x: last ? x + barW : x + barW / 2, y: H - 6, 'text-anchor': last ? 'end' : i === 0 ? 'start' : 'middle', 'font-size': 10, fill: 'var(--color-on-surface-variant)' });
-      t.textContent = dayLabel(d.day);
-      chart.append(t);
+      const tick = svg('text', { x: last ? x + barW : x + barW / 2, y: H - 6, 'text-anchor': last ? 'end' : i === 0 ? 'start' : 'middle', 'font-size': 10, fill: 'var(--color-on-surface-variant)' });
+      tick.textContent = dayLabel(d.day);
+      chart.append(tick);
     }
     // The hit target is the whole column, bigger than the mark.
     const hit = svg('rect', { x: x - 1, y: top, width: step, height: plotH, fill: 'transparent' });
     hit.addEventListener('pointerenter', () => {
       tip.replaceChildren(h('b', { class: 'block pb-1' }, dayLabel(d.day)),
-        ...SERIES.map((s) => h('span', { class: 'block tabular-nums' }, `${s.label} : ${d[s.key]}`)));
+        ...SERIES.map((s) => h('span', { class: 'block tabular-nums' }, t('seriesValue', { label: labelOf(s), value: d[s.key] }))));
       tip.classList.remove('hidden');
       const pct = ((x - 1 + step / 2) / W) * 100;
       tip.style.setProperty('left', `${Math.min(80, Math.max(0, pct - 8))}%`);
@@ -90,11 +95,11 @@ export function dailyChart(days: DayCount[]): HTMLElement {
     chart.append(hit);
   });
   const busy = days.filter((d) => d.created + d.changed + d.deleted > 0);
-  const table = h('details', { class: 'text-sm' }, h('summary', { class: 'cursor-pointer text-primary' }, 'Voir les chiffres'),
-    busy.length === 0 ? h('p', { class: 'py-2 text-on-surface-variant' }, 'Aucune modification sur la période.')
+  const table = h('details', { class: 'text-sm' }, h('summary', { class: 'cursor-pointer text-primary' }, t('showFigures')),
+    busy.length === 0 ? h('p', { class: 'py-2 text-on-surface-variant' }, t('noChanges'))
       : h('div', { class: 'mt-2 max-h-64 overflow-auto rounded-md3-m bg-surface-lowest' },
         h('table', { class: 'w-full text-sm' },
-          h('thead', {}, h('tr', {}, ...['Jour', ...SERIES.map((s) => s.label)].map((c) => h('th', { class: 'px-3 py-2 text-left text-[11px] font-semibold uppercase text-on-surface-variant' }, c)))),
+          h('thead', {}, h('tr', {}, ...[t('day'), ...SERIES.map(labelOf)].map((c) => h('th', { class: 'px-3 py-2 text-left text-[11px] font-semibold uppercase text-on-surface-variant' }, c)))),
           h('tbody', {}, ...busy.reverse().map((d) => h('tr', { class: 'border-t border-outline-variant/50' },
             h('td', { class: 'px-3 py-1.5' }, dayLabel(d.day)), ...SERIES.map((s) => h('td', { class: 'px-3 py-1.5 tabular-nums' }, String(d[s.key]))))))))) ;
   return h('div', { class: 'flex flex-col gap-3' }, legend, wrap, table);

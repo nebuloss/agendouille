@@ -41,7 +41,7 @@ describe('ActivityLog', () => {
     expect(asked.at(-1)).toContain('user=maman');
     expect(window.location.search).toBe('?user=maman');
     expect(log.root.querySelectorAll('tbody tr').length).toBe(1);
-    const chip = [...log.root.querySelectorAll('button')].find((b) => b.textContent?.startsWith('qui : maman'))!;
+    const chip = [...log.root.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Qui : maman'))!;
     expect(chip).toBeDefined();
     // The chip takes it off.
     chip.click();
@@ -76,9 +76,21 @@ describe('ActivityLog', () => {
     const d = (x: Partial<Activity>) => describeEntry({ at: '', kind: 'event', action: 'created', by: 'lea', ...x });
     expect(d({ via: 'caldav', device: 'Pixel', calendar: 'lea~perso' })).toMatchObject({ verb: 'a créé un événement', subject: 'lea~perso', source: 'Pixel · CalDAV' });
     expect(d({ kind: 'share', action: 'shared', by: 'maman', calendar: 'maman~ecole', detail: 'g:famille readwrite' })).toMatchObject({ extra: 'g:famille · lecture et écriture', source: 'application web' });
-    expect(d({ kind: 'user', action: 'added', by: 'admin', detail: 'lea' })).toMatchObject({ who: 'administration', subject: 'lea', href: '/users/lea', source: "interface d'administration" });
+    expect(d({ kind: 'user', action: 'added', by: 'admin', detail: 'lea' })).toMatchObject({ who: 'administration', subject: 'lea', href: '/users/lea', source: 'interface d’administration' });
     expect(d({ kind: 'setting', action: 'changed', by: 'cli', detail: 'backup_keep 14 -> 30' })).toMatchObject({ who: 'console', subject: 'backup_keep', extra: '→ 30', source: 'ligne de commande' });
     expect(d({ kind: 'group', action: 'member_added', by: 'admin', detail: 'famille lea' })).toMatchObject({ subject: 'famille', extra: 'lea' });
+  });
+
+  it('describes in English when the page is', () => {
+    document.documentElement.lang = 'en';
+    try {
+      const d = (x: Partial<Activity>) => describeEntry({ at: '', kind: 'event', action: 'created', by: 'lea', ...x });
+      expect(d({ via: 'web', calendar: 'lea~perso' })).toMatchObject({ verb: 'created an event', source: 'web app' });
+      expect(d({ kind: 'share', action: 'shared', by: 'admin', calendar: 'maman~ecole', detail: 'g:famille read' })).toMatchObject({ who: 'administration', extra: 'g:famille · read-only', source: 'admin interface' });
+      expect(stamp('2026-11-20T14:00:00Z', new Date('2026-11-23T15:00:00Z'))).toContain('Nov');
+    } finally {
+      document.documentElement.lang = 'fr';
+    }
   });
 
   it('stamps today with the time alone', () => {

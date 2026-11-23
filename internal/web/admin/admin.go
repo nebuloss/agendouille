@@ -10,6 +10,7 @@ import (
 
 	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/deps"
+	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/web/assets"
 	"github.com/nebuloss/agendouille/internal/web/webx"
 )
@@ -28,9 +29,9 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.HandleFunc("GET /signin", h.signinPage)
 	mux.Handle("POST /signin", guard(http.HandlerFunc(h.signin)))
 	mux.Handle("POST /signout", guard(http.HandlerFunc(h.signout)))
-	mux.Handle("GET /{$}", h.page(h.shell("overview", "", "Vue d'ensemble")))
+	mux.Handle("GET /{$}", h.page(h.shell("overview", "", "admin.nav.overview")))
 	for _, s := range sections {
-		mux.Handle("GET /"+s.id, h.page(h.shell(s.id, s.id, s.label)))
+		mux.Handle("GET /"+s.id, h.page(h.shell(s.id, s.id, s.key)))
 	}
 	// An item's overview and its pages (nav.go): a user, a group.
 	mux.Handle("GET /users/{name}", h.page(h.shell("user", "users", "")))
@@ -54,8 +55,10 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 // shell is a page of the admin UI: the layout, the rail and the trail of
 // its level (nav.go), and a mount point the admin bundle fills from
 // /api/admin (PLAN.md 9.4). page picks the TypeScript page, section the
-// top level; an item's title is its name, until the page names it better.
-func (h *handlers) shell(page, section, title string) http.HandlerFunc {
+// top level, titleKey the title's catalog key; an item's title is its
+// name, until the page names it better. Everything is in the request's
+// language.
+func (h *handlers) shell(page, section, titleKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name, sub := r.PathValue("name"), r.PathValue("sub")
 		if to, ok := moved[section+"/"+sub]; ok && name != "" {
@@ -66,23 +69,28 @@ func (h *handlers) shell(page, section, title string) http.HandlerFunc {
 			http.Redirect(w, r, "/"+section+"/"+url.PathEscape(name), http.StatusSeeOther)
 			return
 		}
+		lang := i18n.FromRequest(r)
+		title := ""
+		if titleKey != "" {
+			title = i18n.T(lang, titleKey)
+		}
 		if name != "" {
 			title = name
 			if sub != "" {
-				label, _ := labelOf(itemPages[section], sub)
-				title = label + " · " + name
+				label, _ := labelOf(lang, itemPages[section], sub)
+				title = i18n.T(lang, "admin.nav.pageOf", "page", label, "name", name)
 			}
 		}
 		webx.Render(w, r, h.d.Log, http.StatusOK, "admin/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.Admin,
 			Data: map[string]any{"Page": page, "Title": title, "Name": name, "Sub": sub, "Version": h.d.Version,
-				"Nav": navOf(section, name, sub)}})
+				"Nav": navOf(lang, section, name, sub)}})
 	}
 }
 
 func (h *handlers) secure() bool { return webx.Secure(h.d.Config.AdminURL()) }
 
 func (h *handlers) render(w http.ResponseWriter, r *http.Request, status int, name, page string, data any) {
-	webx.Render(w, r, h.d.Log, status, name, webx.Page{Title: "Administration", Page: page, Bundle: assets.Admin, Data: data})
+	webx.Render(w, r, h.d.Log, status, name, webx.Page{Title: i18n.T(i18n.FromRequest(r), "admin.title"), Page: page, Bundle: assets.Admin, Data: data})
 }
 
 func (h *handlers) page(next http.HandlerFunc) http.Handler {
@@ -103,9 +111,10 @@ func (h *handlers) signinPage(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	secret, err := h.d.Auth.AdminSignIn(r.Context(), r.PostFormValue("password"), r.UserAgent())
 	if err != nil {
-		status, msg := http.StatusInternalServerError, "Une erreur est survenue."
+		lang := i18n.FromRequest(r)
+		status, msg := http.StatusInternalServerError, i18n.T(lang, "admin.signin.failed")
 		if errors.Is(err, auth.ErrWrongPassword) {
-			status, msg = http.StatusUnauthorized, "Mot de passe incorrect."
+			status, msg = http.StatusUnauthorized, i18n.T(lang, "admin.signin.wrongPassword")
 			h.d.Log.Warn("admin sign-in refused", "ip", auth.ClientIP(r, nil).String())
 		} else {
 			h.d.Log.Error("admin sign-in", "err", err)

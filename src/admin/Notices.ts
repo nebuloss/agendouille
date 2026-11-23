@@ -4,6 +4,9 @@ import type { Disposable } from '@/shared/core/Disposable.ts';
 import { icon, type IconName } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ago } from '@/shared/render/format.ts';
+import { t } from '@/admin/Notices.msg.ts';
+
+type Key = Parameters<typeof t>[0];
 
 /**
  * The notification centre, as claudication's and cafard's: a bell in the
@@ -26,16 +29,16 @@ export interface Notice {
 
 type Severity = Notice['severity'];
 
-const TONE: Record<Severity, { icon: IconName; circle: string; badge: string; label: string }> = {
-  error: { icon: 'warn', circle: 'bg-error-container text-on-error-container', badge: 'bg-error text-on-error', label: 'À corriger' },
-  warn: { icon: 'warn', circle: 'bg-warning-container text-on-warning-container', badge: 'bg-warning text-on-warning', label: 'Attention' },
-  info: { icon: 'info', circle: 'bg-info-container text-on-info-container', badge: 'bg-info-container text-on-info-container', label: 'Info' },
+const TONE: Record<Severity, { icon: IconName; circle: string; badge: string; label: Key }> = {
+  error: { icon: 'warn', circle: 'bg-error-container text-on-error-container', badge: 'bg-error text-on-error', label: 'toFix' },
+  warn: { icon: 'warn', circle: 'bg-warning-container text-on-warning-container', badge: 'bg-warning text-on-warning', label: 'warning' },
+  info: { icon: 'info', circle: 'bg-info-container text-on-info-container', badge: 'bg-info-container text-on-info-container', label: 'info' },
 };
 
-const GROUPS: { kind: Notice['kind']; label: string }[] = [
-  { kind: 'server', label: 'Serveur' },
-  { kind: 'device', label: 'Appareils' },
-  { kind: 'user', label: 'Utilisateurs' },
+const GROUPS: { kind: Notice['kind']; label: Key }[] = [
+  { kind: 'server', label: 'server' },
+  { kind: 'device', label: 'devices' },
+  { kind: 'user', label: 'users' },
 ];
 
 /** The worst severity among notices, or null. */
@@ -89,7 +92,7 @@ export class NoticeCenter implements Disposable {
     const unread = this.unread();
     const n = unread.length;
     const w = worst(unread);
-    const label = n === 0 ? 'Notifications' : `${n} notification${n === 1 ? '' : 's'}`;
+    const label = t('bell', { count: n });
     this.bell.setAttribute('aria-label', label);
     this.bell.setAttribute('title', label);
     this.bell.replaceChildren(icon('bell'));
@@ -111,7 +114,7 @@ export class NoticeCenter implements Disposable {
     if (this.sheet !== null) return;
     const sheet = this.doc.createElement('dialog');
     sheet.className = 'm-0 ml-auto flex h-dvh max-h-dvh w-full max-w-[460px] flex-col bg-surface p-0 text-on-surface elevation-2 animate-sheet-in sm:rounded-l-md3-xl';
-    sheet.setAttribute('aria-label', 'Notifications');
+    sheet.setAttribute('aria-label', t('notifications'));
     sheet.addEventListener('click', (e) => {
       if (e.target === sheet) sheet.close();
     });
@@ -129,14 +132,14 @@ export class NoticeCenter implements Disposable {
   private drawSheet(): void {
     const sheet = this.sheet;
     if (sheet === null) return;
-    const close = h('button', { type: 'button', class: ui.iconBtn, 'aria-label': 'Fermer' }, icon('close'));
+    const close = h('button', { type: 'button', class: ui.iconBtn, 'aria-label': t('close') }, icon('close'));
     close.addEventListener('click', () => sheet.close());
-    const head = h('div', { class: 'flex items-center gap-3 px-6 pt-5 pb-3' }, h('h2', { class: 'mr-auto text-2xl font-normal' }, 'Notifications'), close);
+    const head = h('div', { class: 'flex items-center gap-3 px-6 pt-5 pb-3' }, h('h2', { class: 'mr-auto text-2xl font-normal' }, t('notifications')), close);
     const unread = this.unread();
     if (unread.length === 0) {
       sheet.replaceChildren(head, h('div', { class: 'flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center' },
         h('span', { class: 'grid size-14 place-items-center rounded-full bg-success-container text-on-success-container [&_.ic]:size-7' }, icon('check')),
-        h('span', { class: 'text-base' }, 'Rien ne vous attend')));
+        h('span', { class: 'text-base' }, t('allClear'))));
       return;
     }
     const count = (s: Severity | 'all'): number => unread.filter((n) => s === 'all' || n.severity === s).length;
@@ -146,7 +149,7 @@ export class NoticeCenter implements Disposable {
       const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on),
         class: on ? 'state-layer flex h-8 items-center gap-1.5 rounded-md3-s bg-secondary-container px-3 text-xs font-medium text-on-secondary-container'
           : 'state-layer flex h-8 items-center gap-1.5 rounded-md3-s px-3 text-xs font-medium text-on-surface-variant ring-1 ring-outline-variant ring-inset' },
-      s === 'all' ? 'Toutes' : TONE[s].label, h('span', { class: 'tabular-nums opacity-70' }, String(count(s))));
+      s === 'all' ? t('all') : t(TONE[s].label), h('span', { class: 'tabular-nums opacity-70' }, String(count(s))));
       b.addEventListener('click', () => {
         this.filter = s;
         this.drawSheet();
@@ -154,24 +157,24 @@ export class NoticeCenter implements Disposable {
       return b;
     });
     const shown = unread.filter((n) => this.filter === 'all' || n.severity === this.filter);
-    const readAll = h('button', { type: 'button', class: ui.btn('text', 'sm') }, icon('check'), 'Tout marquer lu');
+    const readAll = h('button', { type: 'button', class: ui.btn('text', 'sm') }, icon('check'), t('markAllRead'));
     readAll.addEventListener('click', () => void this.mark(shown.map((n) => n.id)));
     const groups: Child[] = GROUPS.map((g) => {
       const items = shown.filter((n) => n.kind === g.kind);
       if (items.length === 0) return null;
-      return h('section', { 'aria-label': g.label },
-        h('h3', { class: 'mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-on-surface-variant uppercase' }, g.label, h('span', { class: 'tabular-nums' }, String(items.length))),
+      return h('section', { 'aria-label': t(g.label) },
+        h('h3', { class: 'mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-on-surface-variant uppercase' }, t(g.label), h('span', { class: 'tabular-nums' }, String(items.length))),
         h('ul', { class: 'm-0 flex list-none flex-col gap-2 p-0' }, ...items.map((n) => this.row(n))));
     });
     sheet.replaceChildren(head, h('div', { class: 'flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6' },
-      h('div', { class: 'flex flex-wrap items-center gap-2' }, h('div', { class: 'flex flex-1 flex-wrap gap-2', role: 'radiogroup', 'aria-label': 'Afficher' }, ...chips), readAll),
+      h('div', { class: 'flex flex-wrap items-center gap-2' }, h('div', { class: 'flex flex-1 flex-wrap gap-2', role: 'radiogroup', 'aria-label': t('filterBySeverity') }, ...chips), readAll),
       ...groups));
   }
 
   private row(n: Notice): HTMLElement {
-    const t = TONE[n.severity];
+    const tone = TONE[n.severity];
     const body: Child[] = [
-      h('span', { class: `grid size-9 shrink-0 place-items-center rounded-full ${t.circle} [&_.ic]:size-5` }, icon(t.icon)),
+      h('span', { class: `grid size-9 shrink-0 place-items-center rounded-full ${tone.circle} [&_.ic]:size-5` }, icon(tone.icon)),
       h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1' },
         h('span', { class: 'text-sm font-medium text-on-surface' }, n.title),
         n.detail !== undefined ? h('span', { class: 'line-clamp-3 text-xs text-on-surface-variant' }, n.detail) : null,
@@ -181,7 +184,7 @@ export class NoticeCenter implements Disposable {
     const main = n.link !== undefined
       ? h('a', { href: n.link, class: 'state-layer flex min-w-0 flex-1 items-start gap-3 rounded-md3-l p-3 text-left no-underline' }, ...body)
       : h('div', { class: 'flex min-w-0 flex-1 items-start gap-3 p-3' }, ...body);
-    const read = h('button', { type: 'button', class: 'state-layer mt-2.5 mr-2 grid size-9 shrink-0 place-items-center rounded-full text-on-surface-variant [&_.ic]:size-5', 'aria-label': 'Marquer comme lu', title: 'Marquer comme lu' }, icon('check'));
+    const read = h('button', { type: 'button', class: 'state-layer mt-2.5 mr-2 grid size-9 shrink-0 place-items-center rounded-full text-on-surface-variant [&_.ic]:size-5', 'aria-label': t('markRead'), title: t('markRead') }, icon('check'));
     read.addEventListener('click', () => void this.mark([n.id]));
     return h('li', { class: 'flex items-start rounded-md3-l bg-surface-lowest' }, main, read);
   }

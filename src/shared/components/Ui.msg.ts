@@ -13,9 +13,9 @@ export const t = messages({
     themeAuto: 'Automatique',
     themeLight: 'Clair',
     themeDark: 'Sombre',
-    themeIsAuto: 'Thème : automatique',
-    themeIsLight: 'Thème : clair',
-    themeIsDark: 'Thème : sombre',
+    themeIsAuto: 'Thème : automatique',
+    themeIsLight: 'Thème : clair',
+    themeIsDark: 'Thème : sombre',
     language: 'Langue',
   },
   en: {

@@ -59,9 +59,57 @@ describe('admin pages', () => {
     expect(document.querySelector('td img')).toBeNull();
     expect(document.body.textContent).toContain('<img src=x onerror=alert(1)>');
     expect(document.querySelector('a[href="/users/lea"]')).not.toBeNull();
-    // "Nouvel utilisateur" opens the form in a modal, with one box per group.
-    [...document.querySelectorAll('button')].find((b) => b.textContent === 'Nouvel utilisateur')!.click();
+    // "Ajouter un utilisateur" opens the form in a modal, with one box per group.
+    [...document.querySelectorAll('button')].find((b) => b.textContent === 'Ajouter un utilisateur')!.click();
     expect(document.querySelectorAll('dialog .add-user-groups input[type="checkbox"]').length).toBe(1);
+    expect(document.querySelector('dialog')?.textContent).toContain('Nouvel utilisateur');
+  });
+
+  it('the overview agrees with its counts, in French and in English', async () => {
+    const overview = { users: 1, groups: 0, calendars: 2, events: 1234, devices: 1, stale_devices: [], storage: { database: 0, backups: 0 },
+      last_backup: null, version: 'dev', public_url: '', warnings: [] };
+    new OverviewPage(document, fakeApi({ '/overview': overview })).start();
+    await settle();
+    let text = document.getElementById('admin-content')?.textContent ?? '';
+    expect(text).toContain('1utilisateur');
+    expect(text).toContain('2calendriers');
+    expect(text).toMatch(/1\s234événements/);
+    expect(text).toContain('Dernière sauvegarde : aucune');
+    document.documentElement.lang = 'en';
+    try {
+      shell('x');
+      new OverviewPage(document, fakeApi({ '/overview': overview })).start();
+      await settle();
+      text = document.getElementById('admin-content')?.textContent ?? '';
+      expect(text).toContain('1user');
+      expect(text).toContain('0groups');
+      expect(text).toContain('1,234events');
+      expect(text).toContain('Last backup: none');
+    } finally {
+      document.documentElement.lang = 'fr';
+    }
+  });
+
+  it('a user without groups says so, in the page’s language', async () => {
+    const routes = {
+      '/users': { users: [{ name: 'tom', display_name: 'Tom', color: '', disabled: true, created_at: '', groups: [], devices: 0, calendars_owned: 1 }] },
+      '/groups': { groups: [] },
+    };
+    new UsersPage(document, fakeApi(routes)).start();
+    await settle();
+    expect(document.body.textContent).toContain('tom · aucun groupe · jamais vu');
+    expect(document.body.textContent).toContain('désactivé');
+    document.documentElement.lang = 'en';
+    try {
+      shell('x');
+      new UsersPage(document, fakeApi(routes)).start();
+      await settle();
+      expect(document.body.textContent).toContain('tom · no group · never seen');
+      expect(document.body.textContent).toContain('0devices');
+      expect(document.body.textContent).toContain('1calendar');
+    } finally {
+      document.documentElement.lang = 'fr';
+    }
   });
 
   it('an error from the server is shown in place of the page', async () => {

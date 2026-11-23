@@ -1,0 +1,36 @@
+import { messages } from '@/shared/i18n/i18n.ts';
+
+export const t = messages({
+  fr: {
+    toFix: 'À corriger',
+    warning: 'Attention',
+    info: 'Information',
+    server: 'Serveur',
+    devices: 'Appareils',
+    users: 'Utilisateurs',
+    bell: { zero: 'Notifications', one: '{count} notification', other: '{count} notifications' },
+    notifications: 'Notifications',
+    close: 'Fermer',
+    allClear: 'Aucune notification. Tout est en ordre.',
+    all: 'Toutes',
+    markAllRead: 'Tout marquer comme lu',
+    filterBySeverity: 'Filtrer par gravité',
+    markRead: 'Marquer comme lu',
+  },
+  en: {
+    toFix: 'To fix',
+    warning: 'Warning',
+    info: 'Information',
+    server: 'Server',
+    devices: 'Devices',
+    users: 'Users',
+    bell: { zero: 'Notifications', one: '{count} notification', other: '{count} notifications' },
+    notifications: 'Notifications',
+    close: 'Close',
+    allClear: 'No notifications. Everything is in order.',
+    all: 'All',
+    markAllRead: 'Mark all as read',
+    filterBySeverity: 'Filter by severity',
+    markRead: 'Mark as read',
+  },
+});

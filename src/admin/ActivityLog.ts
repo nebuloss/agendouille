@@ -4,6 +4,10 @@ import { dialog } from '@/shared/components/Ui.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { when } from '@/shared/render/format.ts';
+import { locale } from '@/shared/i18n/i18n.ts';
+import { t } from '@/admin/ActivityLog.msg.ts';
+
+type Key = Parameters<typeof t>[0];
 
 /**
  * The activity log, as claudication's request log (web/src/ui/features/
@@ -32,26 +36,38 @@ export interface Activity {
 
 type Field = 'user' | 'kind' | 'calendar';
 
-const ACTIONS: Record<string, string> = {
-  created: 'créé', changed: 'modifié', deleted: 'supprimé', added: 'ajouté', removed: 'retiré', shared: 'partagé',
-  unshared: 'partage retiré', disabled: 'désactivé', enabled: 'réactivé', groups: 'groupes changés', member_added: 'membre ajouté',
-  member_removed: 'membre retiré', password: 'mot de passe changé', revoked: 'révoqué', made: 'créé', approved: 'approuvé',
-  transferred: 'donné', calendar_created: 'calendrier créé', calendar_changed: 'calendrier modifié', calendar_deleted: 'calendrier supprimé',
+/** A code's words, or the code itself when the catalog has none. */
+const word = (keys: Readonly<Record<string, Key>>, code: string): string => {
+  const k = keys[code];
+  return k === undefined ? code : t(k);
 };
 
-export const KINDS: Record<string, string> = {
-  event: 'événement', calendar: 'calendrier', share: 'partage', user: 'utilisateur', group: 'groupe', device: 'appareil',
-  enrolment: 'QR de connexion', setting: 'réglage', admin: 'administration', approval: 'connexion',
+const ACTIONS: Record<string, Key> = {
+  created: 'actCreated', changed: 'actChanged', deleted: 'actDeleted', added: 'actAdded', removed: 'actRemoved', shared: 'actShared',
+  unshared: 'actUnshared', disabled: 'actDisabled', enabled: 'actEnabled', groups: 'actGroups', member_added: 'actMemberAdded',
+  member_removed: 'actMemberRemoved', password: 'actPassword', revoked: 'actRevoked', made: 'actMade', approved: 'actApproved',
+  transferred: 'actTransferred', exported: 'actExported', calendar_created: 'actCalendarCreated', calendar_changed: 'actCalendarChanged',
+  calendar_deleted: 'actCalendarDeleted',
 };
 
-const FIELD_WORDS: Record<Field, string> = { user: 'qui', kind: 'type', calendar: 'calendrier' };
+const KINDS: Record<string, Key> = {
+  event: 'kindEvent', calendar: 'kindCalendar', share: 'kindShare', user: 'kindUser', group: 'kindGroup', device: 'kindDevice',
+  enrolment: 'kindEnrolment', setting: 'kindSetting', admin: 'kindAdmin', approval: 'kindApproval',
+};
+
+/** What an entry is about, in words ("événement"). */
+export const kindLabel = (kind: string): string => word(KINDS, kind);
+
+const CHIP: Record<Field, Key> = { user: 'chipUser', kind: 'chipKind', calendar: 'chipCalendar' };
+const UNFILTER: Record<Field, Key> = { user: 'unfilterUser', kind: 'unfilterKind', calendar: 'unfilterCalendar' };
+const ONLY: Record<Field, Key> = { user: 'onlyUser', kind: 'onlyKind', calendar: 'onlyCalendar' };
 
 const valueOf = (a: Activity, f: Field): string => (f === 'user' ? a.by : f === 'kind' ? a.kind : (a.calendar ?? ''));
-const labelOf = (f: Field, v: string): string => (f === 'kind' ? (KINDS[v] ?? v) : v === '' ? 'aucun' : v);
+const labelOf = (f: Field, v: string): string => (f === 'kind' ? kindLabel(v) : v === '' ? t('none') : v);
 
 /** What a row did, in words. */
 export function what(a: Activity): string {
-  return `${KINDS[a.kind] ?? a.kind} · ${ACTIONS[a.action] ?? a.action}`;
+  return t('what', { kind: kindLabel(a.kind), action: word(ACTIONS, a.action) });
 }
 
 /** What the columns show for one entry: every kind fills every column. */
@@ -66,34 +82,36 @@ export interface Described {
   source: string; // where it came from: a device, CalDAV, the web app, the console
 }
 
-const VIA: Record<string, string> = { caldav: 'CalDAV', dav: 'CalDAV', web: 'application web', app: "l'app agendouille", import: 'import', ics: 'lien .ics', cli: 'console', test: 'test' };
-const ACCESS_WORD: Record<string, string> = { read: 'lecture', readwrite: 'lecture et écriture' };
+const VIA: Record<string, Key> = { caldav: 'viaCaldav', dav: 'viaCaldav', web: 'viaWeb', app: 'viaApp', import: 'viaImport', ics: 'viaIcs', cli: 'viaCli', test: 'viaTest' };
+const ACCESS_WORD: Record<string, Key> = { read: 'accessRead', readwrite: 'accessReadwrite' };
 
-const VERBS: Record<string, string> = {
-  'event created': 'a créé un événement', 'event changed': 'a modifié un événement', 'event deleted': 'a supprimé un événement',
-  'calendar created': 'a créé un calendrier', 'calendar deleted': 'a supprimé un calendrier', 'calendar transferred': 'a donné un calendrier',
-  'calendar changed': 'a modifié un calendrier', 'calendar exported': 'a téléchargé un calendrier en .ics',
-  'share shared': 'a partagé un calendrier', 'share unshared': 'a retiré un partage',
-  'user added': 'a ajouté un utilisateur', 'user changed': 'a modifié un utilisateur', 'user removed': 'a supprimé un utilisateur',
-  'user disabled': 'a désactivé un utilisateur', 'user enabled': 'a réactivé un utilisateur', 'user groups': 'a changé les groupes de',
-  'group added': 'a créé un groupe', 'group changed': 'a modifié un groupe', 'group removed': 'a supprimé un groupe',
-  'group member_added': 'a ajouté au groupe', 'group member_removed': 'a retiré du groupe',
-  'device revoked': 'a révoqué un appareil', 'enrolment made': 'a créé un QR de connexion pour',
-  'setting changed': 'a changé un réglage', 'admin password': "a changé le mot de passe d'administration",
-  'approval approved': 'a connecté un navigateur',
+const VERBS: Record<string, Key> = {
+  'event created': 'verbEventCreated', 'event changed': 'verbEventChanged', 'event deleted': 'verbEventDeleted',
+  'calendar created': 'verbCalendarCreated', 'calendar deleted': 'verbCalendarDeleted', 'calendar transferred': 'verbCalendarTransferred',
+  'calendar changed': 'verbCalendarChanged', 'calendar exported': 'verbCalendarExported',
+  'share shared': 'verbShareShared', 'share unshared': 'verbShareUnshared',
+  'user added': 'verbUserAdded', 'user changed': 'verbUserChanged', 'user removed': 'verbUserRemoved',
+  'user disabled': 'verbUserDisabled', 'user enabled': 'verbUserEnabled', 'user groups': 'verbUserGroups',
+  'group added': 'verbGroupAdded', 'group changed': 'verbGroupChanged', 'group removed': 'verbGroupRemoved',
+  'group member_added': 'verbGroupMemberAdded', 'group member_removed': 'verbGroupMemberRemoved',
+  'device revoked': 'verbDeviceRevoked', 'enrolment made': 'verbEnrolmentMade',
+  'setting changed': 'verbSettingChanged', 'admin password': 'verbAdminPassword',
+  'approval approved': 'verbApprovalApproved',
 };
 
 export function describe(a: Activity): Described {
   const parts = (a.detail ?? '').split(' ');
   const first = parts[0] ?? '';
-  const who = a.by === 'admin' ? 'administration' : a.by === 'cli' || a.by === '' ? 'console' : a.by;
+  const who = a.by === 'admin' ? t('whoAdmin') : a.by === 'cli' || a.by === '' ? t('whoConsole') : a.by;
   const actor = a.by !== 'admin' && a.by !== 'cli' && a.by !== '' ? a.by : undefined;
+  const via = a.via ?? '';
   let source: string;
-  if (a.kind === 'event') source = a.device ? `${a.device} · ${VIA[a.via ?? ''] ?? a.via ?? ''}` : (VIA[a.via ?? ''] ?? (a.via || 'console'));
-  else if (a.by === 'admin') source = "interface d'administration";
-  else if (a.by === 'cli' || a.by === '') source = 'ligne de commande';
-  else source = 'application web';
-  const d: Described = { who, actor, verb: VERBS[`${a.kind} ${a.action}`] ?? `${ACTIONS[a.action] ?? a.action}`, subject: '—', source };
+  if (a.kind === 'event') source = a.device ? `${a.device} · ${word(VIA, via)}` : via === '' ? t('viaCli') : word(VIA, via);
+  else if (a.by === 'admin') source = t('sourceAdmin');
+  else if (a.by === 'cli' || a.by === '') source = t('sourceCli');
+  else source = t('sourceWeb');
+  const verb = VERBS[`${a.kind} ${a.action}`];
+  const d: Described = { who, actor, verb: verb !== undefined ? t(verb) : word(ACTIONS, a.action), subject: '—', source };
   const user = (n: string): void => {
     d.subject = n;
     d.href = `/users/${encodeURIComponent(n)}`;
@@ -103,16 +121,19 @@ export function describe(a: Activity): Described {
     case 'calendar':
       d.subject = a.calendar || first || '—';
       if (a.calendar) d.calendar = a.calendar;
-      if (a.action === 'transferred') d.extra = (a.detail ?? '').split(' -> ')[1] !== undefined ? `à ${(a.detail ?? '').split(' -> ')[1]}` : undefined;
+      if (a.action === 'transferred') {
+        const to = (a.detail ?? '').split(' -> ')[1];
+        d.extra = to !== undefined ? t('transferredTo', { name: to }) : undefined;
+      }
       break;
     case 'share':
       d.subject = a.calendar || '—';
       if (a.calendar) d.calendar = a.calendar;
-      d.extra = `${first}${parts[1] ? ` · ${ACCESS_WORD[parts[1]] ?? parts[1]}` : ''}`;
+      d.extra = `${first}${parts[1] ? ` · ${word(ACCESS_WORD, parts[1])}` : ''}`;
       break;
     case 'user':
       user(first);
-      if (a.action === 'groups') d.extra = parts[1] ? parts[1].split(',').join(', ') : 'aucun groupe';
+      if (a.action === 'groups') d.extra = parts[1] ? parts[1].split(',').join(', ') : t('noGroups');
       break;
     case 'enrolment':
       user(first);
@@ -123,7 +144,7 @@ export function describe(a: Activity): Described {
       if (parts[1]) d.extra = parts[1];
       break;
     case 'device':
-      d.subject = `appareil n° ${first}`;
+      d.subject = t('deviceNo', { id: first });
       break;
     case 'setting': {
       d.subject = first;
@@ -133,7 +154,7 @@ export function describe(a: Activity): Described {
       break;
     }
     case 'admin':
-      d.subject = "mot de passe d'administration";
+      d.subject = t('adminPassword');
       break;
     case 'approval':
       d.subject = browserOf(a.detail ?? '');
@@ -145,16 +166,16 @@ export function describe(a: Activity): Described {
 /** A browser's name from its user agent, roughly. */
 function browserOf(ua: string): string {
   const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
-  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'navigateur';
+  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : t('browser');
   return os === '' ? b : `${b}, ${os}`;
 }
 
 /** Same day: the time; else the date and the time (claudication's sameDayStamp). */
 export function stamp(iso: string, now: Date = new Date()): string {
   const d = new Date(iso);
-  const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const time = d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   if (d.toDateString() === now.toDateString()) return time;
-  return `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} ${time}`;
+  return `${d.toLocaleDateString(locale(), { day: 'numeric', month: 'short' })} ${time}`;
 }
 
 const TH = 'sticky top-0 z-10 border-b border-outline-variant bg-surface-high px-3 py-2.5 text-left text-[11px] font-semibold tracking-wider whitespace-nowrap text-on-surface-variant uppercase first:pl-4 last:pr-4';
@@ -237,9 +258,9 @@ export class ActivityLog {
   private draw(): void {
     this.closeMenu();
     const chips = (Object.entries(this.filter) as [Field, string][]).filter(([, v]) => v !== undefined && v !== '').map(([f, v]) => {
-      const b = h('button', { type: 'button', title: `Ne plus filtrer par ce ${FIELD_WORDS[f]}`,
+      const b = h('button', { type: 'button', title: t(UNFILTER[f]),
         class: 'state-layer inline-flex h-7 items-center gap-1.5 rounded-md3-s border border-outline px-2.5 text-xs font-medium text-on-surface-variant' },
-      `${FIELD_WORDS[f]} : ${labelOf(f, v)}`, h('span', { class: 'text-base leading-none', 'aria-hidden': 'true' }, '×'));
+      t(CHIP[f], { value: labelOf(f, v) }), h('span', { class: 'text-base leading-none', 'aria-hidden': 'true' }, '×'));
       b.addEventListener('click', () => {
         const next = { ...this.filter };
         delete next[f];
@@ -249,9 +270,9 @@ export class ActivityLog {
     });
     const rows = [...this.items].sort((a, b) => (this.sort === 'desc' ? b.at.localeCompare(a.at) : a.at.localeCompare(b.at)));
     const parts: Child[] = [
-      chips.length > 0 ? h('div', { class: 'flex flex-wrap items-center gap-2 text-sm' }, h('span', { class: 'text-on-surface-variant' }, 'Restreint à'), ...chips) : null,
+      chips.length > 0 ? h('div', { class: 'flex flex-wrap items-center gap-2 text-sm' }, h('span', { class: 'text-on-surface-variant' }, t('filteredBy')), ...chips) : null,
       rows.length === 0
-        ? h('p', { class: ui.empty }, chips.length > 0 ? 'Rien ne correspond à ce filtre.' : "Rien dans l'historique.")
+        ? h('p', { class: ui.empty }, chips.length > 0 ? t('noMatch') : t('noActivity'))
         : this.table(rows),
     ];
     if (rows.length > 0) parts.push(this.footer(rows.length));
@@ -259,7 +280,7 @@ export class ActivityLog {
   }
 
   private table(rows: Activity[]): HTMLElement {
-    const sortBtn = h('button', { type: 'button', class: 'state-layer -mx-1 inline-flex items-center gap-1 rounded-md3-xs px-1 uppercase' }, 'Quand',
+    const sortBtn = h('button', { type: 'button', class: 'state-layer -mx-1 inline-flex items-center gap-1 rounded-md3-xs px-1 uppercase' }, t('colWhen'),
       h('span', { 'aria-hidden': 'true' }, this.sort === 'desc' ? '↓' : '↑'));
     sortBtn.addEventListener('click', () => {
       this.sort = this.sort === 'desc' ? 'asc' : 'desc';
@@ -267,10 +288,10 @@ export class ActivityLog {
     });
     const head = h('tr', {},
       h('th', { class: TH, 'aria-sort': this.sort === 'desc' ? 'descending' : 'ascending' }, sortBtn),
-      this.facetHead('Qui', 'user'),
-      this.facetHead('Action', 'kind'),
-      this.facetHead('Sur', 'calendar'),
-      h('th', { class: TH }, 'Depuis'));
+      this.facetHead(t('colWho'), 'user'),
+      this.facetHead(t('colAction'), 'kind'),
+      this.facetHead(t('colSubject'), 'calendar'),
+      h('th', { class: TH }, t('colSource')));
     const body = h('tbody', {}, ...rows.map((a) => this.row(a)));
     return h('div', { class: 'isolate max-h-[34rem] overflow-auto rounded-md3-l bg-surface-lowest ring-1 ring-outline-variant/60' },
       h('table', { class: 'w-full min-w-max text-sm [&>tbody>tr>td]:border-r [&>tbody>tr>td]:border-outline-variant/50 [&>tbody>tr>td:last-child]:border-r-0 [&>thead>tr>th]:border-r [&>thead>tr>th]:border-outline-variant/50 [&>thead>tr>th:last-child]:border-r-0' },
@@ -301,7 +322,7 @@ export class ActivityLog {
     const entries = [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
     const menu = h('div', { class: MENU, role: 'menu' });
     if (chosen !== undefined) {
-      const clear = h('button', { type: 'button', class: MENU_ITEM, role: 'menuitem' }, 'Tout afficher');
+      const clear = h('button', { type: 'button', class: MENU_ITEM, role: 'menuitem' }, t('showAll'));
       clear.addEventListener('click', () => {
         const next = { ...this.filter };
         delete next[field];
@@ -309,7 +330,7 @@ export class ActivityLog {
       });
       menu.append(clear, h('div', { role: 'separator', class: '-mx-1.5 my-1.5 border-t border-outline-variant' }));
     }
-    if (entries.length === 0) menu.append(h('p', { class: 'px-3 py-2 text-xs text-on-surface-variant' }, 'Rien dans cette colonne.'));
+    if (entries.length === 0) menu.append(h('p', { class: 'px-3 py-2 text-xs text-on-surface-variant' }, t('emptyColumn')));
     for (const [v, n] of entries) {
       const item = h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(v === chosen),
         class: `${MENU_ITEM} ${v === chosen ? 'bg-secondary-container text-on-secondary-container' : ''}` },
@@ -318,7 +339,7 @@ export class ActivityLog {
       item.addEventListener('click', () => this.narrow({ ...this.filter, [field]: v }));
       menu.append(item);
     }
-    menu.append(h('p', { class: 'px-3 pt-1.5 pb-1 text-[11px] text-on-surface-variant' }, 'Parmi les lignes affichées.'));
+    menu.append(h('p', { class: 'px-3 pt-1.5 pb-1 text-[11px] text-on-surface-variant' }, t('amongShown')));
     const r = anchor.getBoundingClientRect();
     menu.style.setProperty('top', `${Math.round(r.bottom + 4)}px`);
     menu.style.setProperty('left', `${Math.round(Math.min(r.left, (this.doc.defaultView?.innerWidth ?? 800) - 240))}px`);
@@ -329,9 +350,9 @@ export class ActivityLog {
       if (e.type === 'pointerdown' && menu.contains(e.target as Node)) return;
       this.closeMenu();
     };
-    for (const t of ['pointerdown', 'keydown', 'scroll']) this.doc.addEventListener(t, away, { capture: true });
+    for (const ev of ['pointerdown', 'keydown', 'scroll']) this.doc.addEventListener(ev, away, { capture: true });
     this.closeMenuListeners = () => {
-      for (const t of ['pointerdown', 'keydown', 'scroll']) this.doc.removeEventListener(t, away, { capture: true });
+      for (const ev of ['pointerdown', 'keydown', 'scroll']) this.doc.removeEventListener(ev, away, { capture: true });
     };
   }
 
@@ -348,7 +369,7 @@ export class ActivityLog {
   private narrowing(field: Field, value: string, shown: string): Child {
     if (value === '') return '—';
     if (this.scope[field] !== undefined) return shown;
-    const b = h('button', { type: 'button', class: CELL_LINK, title: `Seulement ce ${FIELD_WORDS[field]}` }, shown);
+    const b = h('button', { type: 'button', class: CELL_LINK, title: t(ONLY[field]) }, shown);
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       this.narrow({ ...this.filter, [field]: value });
@@ -366,7 +387,7 @@ export class ActivityLog {
     const tr = h('tr', { class: 'cursor-pointer border-b border-outline-variant/50 last:border-0 hover:bg-surface-low' },
       h('td', { class: `${TD} whitespace-nowrap tabular-nums text-on-surface-variant`, title: a.at }, stamp(a.at)),
       h('td', { class: `${TD} whitespace-nowrap` }, d.actor !== undefined ? this.narrowing('user', d.actor, d.actor) : h('span', { class: 'italic text-on-surface-variant' }, d.who)),
-      h('td', { class: `${TD} whitespace-nowrap`, title: KINDS[a.kind] ?? a.kind }, d.verb),
+      h('td', { class: `${TD} whitespace-nowrap`, title: kindLabel(a.kind) }, d.verb),
       h('td', { class: `${TD} max-w-[18rem] truncate` }, ...subject),
       h('td', { class: `${TD} whitespace-nowrap text-on-surface-variant` }, d.source));
     tr.addEventListener('click', () => void this.open(a));
@@ -381,14 +402,15 @@ export class ActivityLog {
   private async open(a: Activity): Promise<void> {
     const line = (k: string, v: string | undefined): Child[] => [h('dt', {}, k), h('dd', {}, v === undefined || v === '' ? '—' : v)];
     const d = describe(a);
-    await dialog(this.doc, `${d.who} ${d.verb}`, [h('dl', { class: ui.kv },
-      ...line('Quand', when(a.at)), ...line('Qui', d.who), ...line('Action', what(a)), ...line('Sur', d.extra !== undefined ? `${d.subject} (${d.extra})` : d.subject),
-      ...line('Depuis', d.source), ...line('Calendrier', a.calendar), ...line('Détail brut', a.detail))],
-    [{ label: 'Fermer', value: '', kind: 'filled' }]);
+    await dialog(this.doc, t('entryTitle', { who: d.who, verb: d.verb }), [h('dl', { class: ui.kv },
+      ...line(t('colWhen'), when(a.at)), ...line(t('colWho'), d.who), ...line(t('colAction'), what(a)),
+      ...line(t('colSubject'), d.extra !== undefined ? t('subjectExtra', { subject: d.subject, extra: d.extra }) : d.subject),
+      ...line(t('colSource'), d.source), ...line(t('calendar'), a.calendar), ...line(t('rawDetail'), a.detail))],
+    [{ label: t('close'), value: '', kind: 'filled' }]);
   }
 
   private footer(shown: number): HTMLElement {
-    const more = h('button', { type: 'button', class: ui.btn('tonal') }, 'Plus ancien');
+    const more = h('button', { type: 'button', class: ui.btn('tonal') }, t('older'));
     more.addEventListener('click', () => {
       more.disabled = true;
       this.more().catch(() => undefined).finally(() => {
@@ -399,9 +421,9 @@ export class ActivityLog {
     for (const [k, v] of Object.entries(this.query())) if (v !== undefined && v !== '') q.set(k, v);
     const s = q.toString();
     return h('div', { class: 'flex flex-wrap items-center gap-3 border-t border-outline-variant pt-4' },
-      this.exhausted ? h('span', { class: 'text-xs text-on-surface-variant' }, "C'est tout ce qui est gardé.") : more,
-      h('span', { class: 'text-xs text-on-surface-variant', 'aria-live': 'polite' }, `${shown} affichées`),
+      this.exhausted ? h('span', { class: 'text-xs text-on-surface-variant' }, t('allShown')) : more,
+      h('span', { class: 'text-xs text-on-surface-variant', 'aria-live': 'polite' }, t('shownCount', { count: shown })),
       h('span', { class: 'grow' }),
-      h('a', { class: ui.btn('text'), href: this.api.url(`/activity/export${s === '' ? '' : `?${s}`}`), download: 'agendouille-activite.csv' }, icon('download'), 'Télécharger en CSV'));
+      h('a', { class: ui.btn('text'), href: this.api.url(`/activity/export${s === '' ? '' : `?${s}`}`), download: t('csvFile') }, icon('download'), t('downloadCsv')));
   }
 }

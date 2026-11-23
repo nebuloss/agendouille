@@ -8,6 +8,7 @@ import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel, tileLink } from '@/admin/pages/More.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
+import { t } from '@/admin/pages/Users.msg.ts';
 
 export interface User {
   name: string;
@@ -79,24 +80,27 @@ interface UserDetail {
   calendars_shared: { ref: string; name: string; access: string; via: string }[];
 }
 
+/** "vu il y a 3 jours", or "jamais vu". */
+const seen = (iso: string | undefined): string => iso === undefined || iso === '' ? t('neverSeen') : t('seenAgo', { ago: ago(iso) });
+
 /** Shows a fresh enrolment's QR code and link, once (PLAN.md 7.2). */
 export async function showEnrolment(doc: Document, who: string, e: Enrolment): Promise<void> {
   if (e.kind === 'browser') {
-    await dialog(doc, `Connecter un navigateur en tant que ${who}`, [
-      h('p', {}, `Pour essayer l'application comme ${who} la voit : ce lien connecte le navigateur qui l'ouvre, une fois, jusqu'au ${when(e.expires_at)}.`),
+    await dialog(doc, t('browserTitle', { name: who }), [
+      h('p', {}, t('browserBody', { name: who, until: when(e.expires_at) })),
       h('p', { class: ui.secret }, e.url ?? ''),
-      h('p', {}, h('a', { class: ui.btn('filled'), href: e.url ?? '#', target: '_blank', rel: 'noopener noreferrer' }, icon('link'), 'Ouvrir dans un nouvel onglet')),
-      h('p', { class: ui.notice }, icon('warn'), `Ce navigateur sera connecté en tant que ${who} : déconnectez-le depuis Connexion quand vous avez fini.`),
-    ], [{ label: 'Fermer', value: 'close', kind: 'text' }]);
+      h('p', {}, h('a', { class: ui.btn('filled'), href: e.url ?? '#', target: '_blank', rel: 'noopener noreferrer' }, icon('link'), t('openInNewTab'))),
+      h('p', { class: ui.notice }, icon('warn'), t('browserWarn', { name: who })),
+    ], [{ label: t('close'), value: 'close', kind: 'text' }]);
     return;
   }
   const body: Child[] = [
-    h('p', {}, `${who} scanne ce code avec l'appareil photo de son téléphone. Il ne marche qu'une fois, jusqu'au ${when(e.expires_at)}.`),
-    e.qr_svg !== undefined ? h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(e.qr_svg), alt: 'QR code de connexion', width: 240, height: 240 }) : null,
-    h('p', { class: 'text-xs text-on-surface-variant' }, 'Ou envoyez-lui ce lien par message :'),
+    h('p', {}, t('phoneBody', { name: who, until: when(e.expires_at) })),
+    e.qr_svg !== undefined ? h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(e.qr_svg), alt: t('qrAlt'), width: 240, height: 240 }) : null,
+    h('p', { class: 'text-xs text-on-surface-variant' }, t('orSendLink')),
     h('p', { class: ui.secret }, e.url ?? ''),
   ];
-  await dialog(doc, 'Première connexion', body, [{ label: 'Fermer', value: 'close', kind: 'filled' }]);
+  await dialog(doc, t('firstSignin'), body, [{ label: t('close'), value: 'close', kind: 'filled' }]);
 }
 
 /** The users, and a form to add one. */
@@ -107,32 +111,32 @@ export class UsersPage extends AdminPage {
       this.api.get<{ groups: Group[] }>('/groups'),
     ]);
     return [
-      card('Utilisateurs', [action('Nouvel utilisateur', () => this.create(groups), 'filled', 'plus')],
+      card(t('users'), [action(t('addUser'), () => this.create(groups), 'filled', 'plus')],
         entries(users.map((u) => ({
           href: `/users/${seg(u.name)}`,
           lead: avatar(u.display_name || u.name, u.color),
           title: u.display_name || u.name,
-          sub: `${u.name}${u.groups.length > 0 ? ` · ${u.groups.join(', ')}` : ' · aucun groupe'} · vu ${ago(u.last_seen_at)}`,
-          tags: u.disabled ? [h('span', { class: ui.pill.err }, 'désactivé')] : [],
-          stats: [{ n: String(u.devices), label: 'appareils' }, { n: String(u.calendars_owned), label: 'calendriers' }],
-        })), 'Aucun utilisateur pour le moment.')),
+          sub: [u.name, u.groups.length > 0 ? u.groups.join(', ') : t('noGroup'), seen(u.last_seen_at)].join(' · '),
+          tags: u.disabled ? [h('span', { class: ui.pill.err }, t('disabled'))] : [],
+          stats: [{ n: String(u.devices), label: t('devicesStat', { count: u.devices }) }, { n: String(u.calendars_owned), label: t('calendarsStat', { count: u.calendars_owned }) }],
+        })), t('noUsers'))),
     ];
   }
 
-  /** "Nouvel utilisateur": the form in a modal, then the sign-in QR. */
+  /** "Ajouter un utilisateur": the form in a modal, then the sign-in QR. */
   private async create(groups: Group[]): Promise<void> {
     const name = h('input', { name: 'name', required: true, autocomplete: 'off', pattern: '[a-z][a-z0-9-]{0,31}', placeholder: 'lea' });
     const display = h('input', { name: 'display_name', placeholder: 'Léa' });
     const checks = groups.map((g) => h('input', { type: 'checkbox', value: g.name }));
     let made: { user: User; enrolment?: Enrolment } | null = null;
-    const ok = await formDialog(this.doc, 'Nouvel utilisateur', [
-      field('Identifiant', name, 'Minuscules, chiffres et tirets ; ne change plus.'),
-      field('Nom affiché', display),
+    const ok = await formDialog(this.doc, t('newUser'), [
+      field(t('username'), name, t('usernameHelp')),
+      field(t('displayName'), display),
       groups.length > 0
-        ? h('div', { class: ui.field }, h('span', { class: ui.label }, 'Groupes'),
+        ? h('div', { class: ui.field }, h('span', { class: ui.label }, t('groups')),
           h('div', { class: 'add-user-groups flex flex-wrap gap-x-5 gap-y-2' }, ...groups.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))))
-        : h('p', { class: 'text-sm' }, "Aucun groupe : créez-en un pour que les gens se voient et partagent."),
-    ], 'Ajouter', async () => {
+        : h('p', { class: 'text-sm' }, t('noGroupsYet')),
+    ], t('add'), async () => {
       made = await this.api.post<{ user: User; enrolment?: Enrolment }>('/users', {
         name: name.value.trim(),
         display_name: display.value.trim(),
@@ -145,7 +149,7 @@ export class UsersPage extends AdminPage {
     this.doc.dispatchEvent(new Event('agd:changed'));
     await this.refresh();
     if (res.enrolment !== undefined) await showEnrolment(this.doc, res.user.display_name, res.enrolment);
-    else this.toasts.show("Ajouté. Configurez public_url dans les réglages pour créer son QR de connexion.");
+    else this.toasts.show(t('addedNoQr'));
   }
 }
 
@@ -173,22 +177,24 @@ export class UserPage extends AdminPage {
         // device in, the devices that sync, the browsers signed in.
         return [
           this.signin(u, d.enrolments),
-          card(`Appareils de synchronisation (${d.devices.length})`, [],
-            h('p', { class: 'text-sm text-on-surface-variant' }, "Chaque téléphone, tablette ou ordinateur qui synchronise ses calendriers, avec son propre mot de passe. La personne en ajoute depuis Appareils, dans l'application."),
+          card(t('syncedDevices', { count: d.devices.length }), [],
+            h('p', { class: 'text-sm text-on-surface-variant' }, t('devicesHelp')),
             entries(d.devices.map((x) => ({
               lead: iconMark(x.kind === 'thunderbird' ? 'laptop' : 'phone'),
               title: x.label,
-              sub: `${KIND[x.kind] ?? x.kind} · ${x.cap === 'read' ? 'lecture seule' : 'lecture et écriture'} · synchronisé ${ago(x.last_used_at)}${x.client ? ` · ${x.client}` : ''}`,
-              tags: x.last_used_at === undefined ? [h('span', { class: ui.pill.muted }, 'jamais synchronisé')] : [],
-              actions: [action('Révoquer', () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), 'Appareil révoqué.'), 'danger-text', 'trash', 'sm')],
-            })), 'Aucun appareil.')),
-          card(`Navigateurs connectés (${d.sessions.length})`, [],
+              sub: [deviceKind(x.kind), x.cap === 'read' ? t('readOnly') : t('readWrite'),
+                ...(x.last_used_at !== undefined ? [t('syncedAgo', { ago: ago(x.last_used_at) })] : []),
+                ...(x.client ? [x.client] : [])].join(' · '),
+              tags: x.last_used_at === undefined ? [h('span', { class: ui.pill.muted }, t('neverSynced'))] : [],
+              actions: [action(t('revoke'), () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), t('deviceRevoked')), 'danger-text', 'trash', 'sm')],
+            })), t('noDevices'))),
+          card(t('browsers', { count: d.sessions.length }), [],
             entries(d.sessions.map((x) => ({
               lead: iconMark(x.app ? 'phone' : 'laptop'),
-              title: x.app ? "L'app agendouille" : browserOf(x.user_agent),
-              sub: `vu ${ago(x.seen_at)} · ${x.user_agent}`,
-              actions: [action('Déconnecter', () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), 'Déconnecté.'), 'danger-text', 'logout', 'sm')],
-            })), 'Aucun navigateur.')),
+              title: x.app ? t('theApp') : browserOf(x.user_agent),
+              sub: `${seen(x.seen_at)} · ${x.user_agent}`,
+              actions: [action(t('signOut'), () => this.act(() => this.api.delete(`${this.path()}/sessions/${x.id}`), t('signedOut')), 'danger-text', 'logout', 'sm')],
+            })), t('noBrowsers'))),
         ];
       case 'calendars':
         return [this.calendarsCard(d)];
@@ -200,7 +206,7 @@ export class UserPage extends AdminPage {
         const log = new ActivityLog(this.doc, this.api, { user: u.name });
         this.bag.defer(() => log.dispose());
         await log.load();
-        return [section('Activité', log.root)];
+        return [section(t('activity'), log.root)];
       }
       default:
         return this.overview(u, d, users);
@@ -217,43 +223,43 @@ export class UserPage extends AdminPage {
       h('section', { class: `${ui.card} flex-row flex-wrap items-center gap-4` }, avatar,
         h('div', { class: 'flex min-w-0 flex-1 flex-col gap-1' },
           h('h2', { class: 'truncate text-2xl font-normal' }, u.display_name || u.name),
-          h('span', { class: 'text-sm text-on-surface-variant' }, `Identifiant ${u.name} · créé le ${day(u.created_at)} · vu ${ago(u.last_seen_at)}`),
+          h('span', { class: 'text-sm text-on-surface-variant' }, [t('usernameIs', { name: u.name }), t('createdOn', { date: day(u.created_at) }), seen(u.last_seen_at)].join(' · ')),
           d.groups.length > 0 ? h('div', { class: 'flex flex-wrap gap-1.5 pt-1' }, ...d.groups.map((g) => h('a', { href: `/groups/${seg(g)}`, class: 'inline-flex h-6 items-center rounded-md3-s bg-surface-high px-2 text-xs font-semibold text-on-surface no-underline' }, g))) : null),
-        u.disabled ? h('span', { class: ui.pill.err }, 'désactivé') : null),
-      u.disabled ? h('p', { class: ui.error }, 'Désactivé : ses appareils et ses navigateurs ne marchent plus.') : null,
+        u.disabled ? h('span', { class: ui.pill.err }, t('disabled')) : null),
+      u.disabled ? h('p', { class: ui.error }, t('disabledNote')) : null,
       h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
-        tileLink(String(d.devices.length), 'appareils', `${base}/devices`),
-        tileLink(String(d.calendars_owned.length), 'calendriers à lui ou elle', `${base}/calendars`),
-        tileLink(String(d.calendars_shared.length), 'calendriers partagés avec lui ou elle', `${base}/calendars`),
-        tileLink(String(d.sessions.length), 'navigateurs connectés', `${base}/devices`)),
+        tileLink(String(d.devices.length), t('devicesTile', { count: d.devices.length }), `${base}/devices`),
+        tileLink(String(d.calendars_owned.length), t('ownedTile', { count: d.calendars_owned.length }), `${base}/calendars`),
+        tileLink(String(d.calendars_shared.length), t('sharedTile', { count: d.calendars_shared.length }), `${base}/calendars`),
+        tileLink(String(d.sessions.length), t('browsersTile', { count: d.sessions.length }), `${base}/devices`)),
       this.profile(u),
-      section('Compte',
+      section(t('account'),
         h('div', { class: 'flex flex-wrap items-center gap-2' },
           u.disabled
-            ? action('Réactiver', () => this.act(() => this.api.patch(this.path(), { disabled: false }), 'Réactivé.'))
-            : action('Désactiver', () => this.act(() => this.api.patch(this.path(), { disabled: true }), 'Désactivé.')),
-          action('Supprimer…', () => this.remove(u, d.calendars_owned, users), 'danger'),
+            ? action(t('enable'), () => this.act(() => this.api.patch(this.path(), { disabled: false }), t('enabled')))
+            : action(t('disable'), () => this.act(() => this.api.patch(this.path(), { disabled: true }), t('disabledDone'))),
+          action(t('deleteUser'), () => this.remove(u, d.calendars_owned, users), 'danger'),
         )),
     ];
   }
 
   /** The user's calendars as rows, each opening its page (stats, members, activity). */
   private calendarsCard(d: UserDetail): HTMLElement {
-    const membersLine = (c: CalendarMeta): string => c.shares.length === 0 ? 'aucun membre'
-      : c.shares.map((s) => `${s.target.startsWith('g:') ? 'groupe ' : ''}${s.target.slice(2)} (${accessLabel(s.access)})`).join(', ');
+    const membersLine = (c: CalendarMeta): string => c.shares.length === 0 ? t('noMembers')
+      : c.shares.map((s) => t(s.target.startsWith('g:') ? 'memberGroup' : 'memberUser', { name: s.target.slice(2), access: accessLabel(s.access) })).join(', ');
     return h('div', { class: 'flex flex-col gap-4' },
-      section(`Ses calendriers (${d.calendars_owned.length})`,
-        h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements. Ouvrez-en un pour ses statistiques et ses membres."),
+      section(t('ownCalendars', { count: d.calendars_owned.length }),
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('adminNoEvents')),
         entries(d.calendars_owned.map((c) => ({
           href: `/calendars/${seg(c.ref)}`, lead: calendarMark(c.color), title: c.name, sub: `${c.ref} · ${membersLine(c)}`,
-          stats: [{ n: String(c.events), label: 'événements' }, { n: bytes(c.bytes), label: 'taille' }],
-        })), "Aucun : la personne en crée depuis l'application ou son téléphone.")),
-      section(`Partagés avec lui ou elle (${d.calendars_shared.length})`,
+          stats: [{ n: String(c.events), label: t('eventsStat', { count: c.events }) }, { n: bytes(c.bytes), label: t('size') }],
+        })), t('noOwnCalendars'))),
+      section(t('sharedCalendars', { count: d.calendars_shared.length }),
         entries(d.calendars_shared.map((c) => ({
           href: `/calendars/${seg(c.ref)}`, lead: calendarMark(''), title: c.name,
-          sub: `de ${c.ref.split('~')[0]} · par ${c.via.startsWith('g:') ? 'le groupe ' + c.via.slice(2) : 'un partage direct'}`,
+          sub: `${t('from', { owner: c.ref.split('~')[0] ?? '' })} · ${c.via.startsWith('g:') ? t('viaGroup', { group: c.via.slice(2) }) : t('viaDirect')}`,
           tags: [h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))],
-        })), 'Aucun.')));
+        })), t('noShared'))));
   }
 
 
@@ -261,40 +267,40 @@ export class UserPage extends AdminPage {
   private profile(u: User): HTMLElement {
     const display = h('input', { value: u.display_name });
     const color = h('input', { type: 'color', value: u.color });
-    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' }, h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field('Nom affiché', display), field('Couleur', color)),
-      h('button', { class: ui.btn('tonal'), type: 'submit' }, 'Enregistrer'));
+    const form = h('form', { class: 'flex flex-col items-start gap-4 [&>div]:w-full' }, h('div', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field(t('displayName'), display), field(t('colour'), color)),
+      h('button', { class: ui.btn('tonal'), type: 'submit' }, t('save')));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
-      void this.act(() => this.api.patch(this.path(), { display_name: display.value.trim(), color: color.value }), 'Enregistré.');
+      void this.act(() => this.api.patch(this.path(), { display_name: display.value.trim(), color: color.value }), t('profileSaved'));
     });
-    return section('Profil', form);
+    return section(t('profile'), form);
   }
 
   /** The user's groups, a row each (opening the group), with the way out and the way in. */
   private groupsCard(mine: string[], all: Group[]): HTMLElement {
     const set = (groups: string[], done: string): Promise<void> => this.act(() => this.api.patch(this.path(), { groups }), done);
     const others = all.filter((g) => !mine.includes(g.name));
-    return card('Groupes', [action('Ajouter à un groupe', () => this.joinGroup(mine, others), 'filled', 'plus')],
-      h('p', { class: 'text-sm text-on-surface-variant' }, "On voit les gens de ses groupes, et on ne partage qu'avec eux."),
+    return card(t('groups'), [action(t('addToGroup'), () => this.joinGroup(mine, others), 'filled', 'plus')],
+      h('p', { class: 'text-sm text-on-surface-variant' }, t('groupsHelp')),
       entries(all.filter((g) => mine.includes(g.name)).map((g) => ({
         href: `/groups/${seg(g.name)}`,
         lead: groupMark(g.color),
         title: g.display_name || g.name,
         sub: g.name,
-        actions: [action('Retirer', () => set(mine.filter((x) => x !== g.name), 'Retiré du groupe.'), 'danger-text', 'close', 'sm')],
-      })), 'Dans aucun groupe : il ou elle ne voit personne.'));
+        actions: [action(t('remove'), () => set(mine.filter((x) => x !== g.name), t('removedFromGroup')), 'danger-text', 'close', 'sm')],
+      })), t('inNoGroup')));
   }
 
   private async joinGroup(mine: string[], others: Group[]): Promise<void> {
     if (others.length === 0) {
-      this.toasts.show(mine.length === 0 ? "Il n'y a aucun groupe : créez-en un dans Groupes." : 'Déjà dans tous les groupes.');
+      this.toasts.show(mine.length === 0 ? t('noGroupsAtAll') : t('inAllGroups'));
       return;
     }
     const which = h('select', { required: true }, ...others.map((g) => h('option', { value: g.name }, g.display_name || g.name)));
-    const ok = await formDialog(this.doc, 'Ajouter à un groupe', [field('Groupe', which)], 'Ajouter',
+    const ok = await formDialog(this.doc, t('addToGroup'), [field(t('group'), which)], t('add'),
       () => this.api.patch(this.path(), { groups: [...mine, which.value] }));
     if (!ok) return;
-    this.toasts.show('Ajouté au groupe.');
+    this.toasts.show(t('addedToGroup'));
     this.doc.dispatchEvent(new Event('agd:changed'));
     await this.refresh();
   }
@@ -324,25 +330,25 @@ export class UserPage extends AdminPage {
         await this.refresh();
       }
     };
-    const STATE: Record<string, [string, string]> = { pending: ['en attente', ui.pill.ok], used: ['utilisé', ui.pill.muted], expired: ['expiré', ui.pill.muted] };
-    return card('Liens de connexion', [
-      action('QR pour un téléphone', () => make('phone'), 'filled', 'qr'),
-      action('Lien pour un navigateur', () => make('browser'), 'tonal', 'laptop'),
+    const STATE: Record<string, [string, string]> = { pending: [t('pending'), ui.pill.ok], used: [t('used'), ui.pill.muted], expired: [t('expired'), ui.pill.muted] };
+    return card(t('signinLinks'), [
+      action(t('makeQr'), () => make('phone'), 'filled', 'qr'),
+      action(t('makeBrowserLink'), () => make('browser'), 'tonal', 'laptop'),
     ],
-    h('p', { class: 'text-sm text-on-surface-variant' }, "Un QR connecte son premier téléphone, ou un nouveau après une perte. Un lien pour un navigateur sert à essayer l'application comme cette personne la voit ; il dure une heure. Un lien en attente se rouvre tant qu'il n'a pas servi."),
+    h('p', { class: 'text-sm text-on-surface-variant' }, t('signinHelp')),
     entries(enrolments.map((e) => {
       const state = e.state ?? (e.used_at !== undefined ? 'used' : 'pending');
       const [label, cls] = STATE[state] ?? STATE['pending']!;
       return {
         open: state === 'pending' ? () => void show(e) : undefined,
         lead: iconMark(e.kind === 'browser' ? 'laptop' : 'qr'),
-        title: e.kind === 'browser' ? 'Lien pour un navigateur' : 'QR pour un téléphone',
-        sub: state === 'used' && e.used_at !== undefined ? `utilisé ${ago(e.used_at)} · créé le ${when(e.created_at)}`
-          : state === 'expired' ? `expiré le ${when(e.expires_at)}` : `créé le ${when(e.created_at)} · expire le ${when(e.expires_at)}`,
+        title: e.kind === 'browser' ? t('browserLinkTitle') : t('qrTitle'),
+        sub: state === 'used' && e.used_at !== undefined ? `${t('usedAgo', { ago: ago(e.used_at) })} · ${t('createdOn', { date: when(e.created_at) })}`
+          : state === 'expired' ? t('expiredOn', { date: when(e.expires_at) }) : `${t('createdOn', { date: when(e.created_at) })} · ${t('expiresOn', { date: when(e.expires_at) })}`,
         tags: [h('span', { class: cls }, label)],
-        actions: state === 'pending' ? [action('Annuler', () => this.act(() => this.api.delete(`${this.path()}/enrolments/${e.id}`), 'Lien annulé.'), 'danger-text', 'close', 'sm')] : [],
+        actions: state === 'pending' ? [action(t('cancelLink'), () => this.act(() => this.api.delete(`${this.path()}/enrolments/${e.id}`), t('linkCancelled')), 'danger-text', 'close', 'sm')] : [],
       };
-    }), 'Aucun lien pour le moment.'));
+    }), t('noLinks')));
   }
 
 
@@ -350,17 +356,17 @@ export class UserPage extends AdminPage {
   private async remove(u: User, owned: CalendarMeta[], users: UserRow[]): Promise<void> {
     const others = users.filter((x) => x.name !== u.name && !x.disabled);
     const choices = owned.map((c) => {
-      const select = h('select', {}, h('option', { value: '' }, 'Supprimer ce calendrier'),
-        ...others.map((o) => h('option', { value: o.name }, `Donner à ${o.display_name}`)));
+      const select = h('select', {}, h('option', { value: '' }, t('deleteCalendar')),
+        ...others.map((o) => h('option', { value: o.name }, t('giveTo', { name: o.display_name }))));
       return { ref: c.ref, select, row: field(c.name, select) };
     });
     const body: Child[] = [
-      h('p', {}, `${u.display_name} ne pourra plus se connecter. Ses événements restent dans les calendriers partagés.`),
-      ...(owned.length > 0 ? [h('p', {}, 'Ses calendriers :'), ...choices.map((c) => c.row)] : []),
+      h('p', {}, t('deleteBody', { name: u.display_name })),
+      ...(owned.length > 0 ? [h('p', {}, t('theirCalendars')), ...choices.map((c) => c.row)] : []),
     ];
-    const v = await dialog(this.doc, `Supprimer ${u.display_name} ?`, body, [
-      { label: 'Annuler', value: 'no' },
-      { label: 'Supprimer', value: 'yes', kind: 'danger' },
+    const v = await dialog(this.doc, t('deleteTitle', { name: u.display_name }), body, [
+      { label: t('cancel'), value: 'no' },
+      { label: t('delete'), value: 'yes', kind: 'danger' },
     ]);
     if (v !== 'yes') return;
     const calendars: Record<string, { transfer_to?: string; delete?: boolean }> = {};
@@ -383,11 +389,19 @@ export function iconButtonSm(ic: 'close', label: string, run: () => Promise<void
   return b;
 }
 
-const KIND: Record<string, string> = { davx5: 'DAVx5', ios: 'iPhone, iPad, Mac', thunderbird: 'Thunderbird', app: "l'app agendouille", other: 'CalDAV' };
+const KIND = {
+  davx5: 'kindDavx5', ios: 'kindIos', thunderbird: 'kindThunderbird', app: 'kindApp', other: 'kindOther',
+} as const satisfies Record<string, Parameters<typeof t>[0]>;
+
+/** A device's kind as a person reads it ("DAVx5", "Application agendouille"). */
+export function deviceKind(kind: string): string {
+  const key = (KIND as Record<string, Parameters<typeof t>[0]>)[kind];
+  return key === undefined ? kind : t(key);
+}
 
 /** A browser's name from its user agent, roughly. */
 function browserOf(ua: string): string {
   const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
-  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navigateur';
+  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : t('browser');
   return os === '' ? b : `${b}, ${os}`;
 }

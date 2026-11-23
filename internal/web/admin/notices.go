@@ -2,14 +2,14 @@ package admin
 
 import (
 	"context"
-	"fmt"
-	"github.com/nebuloss/agendouille/internal/auth"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"time"
 
+	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/store"
 	"github.com/nebuloss/agendouille/internal/web/webx"
 )
@@ -37,9 +37,11 @@ var warningNotice = map[string]struct{ severity, link string }{
 	"backup_old":           {"warn", "/backups"},
 }
 
-// currentNotices is every current notice, newest problem first within a severity.
+// currentNotices is every current notice, newest problem first within a
+// severity, in the request's language.
 func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 	ctx := r.Context()
+	l := i18n.FromRequest(r)
 	out := []notice{}
 	for _, w := range h.warnings(r) {
 		n := warningNotice[w.Code]
@@ -50,9 +52,13 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 	}
 	if mode := h.d.Auth.DavAuthMode(ctx); mode != auth.DavPassword {
 		if n, err := h.d.Auth.DevicesWithoutCert(ctx); err == nil && n > 0 {
+			title := "notice.devices_without_certificate.title.other"
+			if n == 1 {
+				title = "notice.devices_without_certificate.title.one"
+			}
 			out = append(out, notice{ID: "server:devices_without_certificate", Kind: "device", Severity: "warn",
-				Title:  fmt.Sprintf("%d appareil(s) sans certificat ne synchronisent plus", n),
-				Detail: "CalDAV demande un certificat : chacun en obtient un depuis Appareils, dans l'application.",
+				Title:  i18n.T(l, title, "count", strconv.Itoa(n)),
+				Detail: i18n.T(l, "notice.devices_without_certificate.detail"),
 				Link:   "/settings"})
 		}
 	}
@@ -61,12 +67,13 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 		return nil, err
 	}
 	for _, d := range stale {
-		title := "« " + d.Label + " » ne s'est pas synchronisé depuis une semaine"
+		title := "notice.device.stale.title"
 		if d.LastUsedAt == nil {
-			title = "« " + d.Label + " » ne s'est jamais synchronisé"
+			title = "notice.device.never.title"
 		}
-		out = append(out, notice{ID: "device:" + strconv.FormatInt(d.ID, 10), Kind: "device", Severity: "warn", Title: title,
-			Detail: "Appareil de " + d.User + " : vérifiez qu'il est allumé et que son mot de passe est le bon, ou retirez-le.",
+		out = append(out, notice{ID: "device:" + strconv.FormatInt(d.ID, 10), Kind: "device", Severity: "warn",
+			Title:  i18n.T(l, title, "device", d.Label),
+			Detail: i18n.T(l, "notice.device.detail", "user", d.User),
 			Link:   "/users/" + url.PathEscape(d.User), Since: d.LastUsedAt})
 	}
 	users, err := h.d.Directory.Users(ctx)
@@ -79,8 +86,8 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 		}
 		created := u.CreatedAt
 		out = append(out, notice{ID: "user:never:" + u.Name, Kind: "user", Severity: "info",
-			Title:  u.DisplayName + " ne s'est jamais connecté",
-			Detail: "Donnez-lui un QR de connexion depuis sa page.",
+			Title:  i18n.T(l, "notice.user.never.title", "name", u.DisplayName),
+			Detail: i18n.T(l, "notice.user.never.detail"),
 			Link:   "/users/" + url.PathEscape(u.Name), Since: &created})
 	}
 	rank := map[string]int{"error": 0, "warn": 1, "info": 2}
