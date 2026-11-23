@@ -21,8 +21,8 @@ Usage:
 
 Commands:
   serve     run the server
-  config    print the bootstrap configuration and the settings;
-            config set <key> <value>... changes settings
+  config    print the configuration (every setting, and where it came from);
+            config migrate: moves settings an older version kept in the database into the file
   admin     admin passwd [--random] [--if-unset]: set the admin password
   user      add, enrol (a one-time sign-in link and QR), list, disable,
             enable, remove

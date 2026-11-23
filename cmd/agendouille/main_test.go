@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"io"
 	"log/slog"
 	"net"
@@ -194,5 +195,46 @@ func TestFaviconIsTheAndouille(t *testing.T) {
 	favicon(rec, httptest.NewRequest("GET", "/favicon.ico", nil))
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/svg+xml" || !strings.Contains(rec.Body.String(), "andouille") {
 		t.Errorf("favicon: %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+}
+
+// config migrate moves the settings an older version kept in the database
+// into the file, then empties the table; config set says where to edit.
+func TestConfigMigrate(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "agendouille.yaml")
+	if err := os.WriteFile(path, []byte("data_dir: "+filepath.Join(dir, "data")+"\nbackup_keep: 20\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	vars := map[string]string{"AGENDOUILLE_CONFIG": path}
+	cfg, _, err := config.NewLoader(flag.NewFlagSet("t", flag.ContinueOnError)).Load(func(k string) string { return vars[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := openServices(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.store.DB().Exec(`INSERT INTO settings(key, value, updated_at) VALUES
+		('public_listen', '"0.0.0.0:8791"', 'x'), ('public_url', '"https://agenda.example.org"', 'x'), ('backup_keep', '3', 'x')`)
+	svc.store.Close()
+
+	out, _, err := runArgs(t, vars, "config", "migrate")
+	if err != nil || !strings.Contains(out, "Moved 2 setting(s)") {
+		t.Fatalf("migrate: %q %v", out, err)
+	}
+	body, _ := os.ReadFile(path)
+	if !strings.Contains(string(body), `public_url: "https://agenda.example.org"`) || !strings.Contains(string(body), "backup_keep: 20") ||
+		strings.Contains(string(body), "backup_keep: 3") {
+		t.Errorf("the file: %s", body)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o640 {
+		t.Errorf("mode %v", info.Mode().Perm())
+	}
+	if out, _, _ := runArgs(t, vars, "config", "migrate"); !strings.Contains(out, "nothing to move") {
+		t.Errorf("twice: %q", out)
+	}
+	if _, _, err := runArgs(t, vars, "config", "set", "backup_keep", "4"); err == nil || !strings.Contains(err.Error(), path) {
+		t.Errorf("config set: %v", err)
 	}
 }

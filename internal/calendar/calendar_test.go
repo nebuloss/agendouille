@@ -32,7 +32,7 @@ func setup(t *testing.T) *fx {
 	t.Cleanup(func() { st.Close() })
 	now := time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
-	set, _ := settings.Open(ctx, st.DB(), clock)
+	set := settings.New(settings.Default())
 	dir := directory.New(st.DB(), clock, func() []string { return settings.DefaultPalette })
 	dir.AddGroup(ctx, "t", "famille", "", "")
 	dir.AddGroup(ctx, "t", "enfants", "", "")
@@ -251,7 +251,7 @@ func TestRangeUsesRecurrence(t *testing.T) {
 func TestQuotasImportExportTransfer(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	f.set.Set(ctx, "t", map[string]string{"max_calendars_per_user": "1", "max_events_per_calendar": "2"})
+	f.set.Apply(map[string]string{"max_calendars_per_user": "1", "max_events_per_calendar": "2"})
 	c, _ := f.cal.Create(ctx, as(f.lea), "lea", "perso", Props{})
 	if _, err := f.cal.Create(ctx, as(f.lea), "lea", "second", Props{}); !errors.Is(err, ErrQuota) {
 		t.Errorf("a second calendar over the limit: %v", err)
@@ -269,7 +269,7 @@ func TestQuotasImportExportTransfer(t *testing.T) {
 	if err != nil || res.Added != 2 || len(res.Errors) != 1 {
 		t.Fatalf("import over the event limit: %+v %v", res, err)
 	}
-	f.set.Set(ctx, "t", map[string]string{"max_events_per_calendar": "100"})
+	f.set.Apply(map[string]string{"max_events_per_calendar": "100"})
 	res, _ = f.cal.Import(ctx, Operator("cli"), c.Ref, []byte(file), false)
 	if res.Added != 1 || res.Skipped != 2 {
 		t.Errorf("import again: %+v", res)

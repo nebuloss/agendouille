@@ -39,7 +39,7 @@ between its parts**:
 |---|---|---|
 | `cmd/agendouille` | subcommands, wiring | everything |
 | `internal/config` | the bootstrap struct | — |
-| `internal/settings` | typed settings in the DB, change notifications | store |
+| `internal/settings` | typed settings, read with the configuration file, change notifications | (none; config embeds it) |
 | `internal/deps` | `Deps` (1.2) | the services |
 | `internal/store` | `*sql.DB`, migrations, `Tx` | sqlite |
 | `internal/directory` | users, groups, membership, `Sees(a, b)` | store |
@@ -432,7 +432,7 @@ errors are 3.1's, with messages in French for the UI to show as they are.
 | GET | `/activity?user=&calendar=&kind=&before=` | 3.5.2, 100 per page, newest first; `before` is the last line's `at` |
 | GET | `/activity/export?user=&calendar=&kind=` | the same as CSV, up to 50 000 rows |
 | GET, POST | `/notices`, `/notices/read` | the notification centre: `{notices}`; `{ids}` marks read |
-| GET, PATCH | `/settings` | `[{key, group, type, default, value}]` ; `{"<key>": <JSON value>, ...}` applied together -> the list |
+| GET | `/settings` | every setting with `value`, `default`, `origin` (file, env, flag, default) and `env`, and the file's `path`; read-only (DECISIONS: settings in the configuration file) |
 | GET, POST | `/backups` | `[{name, size, made, before_restore}]` ; make one now (201) |
 | GET | `/backups/{file}` | download |
 | POST | `/backups/{file}/restore` | `{"confirm": "<file>"}` -> 202 `{status: "restarting"}`; the server restarts on it (PLAN 13.6) |

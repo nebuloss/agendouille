@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -49,12 +50,18 @@ func (l *Loader) Path(getenv func(string) string) (path string, explicit bool) {
 // was found at the default location.
 func (l *Loader) Load(getenv func(string) string) (*Config, string, error) {
 	cfg := Default()
+	cfg.Origins = map[string]string{}
 	path, explicit := l.Path(getenv)
 	data, err := os.ReadFile(path)
 	switch {
 	case err == nil:
 		if err := decodeYAML(data, &cfg); err != nil {
 			return nil, path, fmt.Errorf("%s: %w", path, err)
+		}
+		var top map[string]any
+		_ = yaml.Unmarshal(data, &top)
+		for k := range top {
+			cfg.Origins[k] = "file"
 		}
 	case errors.Is(err, fs.ErrNotExist) && !explicit:
 		path = ""
@@ -71,6 +78,7 @@ func (l *Loader) Load(getenv func(string) string) (*Config, string, error) {
 		if err := setString(root.FieldByIndex(k.index), raw); err != nil {
 			return nil, path, fmt.Errorf("%s: %w", k.envName(), err)
 		}
+		cfg.Origins[k.name] = "env"
 	}
 	names := make([]string, 0, len(l.flags))
 	for name := range l.flags {
@@ -82,10 +90,16 @@ func (l *Loader) Load(getenv func(string) string) (*Config, string, error) {
 		if err := setString(root.FieldByIndex(fv.key.index), fv.raw); err != nil {
 			return nil, path, fmt.Errorf("-%s: %w", fv.key.flagName(), err)
 		}
+		cfg.Origins[fv.key.name] = "flag"
 	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, path, err
+	}
+	cfg.Path = path
+	cfg.reload = func() (*Config, error) {
+		c, _, err := l.Load(getenv)
+		return c, err
 	}
 	return &cfg, path, nil
 }
@@ -126,3 +140,8 @@ func (f *flagValue) Set(s string) error {
 }
 
 func (f *flagValue) IsBoolFlag() bool { return f.key.typ.Kind() == reflect.Bool }
+
+// EnvName is the environment variable of a key, for the admin UI.
+func EnvName(key string) string {
+	return EnvPrefix + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+}

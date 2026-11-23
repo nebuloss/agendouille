@@ -3,6 +3,38 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: settings in the configuration file
+
+The user: "settings must be in a configuration files instead like cafard
+and claudication". This replaces PLAN 11.2's "in the database, edited in
+the admin UI, applied live" and the M3 settings page that edited them.
+
+- **Every setting lives in `/etc/agendouille.yaml`**, at its top level,
+  beside the bootstrap keys (`config.Config` embeds `settings.Values`
+  inline): one strict file, an unknown key still an error, every key also
+  an `AGENDOUILLE_*` variable (a list comma-separated) and a flag, which
+  win in that order. `deploy/agendouille.yaml.example` lists them.
+- **Still applied live:** serve looks at the file every 5 s; when it
+  changed it reads the configuration again and puts the new settings in
+  place (the public listener rebinds, backups reschedule). A file that
+  does not read or validate is logged and the settings in force are kept;
+  a bootstrap key (`data_dir`, `admin_listen`, `admin_public_url`,
+  `admin_allow_insecure`, `log_level`) is logged as waiting for a restart.
+- **The admin UI shows, it does not edit** (cafard's settings page):
+  Réglages lists every setting with its value, where it came from (file,
+  environment, flag, default, as claudication's Origin), its variable and
+  its default, and the file's path and how to edit it. `PATCH
+  /api/admin/settings` is gone.
+- **No `config set`:** it says to edit the file. `agendouille config`
+  prints every key and, for those not from the file, where they came from.
+- **`agendouille config migrate`** moves the settings an older version
+  kept in the database into the file (appended, under a dated comment,
+  after checking the result loads; a key already in the file keeps the
+  file's value), then empties the table; install.sh runs it as root on
+  every install. The `settings` table stays, unused, for that.
+- Setting changes leave no audit row any more: they are an edit of a file
+  on the server, outside the application, as for cafard and claudication.
+
 ## 2026-11-23: calendars as .ics from the admin UI
 
 The user: "we should be able to backup calendar as ics in admin page".

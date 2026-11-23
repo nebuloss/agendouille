@@ -48,7 +48,7 @@ func cmdDevice(ctx context.Context, e env, args []string) error {
 		}
 		base := strings.TrimRight(svc.settings.Get().PublicURL, "/")
 		if base == "" {
-			return errors.New("public_url is not set, so a device has no address to sync with: agendouille config set public_listen ... public_url ...")
+			return errors.New("public_url is not set, so a device has no address to sync with: set public_listen and public_url in the configuration file (/etc/agendouille.yaml)")
 		}
 		cap := "readwrite"
 		if *read {

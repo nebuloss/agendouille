@@ -224,6 +224,8 @@ interface Setting {
   type: 'string' | 'bool' | 'int' | 'list';
   default: unknown;
   value: unknown;
+  origin: 'file' | 'env' | 'flag' | 'default';
+  env: string;
 }
 
 const groupNames: Record<string, string> = { network: 'Réseau', storage: 'Stockage et sauvegardes', limits: 'Limites', defaults: 'Valeurs par défaut' };
@@ -232,60 +234,52 @@ const hints: Record<string, string> = {
   public_listen: 'Adresse où écoutent CalDAV et l’application (celle vers laquelle le proxy de la DMZ renvoie), par exemple 0.0.0.0:8791.',
   public_url: 'Adresse publique, en https, telle que le proxy la sert : elle est dans chaque QR et chaque téléphone.',
   public_allow_insecure: 'Accepter http:// pour public_url (essais sur le réseau local seulement).',
-  trusted_proxies: 'Adresses ou CIDR du proxy, séparés par des virgules : leur X-Forwarded-For est cru.',
+  trusted_proxies: 'Adresses ou CIDR du proxy : leur X-Forwarded-For est cru.',
   backup_schedule: 'Heure de la sauvegarde quotidienne (HH:MM, heure du serveur).',
 };
 
-/** Settings, applied live (PLAN.md 11.2). */
+const ORIGINS: Record<string, { label: string; cls: string }> = {
+  file: { label: 'fichier', cls: ui.pill.ok },
+  env: { label: "variable d'environnement", cls: ui.pill.warn },
+  flag: { label: 'option de lancement', cls: ui.pill.warn },
+  default: { label: 'par défaut', cls: ui.pill.muted },
+};
+
+const shown = (v: unknown): string => (Array.isArray(v) ? (v.length === 0 ? '—' : v.join(', ')) : v === '' || v === null || v === undefined ? '—' : String(v));
+
+/**
+ * The settings, as cafard and claudication show theirs: read from the
+ * configuration file (and the environment), each with where its value
+ * came from. Edited in the file; the server applies an edit within
+ * seconds (DECISIONS: settings in the configuration file).
+ */
 export class SettingsPage extends AdminPage {
   protected async render(): Promise<Child[]> {
-    const { settings } = await this.api.get<{ settings: Setting[] }>('/settings');
-    const inputs = new Map<string, () => unknown>();
-    const groups = new Map<string, Child[]>();
-    for (const s of settings) {
-      let input: HTMLInputElement;
-      let read: () => unknown;
-      switch (s.type) {
-        case 'bool':
-          input = h('input', { type: 'checkbox', checked: s.value === true });
-          read = () => input.checked;
-          break;
-        case 'int':
-          input = h('input', { type: 'number', value: String(s.value), min: 0 });
-          read = () => Number(input.value);
-          break;
-        case 'list':
-          input = h('input', { value: (s.value as string[]).join(', ') });
-          read = () => input.value.split(',').map((x) => x.trim()).filter((x) => x !== '');
-          break;
-        default:
-          input = h('input', { value: String(s.value) });
-          read = () => input.value.trim();
-      }
-      input.dataset['key'] = s.key;
-      inputs.set(s.key, read);
-      const list = groups.get(s.group) ?? [];
-      list.push(field(s.key, input, hints[s.key] ?? `Par défaut : ${JSON.stringify(s.default)}`));
-      groups.set(s.group, list);
-    }
-    const initial = new Map(settings.map((s) => [s.key, JSON.stringify(s.value)]));
-    const form = h('form', { class: 'flex flex-col gap-4' },
-      h('div', { class: ui.cards }, ...['network', 'storage', 'limits', 'defaults'].map((g) => section(groupNames[g] ?? g, ...(groups.get(g) ?? [])))),
-      h('button', { class: ui.btn('filled'), type: 'submit' }, 'Appliquer'));
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      const changes: Record<string, unknown> = {};
-      for (const [k, read] of inputs) {
-        const v = read();
-        if (JSON.stringify(v) !== initial.get(k)) changes[k] = v;
-      }
-      if (Object.keys(changes).length === 0) {
-        this.toasts.show('Rien à changer.');
-        return;
-      }
-      void this.act(() => this.api.patch('/settings', changes), 'Réglages appliqués.');
-    });
-    return [h('p', { class: 'text-sm text-on-surface-variant' }, "Appliqués tout de suite, sans redémarrer. L'adresse de l'administration reste celle du fichier de démarrage."), form];
+    const { settings, path, exists } = await this.api.get<{ settings: Setting[]; path: string; exists: boolean }>('/settings');
+    const groups = new Map<string, Setting[]>();
+    for (const st of settings) groups.set(st.group, [...(groups.get(st.group) ?? []), st]);
+    const how = card('Fichier de configuration', [h('code', { class: 'rounded-md3-s bg-surface-lowest px-2 py-1 font-mono text-[13px]' }, path)],
+      h('p', { class: 'text-sm text-on-surface-variant' },
+        exists ? "Les réglages se changent dans ce fichier, sur le serveur. Le serveur l'applique tout seul en quelques secondes ; une erreur dans le fichier est notée dans son journal et les réglages en place restent."
+          : "Aucun fichier à cet endroit : tout vient des valeurs par défaut et de l'environnement. Créez-le pour changer un réglage."),
+      h('pre', { class: 'overflow-x-auto rounded-md3-m bg-surface-lowest px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface' },
+        `sudo -e ${path}\n# par exemple :\npublic_url: https://agenda.example.org\nbackup_keep: 30\n\n# puis, pour vérifier :\nagendouille config`),
+      h('p', { class: 'text-xs text-on-surface-variant' }, "Une variable d'environnement (AGENDOUILLE_…) l'emporte sur le fichier. Les clés data_dir, admin_listen, admin_public_url et log_level demandent un redémarrage."));
+    const cards = ['network', 'storage', 'limits', 'defaults'].map((g) => section(groupNames[g] ?? g,
+      h('dl', { class: 'm-0 flex flex-col divide-y divide-outline-variant/50 rounded-md3-m bg-surface-lowest' }, ...(groups.get(g) ?? []).map((st) => {
+        const o = ORIGINS[st.origin] ?? ORIGINS['default']!;
+        const changed = JSON.stringify(st.value) !== JSON.stringify(st.default);
+        return h('div', { class: 'flex flex-col gap-1 px-4 py-3' },
+          h('dt', { class: 'flex flex-wrap items-center gap-2' },
+            h('code', { class: 'font-mono text-[13px] font-semibold' }, st.key),
+            h('span', { class: o.cls, title: st.origin === 'env' ? st.env : undefined }, o.label)),
+          h('dd', { class: 'm-0 flex flex-col gap-0.5' },
+            h('span', { class: 'font-mono text-[13px] break-all text-on-surface' }, shown(st.value)),
+            hints[st.key] !== undefined ? h('span', { class: 'text-xs text-on-surface-variant' }, hints[st.key]) : null,
+            changed ? h('span', { class: 'text-xs text-on-surface-variant' }, `Par défaut : ${shown(st.default)} · ${st.env}`)
+              : h('span', { class: 'text-xs text-on-surface-variant' }, st.env)));
+      }))));
+    return [how, h('div', { class: ui.cards }, ...cards)];
   }
 }
 

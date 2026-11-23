@@ -161,7 +161,7 @@ func cmdUser(ctx context.Context, e env, args []string) error {
 		}
 		base := strings.TrimRight(svc.settings.Get().PublicURL, "/")
 		if base == "" {
-			return errors.New("public_url is not set, so there is no address for the link: agendouille config set public_listen 0.0.0.0:8791 public_url https://agenda.example.org")
+			return errors.New("public_url is not set, so there is no address for the link: set public_listen and public_url in the configuration file (/etc/agendouille.yaml)")
 		}
 		u, err := svc.dir.User(ctx, pos[1])
 		if err != nil {

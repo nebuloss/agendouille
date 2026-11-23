@@ -17,7 +17,8 @@ D=$(mktemp -d)
 export AGENDOUILLE_DATA_DIR=$D AGENDOUILLE_ADMIN_LISTEN=127.0.0.1:18892
 pw="screenshots password"
 printf '%s\n' "$pw" | $B admin passwd >/dev/null
-$B config set public_listen 127.0.0.1:18891 public_url http://127.0.0.1:18891 public_allow_insecure true >/dev/null
+# Settings are configuration: the environment says them here, as a file would.
+export AGENDOUILLE_PUBLIC_LISTEN=127.0.0.1:18891 AGENDOUILLE_PUBLIC_URL=http://127.0.0.1:18891 AGENDOUILLE_PUBLIC_ALLOW_INSECURE=true
 $B group add famille --display-name Famille >/dev/null
 $B group add enfants --display-name Enfants >/dev/null
 $B user add maman --display-name Maman --group famille >/dev/null

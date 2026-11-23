@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -28,8 +29,8 @@ import (
 	"github.com/nebuloss/agendouille/internal/web/webx"
 )
 
-// settingsPoll is how often serve looks for settings another process
-// (agendouille config set) wrote.
+// settingsPoll is how often serve looks at the configuration file for an
+// edit to apply.
 var settingsPoll = 5 * time.Second
 
 func cmdServe(ctx context.Context, e env, args []string) error {
@@ -94,11 +95,7 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 	if err != nil {
 		return nil, err
 	}
-	set, err := settings.Open(ctx, st.DB(), time.Now)
-	if err != nil {
-		st.Close()
-		return nil, err
-	}
+	set := settings.New(cfg.Settings)
 	dir := directory.New(st.DB(), time.Now, func() []string { return set.Get().Palette })
 	h := hub.New()
 	cal := calendar.New(st.DB(), time.Now, set, dir, sharing.New(st.DB(), dir), h)
@@ -217,11 +214,11 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	if address := svc.settings.Get().PublicListen; address != "" {
 		apply(address)
 	} else {
-		log.Warn("the public listener (CalDAV and the family web app) is off: set public_listen and public_url in the admin UI or with agendouille config set")
+		log.Warn("the public listener (CalDAV and the family web app) is off: set public_listen and public_url in the configuration file", "path", cfg.Path)
 	}
 	watchCtx, stopWatch := context.WithCancel(ctx)
 	defer stopWatch()
-	go svc.settings.Watch(watchCtx, settingsPoll, func(err error) { log.Error("reloading settings", "err", err) })
+	go watchConfig(watchCtx, cfg, svc.settings, log)
 	go prune(watchCtx, svc.calendar, log)
 	go bk.Run(watchCtx)
 
@@ -245,4 +242,54 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 		log.Info("stopped")
 	}
 	return runErr
+}
+
+// watchConfig applies an edit of the configuration file while serve runs:
+// every settingsPoll it looks at the file, and when it changed reads the
+// configuration again and puts the new settings in place (the subscribers
+// rebind the public listener, reschedule the backups). A file that does
+// not read or validate is logged and the settings in force are kept; a key
+// only a restart applies is logged as such.
+func watchConfig(ctx context.Context, cfg *config.Config, set *settings.Service, log *slog.Logger) {
+	if cfg.Path == "" {
+		return
+	}
+	stamp := func() string {
+		info, err := os.Stat(cfg.Path)
+		if err != nil {
+			return "gone"
+		}
+		return fmt.Sprint(info.ModTime().UnixNano(), info.Size())
+	}
+	last := stamp()
+	t := time.NewTicker(settingsPoll)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		now := stamp()
+		if now == last {
+			continue
+		}
+		last = now
+		next, err := cfg.Reload()
+		if err != nil {
+			log.Error("the configuration file does not read; the settings in force are kept", "path", cfg.Path, "err", err)
+			continue
+		}
+		keys, err := set.Replace(next.Settings)
+		if err != nil {
+			log.Error("the configuration file's settings are not valid; the settings in force are kept", "err", err)
+			continue
+		}
+		if len(keys) > 0 {
+			log.Info("settings applied from the configuration file", "keys", keys)
+		}
+		if r := cfg.Restart(next); len(r) > 0 {
+			log.Warn("these keys apply at the next restart", "keys", r)
+		}
+	}
 }

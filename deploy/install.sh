@@ -22,7 +22,12 @@
 #       then plain http, which the LAN-only admin UI accepts).
 #   AGENDOUILLE_INSTALL_PUBLIC_URL    the address the family uses, the DMZ
 #       proxy's (https://agenda.example.org). With it, the public listener
-#       (CalDAV and the web app) is turned on at :8791.
+#       (CalDAV and the web app) is turned on at :8791, in the file.
+#
+# Every setting lives in /etc/agendouille.yaml (deploy/agendouille.yaml.example
+# lists them); a running server applies an edit within seconds. Settings an
+# older version kept in the database are moved into the file on every run
+# (agendouille config migrate).
 #   AGENDOUILLE_INSTALL_VERSION / _REPO   which release (default: the latest).
 #
 # POSIX sh on purpose: a fresh Alpine container has busybox, not bash.
@@ -216,6 +221,11 @@ else
 			;;
 		esac
 	fi
+	if [ -n "$PUBLIC_URL" ]; then
+		insecure=false
+		case "$PUBLIC_URL" in http://*) insecure=true ;; esac
+		printf '\npublic_listen: %s\npublic_url: %s\npublic_allow_insecure: %s\n' "$PUBLIC_LISTEN" "$PUBLIC_URL" "$insecure" >>"$TMP/agendouille.yaml"
+	fi
 	cp "$TMP/agendouille.yaml" "$CONFIG.new"
 	mv "$CONFIG.new" "$CONFIG"
 fi
@@ -289,14 +299,13 @@ case "$passwd_out" in
 esac
 unset password
 
-# The public listener, on a first install with a public URL.
-if [ "$new_install" = yes ] && [ -n "$PUBLIC_URL" ]; then
-	insecure=false
-	case "$PUBLIC_URL" in http://*) insecure=true ;; esac
-	as_service "$BINARY" config -config "$CONFIG" set public_listen "$PUBLIC_LISTEN" public_url "$PUBLIC_URL" \
-		public_allow_insecure "$insecure" >/dev/null || die "could not set the public listener"
-	say "the public listener is on at $PUBLIC_LISTEN for $PUBLIC_URL"
+# Settings an older version kept in the database go into the file, once.
+# As root: the file is root's; the data directory is given back just below.
+if ! migrated=$("$BINARY" config -config "$CONFIG" migrate 2>&1); then
+	printf '%s\n' "$migrated" | sed 's/^/  /' >&2
+	die "could not move the settings from the database into $CONFIG"
 fi
+case "$migrated" in Moved*) say "$migrated" ;; esac
 chown -R "$SERVICE_USER:$SERVICE_USER" "$data_dir"
 
 # --- the service -------------------------------------------------------------
@@ -408,8 +417,9 @@ if [ "$new_install" = yes ]; then
 Next:
 
   1. Sign in at $admin_url/ with the password above.
-  2. Settings, Network: the public address the family uses (your proxy's
-     https:// address) and the listener behind it, if not done here.
+  2. In $CONFIG: public_url (your proxy's https:// address) and
+     public_listen, if not done here; the server applies an edit within
+     seconds. Every setting is listed in deploy/agendouille.yaml.example.
   3. Users: add the family, put them in groups, and give each a sign-in QR.
 
 Behind a reverse proxy, and for the admin UI on the LAN only, see

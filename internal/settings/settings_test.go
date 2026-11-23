@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/nebuloss/agendouille/internal/store"
 )
@@ -16,11 +15,7 @@ func open(t *testing.T) (*store.Store, *Service) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	s, err := Open(context.Background(), st.DB(), time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return st, s
+	return st, New(Default())
 }
 
 func TestDefaultsAreValid(t *testing.T) {
@@ -32,13 +27,11 @@ func TestDefaultsAreValid(t *testing.T) {
 	}
 }
 
-func TestSetPersistsAndNotifies(t *testing.T) {
-	st, s := open(t)
-	ctx := context.Background()
+func TestApplyNotifies(t *testing.T) {
+	_, s := open(t)
 	var heard []Change
 	s.Subscribe(func(c Change) { heard = append(heard, c) })
-
-	_, err := s.Set(ctx, "admin", map[string]string{
+	_, err := s.Apply(map[string]string{
 		"public_listen":   "0.0.0.0:8791",
 		"public_url":      "https://agenda.example.org",
 		"trusted_proxies": "10.0.40.0/24, 192.168.1.1",
@@ -47,33 +40,40 @@ func TestSetPersistsAndNotifies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(heard) != 1 || heard[0].Old.PublicListen != "" || heard[0].New.PublicListen != "0.0.0.0:8791" {
+	if len(heard) != 1 || heard[0].Old.PublicListen != "" || heard[0].New.PublicListen != "0.0.0.0:8791" || len(heard[0].Keys) != 4 {
 		t.Fatalf("heard %+v", heard)
 	}
 	got := s.Get()
 	if got.BackupKeep != 30 || len(got.TrustedProxies) != 2 || got.TrustedPrefixes()[1].String() != "192.168.1.1/32" {
 		t.Fatalf("got %+v", got)
 	}
-
-	// A fresh service reads the same values back.
-	again, err := Open(ctx, st.DB(), time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if again.Get().PublicURL != "https://agenda.example.org" || again.Get().BackupKeep != 30 {
-		t.Fatalf("reloaded %+v", again.Get())
-	}
-	var audits int
-	st.DB().QueryRow(`SELECT count(*) FROM audit WHERE kind = 'setting'`).Scan(&audits)
-	if audits != 4 {
-		t.Errorf("audit rows: %d, want 4", audits)
+	// The same values again: nothing changed, nobody is told.
+	if keys, err := s.Replace(s.Get()); err != nil || len(keys) != 0 || len(heard) != 1 {
+		t.Fatalf("a non-change: %v %v %d", keys, err, len(heard))
 	}
 }
 
-func TestSetIsAllOrNothing(t *testing.T) {
-	_, s := open(t)
+// The table an older version kept its settings in is read once, for the
+// migration into the file, and then emptied.
+func TestStoredAndForgotten(t *testing.T) {
+	st, _ := open(t)
 	ctx := context.Background()
-	if _, err := s.Set(ctx, "admin", map[string]string{"public_listen": "0.0.0.0:8791"}); err == nil ||
+	st.DB().Exec(`INSERT INTO settings(key, value, updated_at) VALUES ('public_url', '"https://a.example"', 'x'), ('gone_key', '1', 'x')`)
+	got, err := Stored(ctx, st.DB())
+	if err != nil || len(got) != 1 || got["public_url"] != `"https://a.example"` {
+		t.Fatalf("stored: %v %v", got, err)
+	}
+	if err := ForgetStored(ctx, st.DB()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := Stored(ctx, st.DB()); len(got) != 0 {
+		t.Fatalf("not forgotten: %v", got)
+	}
+}
+
+func TestApplyIsAllOrNothing(t *testing.T) {
+	_, s := open(t)
+	if _, err := s.Apply(map[string]string{"public_listen": "0.0.0.0:8791"}); err == nil ||
 		!strings.Contains(err.Error(), "public_url") {
 		t.Fatalf("public_listen without public_url: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestRules(t *testing.T) {
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, s := open(t)
-			if _, err := s.Set(context.Background(), "admin", change); err == nil {
+			if _, err := s.Apply(change); err == nil {
 				t.Fatalf("%v was accepted", change)
 			}
 		})
@@ -117,7 +117,7 @@ func TestRules(t *testing.T) {
 		"the public side off":    {"public_listen": ""},
 		"a trailing slash is ok": {"public_url": "https://agenda.example.org/"},
 	} {
-		if _, err := s.Set(context.Background(), "admin", change); err != nil {
+		if _, err := s.Apply(change); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

@@ -44,6 +44,11 @@ func walkType(t reflect.Type, prefix string, index []int, keys *[]key) {
 		if !f.IsExported() {
 			continue
 		}
+		path := append(append([]int(nil), index...), i)
+		if isInline(f) && f.Type.Kind() == reflect.Struct {
+			walkType(f.Type, prefix, path, keys)
+			continue
+		}
 		name := yamlName(f)
 		if name == "" {
 			continue
@@ -51,14 +56,23 @@ func walkType(t reflect.Type, prefix string, index []int, keys *[]key) {
 		if prefix != "" {
 			name = prefix + "." + name
 		}
-		path := append(append([]int(nil), index...), i)
 		switch {
-		case isScalar(f.Type):
+		case isScalar(f.Type) || isStringList(f.Type):
 			*keys = append(*keys, key{name: name, index: path, typ: f.Type})
 		case f.Type.Kind() == reflect.Struct:
 			walkType(f.Type, name, path, keys)
 		}
 	}
+}
+
+func isInline(f reflect.StructField) bool {
+	_, opts, _ := strings.Cut(f.Tag.Get("yaml"), ",")
+	return strings.Contains(","+opts+",", ",inline,")
+}
+
+// isStringList is a list the environment and flags give comma-separated.
+func isStringList(t reflect.Type) bool {
+	return t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.String
 }
 
 func yamlName(f reflect.StructField) string {
@@ -101,6 +115,17 @@ func setString(v reflect.Value, s string) error {
 		return nil
 	}
 	switch v.Kind() {
+	case reflect.Slice:
+		if v.Type().Elem().Kind() != reflect.String {
+			return fmt.Errorf("type %s cannot be set from text", v.Type())
+		}
+		items := []string{}
+		for _, part := range strings.Split(s, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				items = append(items, part)
+			}
+		}
+		v.Set(reflect.ValueOf(items))
 	case reflect.String:
 		v.SetString(s)
 	case reflect.Bool:
@@ -149,6 +174,9 @@ func validateStructs(v reflect.Value) error {
 	return walkStructs(v, "", func(name string, v reflect.Value) error {
 		if val, ok := v.Addr().Interface().(Validator); ok {
 			if err := val.Validate(); err != nil {
+				if name == "" {
+					return err // inline: its errors name their keys
+				}
 				return fmt.Errorf("%s: %w", name, err)
 			}
 		}
@@ -165,12 +193,15 @@ func walkStructs(v reflect.Value, prefix string, visit func(name string, v refle
 		if !f.IsExported() || f.Type.Kind() != reflect.Struct || isScalar(f.Type) {
 			continue
 		}
-		name := yamlName(f)
-		if name == "" {
-			continue
-		}
-		if prefix != "" {
-			name = prefix + "." + name
+		name := prefix
+		if !isInline(f) {
+			name = yamlName(f)
+			if name == "" {
+				continue
+			}
+			if prefix != "" {
+				name = prefix + "." + name
+			}
 		}
 		if err := visit(name, v.Field(i)); err != nil {
 			return err

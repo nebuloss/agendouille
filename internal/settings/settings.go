@@ -1,7 +1,12 @@
-// Package settings holds the settings kept in the database (PLAN.md 11.2):
-// everything the admin edits in the admin UI, as opposed to the bootstrap
-// file. Values are validated together, stored as JSON one row per key,
-// and applied live: subscribers hear of every change.
+// Package settings holds the settings (PLAN.md 11.2, DECISIONS: "settings
+// in the configuration file"): the public listener and URL, backups,
+// limits, defaults. They live in /etc/agendouille.yaml beside the
+// bootstrap keys, are read with it (internal/config embeds Values), are
+// validated together, and are applied live: serve re-reads the file when
+// it changes and Replace tells the subscribers (the public listener
+// rebinds, backups reschedule). The admin UI shows them; it does not edit
+// them. The database's old settings table is read once, to move its rows
+// into the file (agendouille config migrate).
 package settings
 
 import (
@@ -21,35 +26,33 @@ import (
 	"sync"
 	"time"
 	_ "time/tzdata" // the family zone must load on a host without zoneinfo
-
-	"github.com/nebuloss/agendouille/internal/store"
 )
 
 // Values is every setting. The json tag is the key.
 type Values struct {
 	// Network
-	PublicListen        string   `json:"public_listen" group:"network"`
-	PublicURL           string   `json:"public_url" group:"network"`
-	PublicAllowInsecure bool     `json:"public_allow_insecure" group:"network"`
-	TrustedProxies      []string `json:"trusted_proxies" group:"network"`
+	PublicListen        string   `json:"public_listen" yaml:"public_listen" group:"network"`
+	PublicURL           string   `json:"public_url" yaml:"public_url" group:"network"`
+	PublicAllowInsecure bool     `json:"public_allow_insecure" yaml:"public_allow_insecure" group:"network"`
+	TrustedProxies      []string `json:"trusted_proxies" yaml:"trusted_proxies" group:"network"`
 
 	// Storage and backups
-	BackupSchedule         string `json:"backup_schedule" group:"storage"`
-	BackupKeep             int    `json:"backup_keep" group:"storage"`
-	SyncTokenRetentionDays int    `json:"sync_token_retention_days" group:"storage"`
-	MaxObjectBytes         int    `json:"max_object_bytes" group:"storage"`
+	BackupSchedule         string `json:"backup_schedule" yaml:"backup_schedule" group:"storage"`
+	BackupKeep             int    `json:"backup_keep" yaml:"backup_keep" group:"storage"`
+	SyncTokenRetentionDays int    `json:"sync_token_retention_days" yaml:"sync_token_retention_days" group:"storage"`
+	MaxObjectBytes         int    `json:"max_object_bytes" yaml:"max_object_bytes" group:"storage"`
 
 	// Limits
-	MaxCalendarsPerUser  int `json:"max_calendars_per_user" group:"limits"`
-	MaxEventsPerCalendar int `json:"max_events_per_calendar" group:"limits"`
-	MaxDevicesPerUser    int `json:"max_devices_per_user" group:"limits"`
+	MaxCalendarsPerUser  int `json:"max_calendars_per_user" yaml:"max_calendars_per_user" group:"limits"`
+	MaxEventsPerCalendar int `json:"max_events_per_calendar" yaml:"max_events_per_calendar" group:"limits"`
+	MaxDevicesPerUser    int `json:"max_devices_per_user" yaml:"max_devices_per_user" group:"limits"`
 
 	// Defaults
-	FamilyTimezone         string   `json:"family_timezone" group:"defaults"`
-	Palette                []string `json:"palette" group:"defaults"`
-	EnrolmentLinkTTLHours  int      `json:"enrolment_link_ttl_hours" group:"defaults"`
-	SessionTTLDays         int      `json:"session_ttl_days" group:"defaults"`
-	AppSyncIntervalMinutes int      `json:"app_sync_interval_minutes" group:"defaults"`
+	FamilyTimezone         string   `json:"family_timezone" yaml:"family_timezone" group:"defaults"`
+	Palette                []string `json:"palette" yaml:"palette" group:"defaults"`
+	EnrolmentLinkTTLHours  int      `json:"enrolment_link_ttl_hours" yaml:"enrolment_link_ttl_hours" group:"defaults"`
+	SessionTTLDays         int      `json:"session_ttl_days" yaml:"session_ttl_days" group:"defaults"`
+	AppSyncIntervalMinutes int      `json:"app_sync_interval_minutes" yaml:"app_sync_interval_minutes" group:"defaults"`
 }
 
 // DefaultPalette is twelve colours that read on light and dark surfaces.
@@ -235,8 +238,7 @@ func Keys() []Key {
 var ErrUnknownKey = errors.New("unknown setting")
 
 // apply sets key to raw on v. raw is JSON, or for a string setting also the
-// bare text, and for a list setting also comma-separated text, so the CLI
-// reads naturally: config set public_url https://agenda.example.org.
+// bare text, and for a list setting also comma-separated text.
 func apply(v *Values, key, raw string) error {
 	f, ok := fields[key]
 	if !ok {
@@ -264,7 +266,7 @@ func apply(v *Values, key, raw string) error {
 	return nil
 }
 
-// Change is one applied Set.
+// Change is one applied change.
 type Change struct {
 	Old, New Values
 	Keys     []string
@@ -272,46 +274,14 @@ type Change struct {
 
 // Service is the live settings.
 type Service struct {
-	db  *sql.DB
-	now func() time.Time
-
 	mu   sync.RWMutex
 	cur  Values
 	subs []func(Change)
 }
 
-// Open loads the settings from the database over the defaults.
-func Open(ctx context.Context, db *sql.DB, now func() time.Time) (*Service, error) {
-	s := &Service{db: db, now: now, cur: Default()}
-	rows, err := db.QueryContext(ctx, `SELECT key, value FROM settings`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	v := Default()
-	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
-			return nil, err
-		}
-		if err := apply(&v, key, value); err != nil {
-			// A key from a newer version, or one removed: kept in the
-			// table, ignored here.
-			if errors.Is(err, ErrUnknownKey) {
-				continue
-			}
-			return nil, fmt.Errorf("setting %s: %w", key, err)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if err := v.Validate(); err != nil {
-		return nil, fmt.Errorf("stored settings: %w (fix with agendouille config set)", err)
-	}
-	s.cur = v
-	return s, nil
-}
+// New is a service holding v, which the caller has validated (the config
+// loader has).
+func New(v Values) *Service { return &Service{cur: clone(v)} }
 
 // Get is the current settings.
 func (s *Service) Get() Values {
@@ -334,115 +304,48 @@ func (s *Service) Subscribe(f func(Change)) {
 	s.mu.Unlock()
 }
 
-// Set changes several settings at once, so rules between them hold
-// (public_listen needs public_url). actor is who did it, for the audit log.
-func (s *Service) Set(ctx context.Context, actor string, changes map[string]string) (Values, error) {
+// Replace puts next in place, when it differs, and tells the subscribers:
+// what serve does when the file changed. It returns the keys that changed.
+func (s *Service) Replace(next Values) ([]string, error) {
+	if err := next.Validate(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	old := clone(s.cur)
-	next := clone(s.cur)
-	keys := make([]string, 0, len(changes))
-	for k := range changes {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		if err := apply(&next, k, changes[k]); err != nil {
-			s.mu.Unlock()
-			return old, err
+	var keys []string
+	for _, k := range Keys() {
+		a, _ := json.Marshal(reflect.ValueOf(old).Field(fields[k.Name].index).Interface())
+		b, _ := json.Marshal(reflect.ValueOf(next).Field(fields[k.Name].index).Interface())
+		if string(a) != string(b) {
+			keys = append(keys, k.Name)
 		}
 	}
-	if err := next.Validate(); err != nil {
+	if len(keys) == 0 {
 		s.mu.Unlock()
-		return old, err
+		return nil, nil
 	}
-	now := store.Time(s.now())
-	err := store.InTx(ctx, s.db, func(tx *sql.Tx) error {
-		for _, k := range keys {
-			value, err := json.Marshal(reflect.ValueOf(next).Field(fields[k].index).Interface())
-			if err != nil {
-				return err
-			}
-			before, _ := json.Marshal(reflect.ValueOf(old).Field(fields[k].index).Interface())
-			if _, err := tx.ExecContext(ctx, `INSERT INTO settings(key, value, updated_at) VALUES (?, ?, ?)
-				ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, k, string(value), now); err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, detail) VALUES (?, ?, 'setting', 'changed', ?)`,
-				now, actor, k+" "+string(before)+" -> "+string(value)); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		s.mu.Unlock()
-		return old, err
-	}
-	s.cur = next
+	s.cur = clone(next)
 	subs := append([]func(Change){}, s.subs...)
 	s.mu.Unlock()
 	for _, f := range subs {
 		f(Change{Old: old, New: clone(next), Keys: keys})
 	}
-	return clone(next), nil
+	return keys, nil
 }
 
-// Watch reloads the settings every interval when another process (the CLI's
-// config set) changed them, and tells the subscribers. It returns when ctx
-// ends.
-func (s *Service) Watch(ctx context.Context, interval time.Duration, onError func(error)) {
-	// No stamp yet: the first tick always reloads and compares with what
-	// this service holds, so a change written between Open and the start of
-	// this goroutine is not missed.
-	last := ""
-	t := time.NewTicker(interval)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-		stamp := s.stamp(ctx)
-		if stamp == last {
-			continue
-		}
-		last = stamp
-		fresh, err := Open(ctx, s.db, s.now)
-		if err != nil {
-			onError(err)
-			continue
-		}
-		next := fresh.Get()
-		s.mu.Lock()
-		old := clone(s.cur)
-		if reflect.DeepEqual(old, next) {
-			s.mu.Unlock()
-			continue
-		}
-		s.cur = next
-		subs := append([]func(Change){}, s.subs...)
-		s.mu.Unlock()
-		var keys []string
-		for _, k := range Keys() {
-			a, _ := json.Marshal(reflect.ValueOf(old).Field(fields[k.Name].index).Interface())
-			b, _ := json.Marshal(reflect.ValueOf(next).Field(fields[k.Name].index).Interface())
-			if string(a) != string(b) {
-				keys = append(keys, k.Name)
-			}
-		}
-		for _, f := range subs {
-			f(Change{Old: old, New: clone(next), Keys: keys})
+// Apply changes some settings over the current ones, all or none, as the
+// file would: for tests, and for the migration's preview.
+func (s *Service) Apply(changes map[string]string) (Values, error) {
+	next := s.Get()
+	for k, v := range changes {
+		if err := apply(&next, k, v); err != nil {
+			return s.Get(), err
 		}
 	}
-}
-
-// stamp changes whenever a setting is written, by this process or another.
-func (s *Service) stamp(ctx context.Context) string {
-	var n int
-	var latest sql.NullString
-	_ = s.db.QueryRowContext(ctx, `SELECT count(*), max(updated_at) FROM settings`).Scan(&n, &latest)
-	return fmt.Sprint(n, latest.String)
+	if _, err := s.Replace(next); err != nil {
+		return s.Get(), err
+	}
+	return s.Get(), nil
 }
 
 // Value is one setting's current value as JSON, for printing.
@@ -453,4 +356,42 @@ func (s *Service) Value(key string) (string, error) {
 	}
 	b, err := json.Marshal(reflect.ValueOf(s.Get()).Field(f.index).Interface())
 	return string(b), err
+}
+
+// Stored reads the settings an older version kept in the database, as
+// key and JSON value, for agendouille config migrate. Unknown keys are left
+// out.
+func Stored(ctx context.Context, db *sql.DB) (map[string]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT key, value FROM settings`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		if _, ok := fields[key]; ok {
+			out[key] = value
+		}
+	}
+	return out, rows.Err()
+}
+
+// ForgetStored empties the database's settings once they are in the file.
+func ForgetStored(ctx context.Context, db *sql.DB) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM settings`)
+	return err
+}
+
+// Parse reads one setting's text as the file or the environment would give
+// it: JSON, or a bare string, or a comma-separated list.
+func Parse(key, raw string) (any, error) {
+	v := Default()
+	if err := apply(&v, key, raw); err != nil {
+		return nil, err
+	}
+	return reflect.ValueOf(v).Field(fields[key].index).Interface(), nil
 }

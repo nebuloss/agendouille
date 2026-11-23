@@ -112,3 +112,49 @@ func TestEveryScalarKeyHasAFlagAndAVariable(t *testing.T) {
 		}
 	}
 }
+
+// The settings live in the same file, at its top level (DECISIONS:
+// settings in the configuration file); the environment overrides them, a
+// list comma-separated; each value says where it came from.
+func TestSettingsInTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agendouille.yaml")
+	body := "admin_listen: 127.0.0.1:8792\npublic_listen: 0.0.0.0:8791\npublic_url: https://agenda.example.org\nbackup_keep: 30\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{"AGENDOUILLE_CONFIG": path, "AGENDOUILLE_TRUSTED_PROXIES": "10.0.60.2, 10.0.10.1", "AGENDOUILLE_BACKUP_KEEP": "7"}
+	cfg, _, err := NewLoader(flag.NewFlagSet("t", flag.ContinueOnError)).Load(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := cfg.Settings
+	if s.PublicURL != "https://agenda.example.org" || s.BackupKeep != 7 || len(s.TrustedProxies) != 2 || s.FamilyTimezone != "Europe/Paris" {
+		t.Fatalf("settings: %+v", s)
+	}
+	for k, want := range map[string]string{"public_url": "file", "backup_keep": "env", "trusted_proxies": "env", "family_timezone": ""} {
+		if cfg.Origins[k] != want {
+			t.Errorf("origin of %s: %q, want %q", k, cfg.Origins[k], want)
+		}
+	}
+	if cfg.Path != path {
+		t.Errorf("path %q", cfg.Path)
+	}
+	again, err := cfg.Reload()
+	if err != nil || again.Settings.BackupKeep != 7 {
+		t.Fatalf("reload: %v %+v", err, again)
+	}
+	// A setting that does not validate makes the file unusable, with its key.
+	if err := os.WriteFile(path, []byte("public_listen: 0.0.0.0:8791\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cfg.Reload(); err == nil || !strings.Contains(err.Error(), "public_url") {
+		t.Errorf("public_listen without public_url: %v", err)
+	}
+	// An unknown key is still an error.
+	if err := os.WriteFile(path, []byte("rate_limit: 5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cfg.Reload(); err == nil {
+		t.Error("an unknown key was accepted")
+	}
+}

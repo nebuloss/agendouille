@@ -111,17 +111,10 @@ func TestM3AdminUI(t *testing.T) {
 		t.Errorf("the overview does not warn the public side is off: %v", ov["warnings"])
 	}
 
-	// Set the public listener from the settings page.
-	addr := freePort(t)
-	A.json("PATCH", "/settings", map[string]any{"public_listen": addr, "public_url": "http://" + addr}, 200)
-	deadline := time.Now().Add(5 * time.Second)
-	for a := x.srv.PublicAddr(); a == nil || a.String() != addr; a = x.srv.PublicAddr() {
-		if time.Now().After(deadline) {
-			t.Fatal("the public listener did not start from the settings page")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	x.public = "http://" + addr
+	// The settings live in the configuration file: the operator edits it,
+	// the running server applies it (DECISIONS, settings in the file).
+	x.publicOn()
+	addr := strings.TrimPrefix(x.public, "http://")
 	if nt := A.json("GET", "/notices", nil, 200); strings.Contains(asJSON(nt), "no_public_listener") {
 		t.Errorf("the notice outlived its problem: %v", nt)
 	}
@@ -130,18 +123,27 @@ func TestM3AdminUI(t *testing.T) {
 	if marks != 0 {
 		t.Error("the read mark outlived its notice")
 	}
-	bad := A.call("PATCH", "/settings", map[string]any{"public_listen": "0.0.0.0:1", "public_url": "http://lan"})
-	if bad.status != http.StatusBadRequest || !strings.Contains(bad.body, "plain http") {
-		t.Errorf("a bad setting: %d %s", bad.status, bad.body)
+	// The settings page shows each value and where it came from, and the
+	// file; it changes nothing.
+	sp := A.json("GET", "/settings", nil, 200)
+	origin := map[string]string{}
+	for _, it := range sp["settings"].([]any) {
+		m := it.(map[string]any)
+		origin[m["key"].(string)] = m["origin"].(string)
 	}
-	// A cross-site request cannot change a setting.
-	evil := x.do("PATCH", x.admin+"/api/admin/settings", strings.NewReader(`{"backup_keep":1}`), func(r *http.Request) {
-		r.AddCookie(&http.Cookie{Name: auth.AdminCookie, Value: A.session})
-		r.Header.Set("Sec-Fetch-Site", "cross-site")
-	})
-	if evil.status != http.StatusForbidden {
-		t.Errorf("a cross-site PATCH: %d", evil.status)
+	if sp["path"] != x.configPath || origin["public_url"] != "file" || origin["backup_keep"] != "default" {
+		t.Errorf("settings page: %v %v", sp["path"], origin)
 	}
+	if a := A.call("PATCH", "/settings", map[string]any{"backup_keep": 1}); a.status != http.StatusMethodNotAllowed {
+		t.Errorf("the settings page edited: %d", a.status)
+	}
+	// A file that does not validate is refused: the settings in force stay.
+	x.configure("public_listen: 0.0.0.0:1\npublic_url: http://lan\n")
+	time.Sleep(300 * time.Millisecond)
+	if a := x.srv.PublicAddr(); a == nil || a.String() != addr {
+		t.Errorf("a bad file moved the public listener: %v", a)
+	}
+	x.configure("public_listen: " + addr + "\npublic_url: http://" + addr + "\n")
 
 	// A group and two users; lea gets her first sign-in QR.
 	A.json("POST", "/groups", map[string]any{"name": "famille", "display_name": "Famille"}, 201)

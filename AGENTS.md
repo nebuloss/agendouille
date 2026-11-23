@@ -145,9 +145,11 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **No rate limits, on purpose** (DECISIONS 2026-11-23). Do not add one to
   a route that checks a random secret; keep secrets random and long
   instead.
-- **A setting changed from the CLI reaches a running server through
-  `settings.Watch`** (every 5 s), not through its own `Set`. Tests that
-  change settings from a second `services` lower `settingsPoll`.
+- **Settings live in the configuration file**, not the database: serve
+  re-reads `/etc/agendouille.yaml` when it changes (every `settingsPoll`)
+  and `settings.Replace` tells the subscribers. Tests change them with
+  `x.configure(...)` (it rewrites the test server's file) and lower
+  `settingsPoll`; package tests use `settings.New` and `Apply`.
 - **The remote tree is rsynced with `--delete`:** a `go get` or `npm
   install` run there is undone by the next `scripts/remote.sh` unless
   `go.mod`/`go.sum`/`package-lock.json` are copied back with `scp` first.

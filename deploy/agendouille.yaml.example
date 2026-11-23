@@ -1,10 +1,11 @@
-# /etc/agendouille.yaml: what agendouille needs before it can open its
-# database. Everything else (the public address and listener, backups,
-# limits, the family's time zone) is a setting, changed in the admin UI and
-# applied at once; `agendouille config` prints both.
+# /etc/agendouille.yaml: all of agendouille's configuration, as cafard and
+# claudication keep theirs. The admin UI shows it (Réglages) and where each
+# value came from; it does not edit it. A running server applies an edit of
+# the settings (below the first block) within seconds; the first block
+# needs a restart. `agendouille config` prints the effective values.
 #
-# Every key is also a flag (-admin-listen) and an environment variable
-# (AGENDOUILLE_ADMIN_LISTEN). An unknown key is an error, on purpose.
+# Every key is also an environment variable (AGENDOUILLE_PUBLIC_URL), which
+# wins over the file, and a flag. An unknown key is an error, on purpose.
 
 # Where the database and its backups live. The systemd unit lets the
 # service write only here; change ReadWritePaths with it.
@@ -25,3 +26,32 @@
 
 # debug, info, warn or error.
 # log_level: info
+
+# ---- settings, applied live ----------------------------------------------
+
+# Network: CalDAV and the family web app listen here, behind the DMZ proxy.
+# Off until both are set. public_url is in every QR code and every phone:
+# pick it once.
+# public_listen: 0.0.0.0:8791
+# public_url: https://agenda.example.org
+# public_allow_insecure: false     # true accepts http:// (a test on the LAN)
+# trusted_proxies: [10.0.60.2]     # whose X-Forwarded-For is believed
+
+# Storage and backups.
+# backup_schedule: "03:30"         # daily, server time
+# backup_keep: 14
+# sync_token_retention_days: 180
+# max_object_bytes: 262144         # one event, alarms and all
+
+# Limits.
+# max_calendars_per_user: 50
+# max_events_per_calendar: 50000
+# max_devices_per_user: 20
+
+# Defaults.
+# family_timezone: Europe/Paris
+# palette: ["#3b6ea5", "#c2185b", "#2e7d32", "#6a1b9a", "#ef6c00", "#00838f",
+#           "#ad1457", "#558b2f", "#4527a0", "#d84315", "#00695c", "#5d4037"]
+# enrolment_link_ttl_hours: 72
+# session_ttl_days: 90
+# app_sync_interval_minutes: 30

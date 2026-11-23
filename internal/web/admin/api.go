@@ -14,6 +14,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/backup"
 	"github.com/nebuloss/agendouille/internal/calendar"
+	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
 	"github.com/nebuloss/agendouille/internal/settings"
@@ -58,7 +59,6 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/activity", h.activity)
 	api("GET /api/admin/activity/export", h.exportActivity)
 	api("GET /api/admin/settings", h.settings)
-	api("PATCH /api/admin/settings", h.patchSettings)
 	api("GET /api/admin/backups", h.backups)
 	api("POST /api/admin/backups", h.makeBackup)
 	api("GET /api/admin/backups/{file}", h.downloadBackup)
@@ -124,7 +124,7 @@ func (h *handlers) warnings(r *http.Request) []warning {
 	out := []warning{}
 	set := h.d.Settings.Get()
 	if set.PublicListen == "" {
-		out = append(out, warning{"no_public_listener", "CalDAV et l'application familiale sont arrêtés : renseignez public_listen et public_url dans les réglages."})
+		out = append(out, warning{"no_public_listener", "CalDAV et l'application familiale sont arrêtés : renseignez public_listen et public_url dans le fichier de configuration."})
 	} else if h.d.PublicStatus != nil {
 		if addr, err := h.d.PublicStatus(); err != "" {
 			out = append(out, warning{"public_listener_down", "L'accès public n'a pas pu démarrer sur " + set.PublicListen + " : " + err})
@@ -876,10 +876,20 @@ func (h *handlers) exportActivity(w http.ResponseWriter, r *http.Request) {
 
 // --- settings
 
+// settings is every setting as the server holds it, where its value came
+// from (the file, the environment, a flag, or the default), and the file
+// to edit: the settings live in the configuration file (DECISIONS), as
+// cafard's and claudication's; this page shows them, it does not edit them.
 func (h *handlers) settings(w http.ResponseWriter, _ *http.Request) {
 	type item struct {
 		settings.Key
-		Value json.RawMessage `json:"value"`
+		Value  json.RawMessage `json:"value"`
+		Origin string          `json:"origin"`
+		Env    string          `json:"env"`
+	}
+	origins := h.d.Config.Origins
+	if fresh, err := h.d.Config.Reload(); err == nil {
+		origins = fresh.Origins // the file as it is now
 	}
 	out := []item{}
 	for _, k := range settings.Keys() {
@@ -888,31 +898,17 @@ func (h *handlers) settings(w http.ResponseWriter, _ *http.Request) {
 			h.fail(w, err)
 			return
 		}
-		out = append(out, item{Key: k, Value: json.RawMessage(v)})
-	}
-	webx.JSON(w, http.StatusOK, map[string]any{"settings": out})
-}
-
-// patchSettings takes {"key": value, ...} with JSON values, applied
-// together (rules between keys hold) and live.
-func (h *handlers) patchSettings(w http.ResponseWriter, r *http.Request) {
-	var body map[string]json.RawMessage
-	if !decode(w, r, &body) {
-		return
-	}
-	changes := map[string]string{}
-	for k, v := range body {
-		changes[k] = string(v)
-	}
-	if _, err := h.d.Settings.Set(r.Context(), "admin", changes); err != nil {
-		if errors.Is(err, settings.ErrUnknownKey) {
-			h.fail(w, err)
-			return
+		origin := origins[k.Name]
+		if origin == "" {
+			origin = "default"
 		}
-		h.fail(w, validation{err.Error()})
-		return
+		out = append(out, item{Key: k, Value: json.RawMessage(v), Origin: origin, Env: config.EnvName(k.Name)})
 	}
-	h.settings(w, r)
+	path := h.d.Config.Path
+	if path == "" {
+		path = config.DefaultPath
+	}
+	webx.JSON(w, http.StatusOK, map[string]any{"settings": out, "path": path, "exists": h.d.Config.Path != ""})
 }
 
 // --- backups

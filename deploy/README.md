@@ -48,7 +48,16 @@ install:
   `0.0.0.0:8792` it is on the LAN, in plain http, which a LAN-only admin UI
   accepts.
 - `AGENDOUILLE_INSTALL_PUBLIC_URL`: turns the public listener on at :8791
-  for that address. Without it, set it later in Settings, Network.
+  for that address, in the file. Without it, add `public_listen` and
+  `public_url` to the file later.
+
+Every setting lives in `/etc/agendouille.yaml`, as cafard's and
+claudication's do; `deploy/agendouille.yaml.example` lists them with their
+defaults. A running server applies an edit of a setting within seconds (an
+error is logged and the settings in force are kept); `data_dir`,
+`admin_listen`, `admin_public_url` and `log_level` need a restart.
+Each key can also come from the environment (`AGENDOUILLE_PUBLIC_URL`),
+which wins over the file.
 
 From a checkout, `sudo deploy/install.sh` builds from source instead.
 From the editing machine, `scripts/devdeploy.sh` builds on dev-build and
@@ -75,7 +84,8 @@ server, as the `agendouille` user.
 - Do not buffer `/api/live` (Server-Sent Events).
 - `/.well-known/caldav` is answered by agendouille itself: forward it.
 
-Then, in the admin UI, Settings, Network:
+Then, in `/etc/agendouille.yaml` (the server applies an edit within seconds;
+the admin UI's Réglages page shows the values and where they came from):
 
 - `public_url`: the proxy's `https://` address. Sign-in QR codes, DAVx5
   links and every phone's account point there, so pick it once: changing

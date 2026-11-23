@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/surface"
 )
 
@@ -28,6 +32,19 @@ type e2e struct {
 	public string // of the public listener, once up
 	svc    *services
 	srv    *surface.Server
+	// The server's configuration file, and its keys before any setting:
+	// configure rewrites the file, as an operator edits it.
+	configPath, configBase string
+}
+
+// configure writes the configuration file with these settings (YAML lines)
+// after its bootstrap keys, as an operator edits it; the server applies it
+// within settingsPoll.
+func (x *e2e) configure(settingsYAML string) {
+	x.t.Helper()
+	if err := os.WriteFile(x.configPath, []byte(x.configBase+settingsYAML), 0o600); err != nil {
+		x.t.Fatal(err)
+	}
 }
 
 func startServer(t *testing.T) *e2e {
@@ -36,7 +53,23 @@ func startServer(t *testing.T) *e2e {
 	settingsPoll = 50 * time.Millisecond
 	t.Cleanup(func() { settingsPoll = old })
 
-	cfg := testConfig(t)
+	// A configuration file, so serve watches it and a test edits it.
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "agendouille.yaml")
+	configBase := "data_dir: " + filepath.Join(dir, "data") + "\nadmin_listen: 127.0.0.1:0\n"
+	if err := os.WriteFile(configPath, []byte(configBase), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, _, err := config.NewLoader(flag.NewFlagSet("t", flag.ContinueOnError)).Load(func(k string) string {
+		if k == config.EnvPrefix+"CONFIG" {
+			return configPath
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := loaded
 	withAdminPassword(t, cfg)
 	ctx, cancel := context.WithCancel(context.Background())
 	up := make(chan *surface.Server, 1)
@@ -65,7 +98,7 @@ func startServer(t *testing.T) *e2e {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { svc.store.Close() })
-	return &e2e{t: t, admin: "http://" + srv.AdminAddr().String(), svc: svc, srv: srv}
+	return &e2e{t: t, admin: "http://" + srv.AdminAddr().String(), svc: svc, srv: srv, configPath: configPath, configBase: configBase}
 }
 
 var noRedirect = &http.Client{
@@ -130,17 +163,12 @@ func freePort(t *testing.T) string {
 	return ln.Addr().String()
 }
 
-// publicOn sets public_listen and public_url the way `agendouille config
-// set` does, from another process's view of the database, and waits for
-// the running server to pick it up.
+// publicOn sets public_listen and public_url in the configuration file,
+// as an operator would, and waits for the running server to apply it.
 func (x *e2e) publicOn() {
 	x.t.Helper()
 	addr := freePort(x.t)
-	if _, err := x.svc.settings.Set(context.Background(), "cli", map[string]string{
-		"public_listen": addr, "public_url": "http://" + addr,
-	}); err != nil {
-		x.t.Fatal(err)
-	}
+	x.configure("public_listen: " + addr + "\npublic_url: http://" + addr + "\n")
 	deadline := time.Now().Add(5 * time.Second)
 	for a := x.srv.PublicAddr(); a == nil || a.String() != addr; a = x.srv.PublicAddr() {
 		if time.Now().After(deadline) {

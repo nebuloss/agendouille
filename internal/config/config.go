@@ -1,13 +1,11 @@
-// Package config loads agendouille's bootstrap configuration from
+// Package config loads agendouille's configuration from
 // /etc/agendouille.yaml, the environment and flags, in that order of
-// increasing precedence.
-//
-// The bootstrap file holds only what the server needs before it can open
-// its database: where the data lives and where the admin UI listens.
-// Everything else (the public listener, limits, backups, defaults) is a
-// setting kept in the database and edited from the admin UI (PLAN.md 11).
-// The admin listener stays here on purpose: a mistake made in the UI must
-// never lock the admin out of the UI.
+// increasing precedence: where the data lives, where the admin UI listens,
+// and every setting (the public listener, limits, backups, defaults;
+// internal/settings), as cafard and claudication keep theirs. The admin UI
+// shows them and where each came from; it does not edit them. serve re-reads
+// the file when it changes and applies the settings live; the keys before
+// the settings need a restart.
 //
 // Every scalar key gets a flag and an environment variable for free: the
 // key admin_listen is -admin-listen and AGENDOUILLE_ADMIN_LISTEN.
@@ -21,6 +19,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/nebuloss/agendouille/internal/settings"
 )
 
 // DefaultPath is where the service looks when neither -config nor
@@ -43,6 +43,48 @@ type Config struct {
 	// other than loopback, for a LAN where the admin UI has no certificate.
 	AdminAllowInsecure bool   `yaml:"admin_allow_insecure"`
 	LogLevel           string `yaml:"log_level"`
+
+	// Settings are the rest of the file, at its top level: applied live.
+	Settings settings.Values `yaml:",inline"`
+
+	// Path is the file read, or "" when there was none.
+	Path string `yaml:"-"`
+	// Origins says where each key's value came from: default, file, env or
+	// flag (claudication's Origin), for the admin UI.
+	Origins map[string]string `yaml:"-"`
+
+	reload func() (*Config, error)
+}
+
+// Reload reads the configuration again, from the same file, environment and
+// flags. Nil when the configuration was not loaded from a Loader (tests).
+func (c *Config) Reload() (*Config, error) {
+	if c.reload == nil {
+		return nil, fmt.Errorf("this configuration was not loaded from a file")
+	}
+	return c.reload()
+}
+
+// Restart lists the keys that changed between c and next and that only a
+// restart applies: everything before the settings.
+func (c *Config) Restart(next *Config) []string {
+	var out []string
+	if c.DataDir != next.DataDir {
+		out = append(out, "data_dir")
+	}
+	if c.AdminListen != next.AdminListen {
+		out = append(out, "admin_listen")
+	}
+	if c.AdminPublicURL != next.AdminPublicURL {
+		out = append(out, "admin_public_url")
+	}
+	if c.AdminAllowInsecure != next.AdminAllowInsecure {
+		out = append(out, "admin_allow_insecure")
+	}
+	if c.LogLevel != next.LogLevel {
+		out = append(out, "log_level")
+	}
+	return out
 }
 
 // Validator is implemented by sub-structs that check themselves.
@@ -61,6 +103,7 @@ func Default() Config {
 		DataDir:     "/var/lib/agendouille",
 		AdminListen: "127.0.0.1:8792",
 		LogLevel:    "info",
+		Settings:    settings.Default(),
 	}
 	applyDefaults(&c)
 	return c

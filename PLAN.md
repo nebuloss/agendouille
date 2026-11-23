@@ -803,7 +803,7 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | `admin_allow_insecure` | `false` | Must be `true` for a plain `http://` admin URL off loopback (a LAN-only admin UI); off loopback, `admin_public_url` is required |
 | `log_level` | `info` | |
 
-### 11.2 Settings (in the database, edited in the admin UI, applied live)
+### 11.2 Settings (in the configuration file, applied live; DECISIONS: settings in the configuration file)
 
 | Group | Setting | Default |
 |---|---|---|
@@ -826,16 +826,17 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 
 - Setting names carry their unit (`_days`, `_hours`, `_minutes`), so a
   value typed in a shell cannot be read in the wrong one.
-- Changing `public_listen` or `public_url` rebinds the public listener
-  without a restart (the old one drains for 10 s). A change made with
-  `agendouille config set` while the server runs reaches it within five
-  seconds (it watches the table). The page says that
+- They live in `/etc/agendouille.yaml` beside the bootstrap keys; the
+  admin UI shows them and where each came from, it does not edit them.
+  An edit of the file reaches a running server within five seconds (it
+  watches the file); changing `public_listen` or `public_url` rebinds the
+  public listener without a restart (the old one drains for 10 s). The page says that
   phones keep their URL, so changing `public_url` means re-enrolling them
   (and App Links follow the new host only with an APK that knows it: open
   question 3).
-- Every change is in the admin activity log with old and new values.
-- `agendouille config` prints the effective bootstrap and settings;
-  `agendouille config set <key> <value>` changes a setting from a shell.
+- `agendouille config` prints the effective configuration and where each
+  value came from; `agendouille config migrate` moves settings an older
+  version kept in the database into the file.
 
 ---
 
@@ -844,7 +845,7 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | Command | Does |
 |---|---|
 | `serve` | Run |
-| `config [set k v]` | Print or change (11) |
+| `config [migrate]` | Print (11); move old database settings into the file |
 | `admin passwd [--random]` | Set the admin password |
 | `user add <name> [--group g]...`, `user enrol <name>` (prints a link and a QR in the terminal), `user list`, `user disable\|enable\|remove` | |
 | `group add\|list\|remove`, `group member add\|remove` | |

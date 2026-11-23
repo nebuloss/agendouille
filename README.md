@@ -53,8 +53,10 @@ agendouille admin passwd --random     # printed once; serve refuses to start wit
 agendouille serve                     # the admin UI on 127.0.0.1:8792
 curl http://127.0.0.1:8792/healthz    # ok dev
 
-# The public side (CalDAV and the family web app), for the DMZ proxy:
-agendouille config set public_listen 0.0.0.0:8791 public_url https://agenda.example.org
+# The public side (CalDAV and the family web app), for the DMZ proxy, in
+# /etc/agendouille.yaml (applied within seconds):
+#   public_listen: 0.0.0.0:8791
+#   public_url: https://agenda.example.org
 
 agendouille group add famille
 agendouille user add lea --display-name Léa --group famille
@@ -74,11 +76,14 @@ A calendar made in DAVx5 or on an iPhone belongs to its user.
 Users have no password and no email. The enrolment QR signs in their first
 device; after that, any browser shows a QR code at `/signin` that a
 signed-in phone approves (`/approve`, or the agendouille app's scanner),
-picking the number the browser shows. `agendouille config` prints the
-settings; a running server picks up `config set` within seconds.
+picking the number the browser shows. `agendouille config` prints every
+setting and where it came from.
 
-The bootstrap file is `/etc/agendouille.yaml` (or `-config`, or
-`AGENDOUILLE_CONFIG`); every key is also a flag and an `AGENDOUILLE_*`
+The configuration is `/etc/agendouille.yaml` (or `-config`, or
+`AGENDOUILLE_CONFIG`), every setting included, as cafard's and
+claudication's (`deploy/agendouille.yaml.example` lists them); a running
+server applies an edit of a setting within seconds, and the admin UI shows
+them without editing them. Every key is also a flag and an `AGENDOUILLE_*`
 variable, which win in that order:
 
 | File key | Flag | Default |

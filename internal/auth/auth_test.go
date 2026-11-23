@@ -41,10 +41,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	t.Cleanup(func() { st.Close() })
 	c := &clock{t: time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)}
-	set, err := settings.Open(ctx, st.DB(), c.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
+	set := settings.New(settings.Default())
 	dir := directory.New(st.DB(), c.Now, func() []string { return settings.DefaultPalette })
 	lea, err := dir.AddUser(ctx, "admin", "lea", "Léa", "", nil)
 	if err != nil {
