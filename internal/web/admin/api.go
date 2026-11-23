@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -49,6 +50,7 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("POST /api/admin/calendars/{ref}/transfer", h.transfer)
 	api("DELETE /api/admin/calendars/{ref}", h.deleteCalendar)
 	api("GET /api/admin/activity", h.activity)
+	api("GET /api/admin/activity/export", h.exportActivity)
 	api("GET /api/admin/settings", h.settings)
 	api("PATCH /api/admin/settings", h.patchSettings)
 	api("GET /api/admin/backups", h.backups)
@@ -723,6 +725,35 @@ func (h *handlers) activity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"activity": items})
+}
+
+// exportActivity is the activity as CSV, with the table's filter: what
+// lands in the file is what was on the screen, and the rows not loaded yet.
+// At most 50 000 rows, newest first.
+func (h *handlers) exportActivity(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	f := calendar.ActivityFilter{User: q.Get("user"), Calendar: q.Get("calendar"), Kind: q.Get("kind"), Limit: 500}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="agendouille-activite.csv"`)
+	w.Header().Set("Cache-Control", "no-store")
+	out := csv.NewWriter(w)
+	_ = out.Write([]string{"at", "by", "kind", "action", "calendar", "via", "device", "detail"})
+	for n := 0; n < 50000; {
+		items, err := h.d.Calendar.AdminActivity(r.Context(), f)
+		if err != nil {
+			h.d.Log.Error("activity export", "err", err)
+			break
+		}
+		for _, a := range items {
+			_ = out.Write([]string{a.At.UTC().Format(time.RFC3339), a.By, a.Kind, a.Action, a.Calendar, a.Via, a.Device, a.Detail})
+		}
+		n += len(items)
+		if len(items) < f.Limit {
+			break
+		}
+		f.Before = items[len(items)-1].At
+	}
+	out.Flush()
 }
 
 // --- settings

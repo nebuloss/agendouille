@@ -165,6 +165,11 @@ func TestM3AdminUI(t *testing.T) {
 		!strings.Contains(a.body, `<span>Appareils</span></a>`) || !strings.Contains(a.body, `href="/users"`) {
 		t.Errorf("the rail of a user's page: %s", a.body)
 	}
+	// The activity log's CSV: the table's filter, a header, the rows.
+	if a := A.call("GET", "/activity/export?user=lea", nil); a.status != 200 || !strings.HasPrefix(a.header.Get("Content-Type"), "text/csv") ||
+		!strings.HasPrefix(a.body, "at,by,kind,action,calendar,via,device,detail\n") || !strings.Contains(a.body, ",user,") {
+		t.Errorf("activity export: %d %q", a.status, a.body)
+	}
 	if a := x.do("GET", x.admin+"/users/lea/nonsense", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/users/lea" {
 		t.Errorf("an unknown page of a user: %d %s", a.status, a.header.Get("Location"))
 	}

@@ -1,4 +1,5 @@
 import { ui } from '@/shared/components/recipes.ts';
+import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { ApiError, seg } from '@/shared/core/Api.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
@@ -196,89 +197,23 @@ export function tileLink(n: string, label: string, href: string): HTMLElement {
     h('span', { class: 'text-[32px] leading-10 font-semibold' }, n), h('span', { class: 'text-sm text-on-surface-variant' }, label));
 }
 
-export interface Activity {
-  at: string;
-  kind: string;
-  action: string;
-  by: string;
-  calendar?: string;
-  via?: string;
-  device?: string;
-  detail?: string;
-}
-
-const actions: Record<string, string> = {
-  created: 'créé', changed: 'modifié', deleted: 'supprimé', added: 'ajouté', removed: 'retiré', shared: 'partagé',
-  unshared: 'partage retiré', disabled: 'désactivé', enabled: 'réactivé', groups: 'groupes changés', member_added: 'membre ajouté',
-  member_removed: 'membre retiré', password: 'mot de passe changé', revoked: 'révoqué', made: 'créé', approved: 'approuvé',
-  transferred: 'donné', calendar_created: 'calendrier créé', calendar_changed: 'calendrier modifié', calendar_deleted: 'calendrier supprimé',
-};
-
 export const accessLabel = (a: string): string => ({ read: 'lecture', readwrite: 'lecture et écriture', owner: 'propriétaire' })[a] ?? a;
 
-const kinds: Record<string, string> = {
-  event: 'événement', calendar: 'calendrier', share: 'partage', user: 'utilisateur', group: 'groupe', device: 'appareil',
-  enrolment: 'QR de connexion', setting: 'réglage', admin: 'administration', approval: 'connexion',
-};
-
-/** The activity as a table: when, who, what, where, through what. */
-export function activityTable(items: Activity[]): HTMLElement {
-  return table(['Quand', 'Qui', 'Quoi', 'Où', 'Par'],
-    items.map((a) => [when(a.at), a.by, `${kinds[a.kind] ?? a.kind} · ${actions[a.action] ?? a.action}${a.detail ? ` · ${a.detail}` : ''}`,
-      a.calendar ?? '', [a.via, a.device].filter((x) => x !== undefined && x !== '').join(' · ')]),
-    "Rien dans l'historique.");
-}
-
-/** Who did what, never what an event said. */
+/** Who did what, never what an event said: claudication's request log, for the activity (ActivityLog). */
 export class ActivityPage extends AdminPage {
-  private filters = { user: '', calendar: '', kind: '' };
-  private items: Activity[] = [];
+  private log: ActivityLog | null = null;
 
   protected async render(): Promise<Child[]> {
-    const { activity } = await this.api.get<{ activity: Activity[] }>('/activity', this.filters);
-    this.items = activity;
-    return [this.filterForm(), this.tableOf(), this.more()];
+    this.log ??= new ActivityLog(this.doc, this.api);
+    await this.log.load();
+    return [card('Activité', [],
+      h('p', { class: 'text-sm text-on-surface-variant' }, "Qui a fait quoi, et par quel appareil ; jamais le contenu d'un événement."),
+      this.log.root)];
   }
 
-  private filterForm(): HTMLElement {
-    const user = h('input', { value: this.filters.user, placeholder: 'lea' });
-    const calendar = h('input', { value: this.filters.calendar, placeholder: 'maman~ecole' });
-    const kind = h('select', {}, h('option', { value: '' }, 'Tout'),
-      ...Object.entries(kinds).map(([k, l]) => h('option', { value: k, selected: k === this.filters.kind }, l)));
-    const form = h('form', { class: 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))]' }, field('Utilisateur', user), field('Calendrier', calendar), field('Quoi', kind),
-      h('div', {}, h('button', { class: ui.btn('tonal'), type: 'submit' }, 'Filtrer')));
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      this.filters = { user: user.value.trim(), calendar: calendar.value.trim(), kind: kind.value };
-      void this.refresh();
-    });
-    return form;
-  }
-
-  private tableOf(): HTMLElement {
-    return activityTable(this.items);
-  }
-
-  private more(): Child {
-    if (this.items.length < 100) return null;
-    return action('Plus ancien', async () => {
-      const last = this.items[this.items.length - 1]!;
-      try {
-        const { activity } = await this.api.get<{ activity: Activity[] }>('/activity', { ...this.filters, before: last.at });
-        this.items = this.items.concat(activity);
-        await this.refreshKeepingItems();
-      } catch (e) {
-        this.toasts.error(e);
-      }
-    });
-  }
-
-  private async refreshKeepingItems(): Promise<void> {
-    const keep = this.items;
-    const content = this.root;
-    const tbl = content.querySelector('.table-wrap, .empty');
-    this.items = keep;
-    tbl?.replaceWith(this.tableOf());
+  override dispose(): void {
+    this.log?.dispose();
+    super.dispose();
   }
 }
 

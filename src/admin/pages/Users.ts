@@ -5,7 +5,8 @@ import { h, svgDataUrl, type Child } from '@/shared/core/Dom.ts';
 import { action, card, confirmDialog, dialog, field, formDialog, section, swatch, table } from '@/shared/components/Ui.ts';
 import { ago, bytes, day, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
-import { accessLabel, activityTable, tileLink, type Activity } from '@/admin/pages/More.ts';
+import { accessLabel, tileLink } from '@/admin/pages/More.ts';
+import { ActivityLog } from '@/admin/ActivityLog.ts';
 
 export interface User {
   name: string;
@@ -181,8 +182,12 @@ export class UserPage extends AdminPage {
       case 'groups':
         return [this.groupsCard(d.groups, groups)];
       case 'activity': {
-        const { activity } = await this.api.get<{ activity: Activity[] }>('/activity', { user: u.name });
-        return [section('Activité', activityTable(activity))];
+        // The log of the activity page, this user's: the user is the page's
+        // scope, the other columns still narrow it.
+        const log = new ActivityLog(this.doc, this.api, { user: u.name });
+        this.bag.defer(() => log.dispose());
+        await log.load();
+        return [section('Activité', log.root)];
       }
       default:
         return this.overview(u, d, users);

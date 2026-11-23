@@ -3,6 +3,28 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: the activity log is claudication's request log
+
+The user: "reuse claudication requests widget for logging widget to have
+cleaner design".
+
+- **`src/admin/ActivityLog.ts`** is claudication's request log
+  (`web/src/ui/features/requests`) in plain DOM: the table on its own
+  ringed tile, capped in height with the heading pinned and column rules;
+  the time sorts; the columns the server filters (who, what, calendar)
+  open a menu of their values with counts; a value in a row narrows to
+  itself; each filter in force is a chip that takes it off; a row opens
+  its record; under the table, older rows, how many are shown, and
+  "Télécharger en CSV". The filter is in the URL (`?user=&kind=&calendar=`).
+- It is the Activité page and a user's Activité page, where the user is the
+  page's scope (always sent, no chip, no menu).
+- **Differences from claudication, for now:** a column's values are counted
+  over the rows loaded, not over the whole log (the server has no facets
+  endpoint yet; the menu says so), one value per column (the server filters
+  one), and no column resizing.
+- **`GET /api/admin/activity/export`**: the same filter as CSV, up to
+  50 000 rows, newest first.
+
 ## 2026-11-23: a view per user and per group, as claudication's items
 
 The user: "like cafard or claudication we must have a per group/per user
