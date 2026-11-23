@@ -399,7 +399,7 @@ export function browserName(ua: string): string {
   return os === '' ? b : `${b}, ${os}`;
 }
 
-/** Moi (PLAN.md 9.3): my name and colour, my groups, enrol another phone. */
+/** Moi (PLAN.md 9.3): my name and colour, my groups, enroll another phone. */
 export class MePage extends AppPage {
   protected async render(): Promise<Child[]> {
     const me = await this.api.get<Me>('/me');
@@ -421,7 +421,7 @@ export class MePage extends AppPage {
         h('p', { class: 'text-sm text-on-surface-variant' }, t('groupsHint'))),
       section(t('otherPhone'),
         h('p', {}, t('otherPhoneIntro')),
-        h('div', {}, action(t('showCode'), () => this.enrol(), 'tonal', 'qr'))),
+        h('div', {}, action(t('showCode'), () => this.enroll(), 'tonal', 'qr'))),
       section(t('thisBrowser'),
         h('p', { class: 'text-sm text-on-surface-variant' }, t('signOutHint')),
         h('form', { method: 'post', action: '/signout' },
@@ -434,13 +434,13 @@ export class MePage extends AppPage {
    * a bar that drains, and a fresh code in its place at zero while the
    * dialog stays open.
    */
-  private async enrol(): Promise<void> {
+  private async enroll(): Promise<void> {
     const img = h('img', { class: 'qr mx-auto rounded-md3-l p-2', alt: t('signinQrAlt'), width: 240, height: 240 });
     const timer = h('div', {});
     let countdown: Countdown | null = null;
     let open = true;
     const refresh = async (): Promise<void> => {
-      const e = await this.api.post<{ qr_svg: string; expires_in_ms: number; ttl_ms: number }>('/me/enrolment');
+      const e = await this.api.post<{ qr_svg: string; expires_in_ms: number; ttl_ms: number }>('/me/enrollment');
       setAttributes(img, { src: svgDataUrl(e.qr_svg) });
       countdown?.dispose();
       countdown = new Countdown(timer, e.expires_in_ms, e.ttl_ms, () => {

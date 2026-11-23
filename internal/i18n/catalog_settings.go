@@ -57,7 +57,7 @@ func init() {
 			FR: "Couleurs attribuées aux nouveaux utilisateurs et calendriers, en hexadécimal.",
 			EN: "Colours given to new users and calendars, in hexadecimal.",
 		},
-		"setting.enrolment_link_ttl_hours.help": {
+		"setting.enrollment_link_ttl_hours.help": {
 			FR: "Durée de validité, en heures, d’un lien de connexion.",
 			EN: "How long a sign-in link stays valid, in hours.",
 		},

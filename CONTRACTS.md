@@ -44,7 +44,7 @@ between its parts**:
 | `internal/store` | `*sql.DB`, migrations, `Tx` | sqlite |
 | `internal/directory` | users, groups, membership, `Sees(a, b)` | store |
 | `internal/sharing` | ownership, shares, hidden flags, `Access(user, cal)` | store, directory |
-| `internal/auth` | admin password and sessions, app sessions, enrolment links, approvals, devices, subscription links, Basic auth, client IP, same-origin | store, directory, settings |
+| `internal/auth` | admin password and sessions, app sessions, enrollment links, approvals, devices, subscription links, Basic auth, client IP, same-origin | store, directory, settings |
 | `internal/ical` | parse, encode, validate, index, RRULE, expand (pure, in-house) | — |
 | `internal/calendar` | calendars and objects: the one write path (1.3), changes, tokens, quotas, import/export | store, ical, hub, sharing, settings |
 | `internal/hub` | in-process fan-out of `calendar.Change` and access events | — |
@@ -52,7 +52,7 @@ between its parts**:
 | `internal/backup` | snapshots, schedule, restore | store, settings |
 | `internal/dav` | surface `dav` | calendar, sharing, auth, ical, surface |
 | `internal/web/webx` | layouts, JSON errors, same-origin middleware, static per surface | surface, dto |
-| `internal/web/app` | surface `app`: pages, `/api/*`, `/api/app/*`, `/enrol/`, the APK, `assetlinks.json` | calendar, sharing, directory, auth, ical, dto, webx |
+| `internal/web/app` | surface `app`: pages, `/api/*`, `/api/app/*`, `/enroll/`, the APK, `assetlinks.json` | calendar, sharing, directory, auth, ical, dto, webx |
 | `internal/web/app` (`live.go`) | surface `app`: `/api/live` | hub, sharing, auth |
 | `internal/web/admin` | surface `admin`: pages, `/api/admin/*` | directory, sharing, calendar (metadata calls only), auth, settings, backup, dto, webx |
 | `internal/dto` | every JSON type of sections 3 and 7 | — |
@@ -200,9 +200,9 @@ type Principal struct {
 func (s *Service) Basic(r *http.Request) (*Principal, error)                          // dav, and /api/app/session
 func (s *Service) Session(r *http.Request, sf surface.Surface) (*Principal, error)    // agd_app | agd_admin
 func (s *Service) AdminSignIn(ctx, password string, r *http.Request) (*http.Cookie, error)
-func (s *Service) NewEnrolment(ctx, by Principal, user string, ttl time.Duration) (Enrolment, error)
-func (s *Service) RedeemEnrolmentForApp(ctx, token string, device DeviceInfo) (DeviceSecret, error)
-func (s *Service) RedeemEnrolmentForBrowser(ctx, token string, r *http.Request) (*http.Cookie, error)
+func (s *Service) NewEnrollment(ctx, by Principal, user string, ttl time.Duration) (Enrollment, error)
+func (s *Service) RedeemEnrollmentForApp(ctx, token string, device DeviceInfo) (DeviceSecret, error)
+func (s *Service) RedeemEnrollmentForBrowser(ctx, token string, r *http.Request) (*http.Cookie, error)
 func (s *Service) StartApproval(ctx, r *http.Request) (Approval, error)  // id, code, short code, number
 func (s *Service) LookupApproval(ctx, p *Principal, code string) (ApprovalView, error) // UA, IP, three numbers
 func (s *Service) Approve(ctx, p *Principal, code string, number int) error
@@ -232,7 +232,7 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 |---|---|---|
 | GET | `/signin` | none (starts an approval) |
 | GET | `/signin/wait/{id}` | none; long-poll (25 s): `{"status": "approved"}` with the `agd_app` cookie, `pending`, or 410 `cancelled`/`expired`/`used`; `?then=redirect` answers 303 to `/` or back to `/signin` instead, for a browser without the bundle |
-| GET, POST | `/enrol/{token}` | the token (GET shows "Continue"; POST redeems for this browser, so link previews do not burn it) |
+| GET, POST | `/enroll/{token}` | the token (GET shows "Continue"; POST redeems for this browser, so link previews do not burn it) |
 | GET | `/.well-known/assetlinks.json` | none |
 | GET | `/app/agendouille.apk`, `/app/version` | none |
 | GET | `/`, `/calendars`, `/approve`, `/devices`, `/me` | `agd_app` (else to `/signin`) |
@@ -240,7 +240,7 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | GET | `/static/app/...`, `/static/shared/...` | none |
 | POST | `/signout` | `agd_app`, same-origin |
 | GET, PATCH | `/api/me` | `agd_app` (PATCH same-origin) |
-| POST | `/api/me/enrolment` | `agd_app`, same-origin: a 10-minute enrolment link for one's own new phone |
+| POST | `/api/me/enrollment` | `agd_app`, same-origin: a 10-minute enrollment link for one's own new phone |
 | GET | `/api/people` | `agd_app`: the users and groups I see |
 | GET, POST | `/api/calendars` | `agd_app` (POST same-origin): my home ; create |
 | GET, PATCH, DELETE | `/api/calendars/{ref}` | `agd_app` (writes same-origin); PATCH by a sharee changes only `hidden` and their own view |
@@ -265,7 +265,7 @@ no same-origin):
 
 | Method | Path | Body / answer |
 |---|---|---|
-| POST | `/api/app/enrol` | no auth; `{"token", "model", "android", "app_version"}` -> `{"user", "device_id", "username", "secret", "dav_url", "app_url"}` (once) |
+| POST | `/api/app/enroll` | no auth; `{"token", "model", "android", "app_version"}` -> `{"user", "device_id", "username", "secret", "dav_url", "app_url"}` (once) |
 | POST | `/api/app/session` | Basic -> sets `agd_app` for the WebView (device kind `app` only) |
 | GET | `/api/app/config` | Basic -> `{"server_version", "min_app_version", "apk_sha256", "bridge": 1, "sync_interval_s"}` |
 
@@ -302,7 +302,7 @@ cookie on the admin surface is ignored.
 | 503 | `busy` (too many sign-ins waiting) |
 | 404 | `not_found` (also: no access) |
 | 409 | `uid_conflict`, `slug_taken` |
-| 410 | `expired`, `used` (enrolment, approval) |
+| 410 | `expired`, `used` (enrollment, approval) |
 | 412 | `precondition_failed` (`by`) |
 | 413 | `too_large` |
 | 422 | `invalid_event` (`field`) |
@@ -423,12 +423,12 @@ errors are 3.1's, with messages in French for the UI to show as they are.
 |---|---|---|
 | GET | `/overview` | `users`, `groups`, `calendars`, `events`, `devices`, `stale_devices`, `storage` {database, backups}, `last_backup`, `version`, `public_url`, `warnings` [{code, message}] |
 | GET | `/system` | `version`, `data_dir`, `listeners` [{surfaces, listen, public_url, bound, error, from}] |
-| GET, POST | `/users` | list ; create `{name, display_name, color, groups, enrol}` -> `{user, enrolment?}` (201) |
+| GET, POST | `/users` | list ; create `{name, display_name, color, groups, enroll}` -> `{user, enrollment?}` (201) |
 | GET, PATCH | `/users/{name}` | 3.5.1 ; `{display_name?, color?, groups?, disabled?}` -> 3.5.1 |
 | POST | `/users/{name}/remove` | `{"calendars": {"<ref>": {"transfer_to": "<user>"} or {"delete": true}}}` -> 204; 409 `owns_calendars` with `calendars` when one is missing |
-| POST | `/users/{name}/enrolments` | `{kind}`: `phone` (default) or `browser` (an hour) -> `{id, kind, url, qr_svg, created_at, expires_at}` (201); 400 without `public_url` |
-| GET | `/users/{name}/enrolments/{id}` | a pending link again, the same answer; 410 `used` or `expired` once gone |
-| DELETE | `/users/{name}/enrolments/{id}`, `/users/{name}/devices/{id}`, `/users/{name}/sessions/{id}` | revoke -> 204 |
+| POST | `/users/{name}/enrollments` | `{kind}`: `phone` (default) or `browser` (an hour) -> `{id, kind, url, qr_svg, created_at, expires_at}` (201); 400 without `public_url` |
+| GET | `/users/{name}/enrollments/{id}` | a pending link again, the same answer; 410 `used` or `expired` once gone |
+| DELETE | `/users/{name}/enrollments/{id}`, `/users/{name}/devices/{id}`, `/users/{name}/sessions/{id}` | revoke -> 204 |
 | GET, POST | `/groups` | list with `members` and `shares` ; create `{name, display_name, color}` |
 | PATCH | `/groups/{name}` | `{display_name?, color?, members?}` (members: the exact list) -> 204 |
 | DELETE | `/groups/{name}` | 409 `has_shares` unless `?confirm=1` |
@@ -452,7 +452,7 @@ errors are 3.1's, with messages in French for the UI to show as they are.
 { "name": "lea", "display_name": "Léa", "color": "#c2185b",
   "groups": ["famille", "enfants"], "disabled": false,
   "created_at": "…", "last_seen_at": "…",
-  "enrolments": [ { "id": 4, "created_at": "…", "expires_at": "…", "used_at": null } ],
+  "enrollments": [ { "id": 4, "created_at": "…", "expires_at": "…", "used_at": null } ],
   "devices":  [ { "id": 7, "kind": "app", "label": "Pixel 8", "cap": "readwrite", "last_used_at": "…", "client": "agendouille/0.3" } ],
   "sessions": [ { "id": 3, "user_agent": "…", "seen_at": "…" } ],
   "calendars_owned":  [ { "ref": "lea~perso", "name": "Perso", "events": 120, "bytes": 81234 } ],
@@ -549,7 +549,7 @@ CREATE TABLE group_members (
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   PRIMARY KEY (group_id, user_id));
 
-CREATE TABLE enrolments (
+CREATE TABLE enrollments (
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash BLOB NOT NULL UNIQUE, made_by TEXT NOT NULL,        -- 'admin' or the user's name
   created_at TEXT NOT NULL, expires_at TEXT NOT NULL,

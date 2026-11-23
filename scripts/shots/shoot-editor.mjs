@@ -1,9 +1,9 @@
 // The calendar page's hover states and the event editor, light and dark,
-// on dev-build. Usage: node shoot-editor.mjs <enrolment URL> <out dir>
+// on dev-build. Usage: node shoot-editor.mjs <enrollment URL> <out dir>
 import puppeteer from 'puppeteer-core';
 
-const [enrol, out] = process.argv.slice(2);
-const base = new URL(enrol).origin;
+const [enroll, out] = process.argv.slice(2);
+const base = new URL(enroll).origin;
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'], headless: true });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const page = await browser.newPage();
@@ -13,7 +13,7 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
 const errors = [];
 page.on('pageerror', (e) => errors.push(`page: ${e.message}`));
 await page.setViewport({ width: 1280, height: 860 });
-await page.goto(enrol, { waitUntil: 'networkidle2' });
+await page.goto(enroll, { waitUntil: 'networkidle2' });
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
 
 for (const scheme of ['light', 'dark']) {

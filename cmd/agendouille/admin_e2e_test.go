@@ -150,11 +150,11 @@ func TestM3AdminUI(t *testing.T) {
 
 	// A group and two users; lea gets her first sign-in QR.
 	A.json("POST", "/groups", map[string]any{"name": "famille", "display_name": "Famille"}, 201)
-	res := A.json("POST", "/users", map[string]any{"name": "lea", "display_name": "Léa", "groups": []string{"famille"}, "enrol": true}, 201)
-	enrol, _ := res["enrolment"].(map[string]any)
-	link, _ := enrol["url"].(string)
-	if qr, _ := enrol["qr_svg"].(string); !strings.HasPrefix(link, x.public+"/enrol/") || !strings.HasPrefix(qr, "<svg") {
-		t.Fatalf("the enrolment: %v", enrol)
+	res := A.json("POST", "/users", map[string]any{"name": "lea", "display_name": "Léa", "groups": []string{"famille"}, "enroll": true}, 201)
+	enroll, _ := res["enrollment"].(map[string]any)
+	link, _ := enroll["url"].(string)
+	if qr, _ := enroll["qr_svg"].(string); !strings.HasPrefix(link, x.public+"/enroll/") || !strings.HasPrefix(qr, "<svg") {
+		t.Fatalf("the enrollment: %v", enroll)
 	}
 	A.json("POST", "/users", map[string]any{"name": "maman", "groups": []string{"famille"}}, 201)
 	// Per user and per group views: an item's overview and its pages, the
@@ -188,9 +188,9 @@ func TestM3AdminUI(t *testing.T) {
 	}
 	// A pending sign-in link shows again; a browser link lasts an hour;
 	// once used, it is gone.
-	pl := A.json("POST", "/users/maman/enrolments", map[string]any{"kind": "browser"}, 201)
+	pl := A.json("POST", "/users/maman/enrollments", map[string]any{"kind": "browser"}, 201)
 	id := fmtID(pl["id"])
-	again := A.json("GET", "/users/maman/enrolments/"+id, nil, 200)
+	again := A.json("GET", "/users/maman/enrollments/"+id, nil, 200)
 	if again["url"] != pl["url"] || pl["kind"] != "browser" {
 		t.Errorf("shown again: %v, first %v", again["url"], pl["url"])
 	}
@@ -198,14 +198,14 @@ func TestM3AdminUI(t *testing.T) {
 		t.Errorf("a browser link lasts until %v", exp)
 	}
 	token := pl["url"].(string)[strings.LastIndex(pl["url"].(string), "/")+1:]
-	if a := x.do("POST", x.public+"/enrol/"+token, nil, nil); cookieOf(a, auth.AppCookie) == "" {
+	if a := x.do("POST", x.public+"/enroll/"+token, nil, nil); cookieOf(a, auth.AppCookie) == "" {
 		t.Fatalf("the browser link did not sign in: %d", a.status)
 	}
-	if a := A.call("GET", "/users/maman/enrolments/"+id, nil); a.status != http.StatusGone {
+	if a := A.call("GET", "/users/maman/enrollments/"+id, nil); a.status != http.StatusGone {
 		t.Errorf("a used link shown again: %d", a.status)
 	}
 	var kept int
-	_ = x.svc.store.DB().QueryRow(`SELECT count(*) FROM enrolments WHERE token IS NOT NULL AND used_at IS NOT NULL`).Scan(&kept)
+	_ = x.svc.store.DB().QueryRow(`SELECT count(*) FROM enrollments WHERE token IS NOT NULL AND used_at IS NOT NULL`).Scan(&kept)
 	if kept != 0 {
 		t.Error("a used link's token is still kept")
 	}
@@ -218,11 +218,11 @@ func TestM3AdminUI(t *testing.T) {
 
 	// The phone's browser opens the link, signed in; the admin sees it used.
 	if a := x.do("POST", link, nil, nil); a.status != http.StatusSeeOther || cookieOf(a, auth.AppCookie) == "" {
-		t.Fatalf("opening the enrolment link: %d", a.status)
+		t.Fatalf("opening the enrollment link: %d", a.status)
 	}
 	lea := A.json("GET", "/users/lea", nil, 200)
-	if es, _ := lea["enrolments"].([]any); len(es) != 1 || es[0].(map[string]any)["used_at"] == nil {
-		t.Errorf("the enrolment is not marked used: %v", lea["enrolments"])
+	if es, _ := lea["enrollments"].([]any); len(es) != 1 || es[0].(map[string]any)["used_at"] == nil {
+		t.Errorf("the enrollment is not marked used: %v", lea["enrollments"])
 	}
 	if !strings.Contains(asJSON(lea["groups"]), "famille") || len(lea["sessions"].([]any)) != 1 {
 		t.Errorf("lea's page: %v", lea)

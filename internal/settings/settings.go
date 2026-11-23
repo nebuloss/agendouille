@@ -50,7 +50,7 @@ type Values struct {
 	// Defaults
 	FamilyTimezone         string   `json:"family_timezone" yaml:"family_timezone" group:"defaults"`
 	Palette                []string `json:"palette" yaml:"palette" group:"defaults"`
-	EnrolmentLinkTTLHours  int      `json:"enrolment_link_ttl_hours" yaml:"enrolment_link_ttl_hours" group:"defaults"`
+	EnrollmentLinkTTLHours int      `json:"enrollment_link_ttl_hours" yaml:"enrollment_link_ttl_hours" group:"defaults"`
 	SessionTTLDays         int      `json:"session_ttl_days" yaml:"session_ttl_days" group:"defaults"`
 	AppSyncIntervalMinutes int      `json:"app_sync_interval_minutes" yaml:"app_sync_interval_minutes" group:"defaults"`
 }
@@ -74,15 +74,15 @@ func Default() Values {
 		MaxDevicesPerUser:      20,
 		FamilyTimezone:         "Europe/Paris",
 		Palette:                append([]string(nil), DefaultPalette...),
-		EnrolmentLinkTTLHours:  72,
+		EnrollmentLinkTTLHours: 72,
 		SessionTTLDays:         90,
 		AppSyncIntervalMinutes: 30,
 	}
 }
 
-// EnrolmentLinkTTL, SessionTTL: the durations the auth package needs.
-func (v Values) EnrolmentLinkTTL() time.Duration {
-	return time.Duration(v.EnrolmentLinkTTLHours) * time.Hour
+// EnrollmentLinkTTL, SessionTTL: the durations the auth package needs.
+func (v Values) EnrollmentLinkTTL() time.Duration {
+	return time.Duration(v.EnrollmentLinkTTLHours) * time.Hour
 }
 func (v Values) SessionTTL() time.Duration { return time.Duration(v.SessionTTLDays) * 24 * time.Hour }
 
@@ -134,7 +134,7 @@ func (v Values) Validate() error {
 		"backup_keep": v.BackupKeep, "sync_token_retention_days": v.SyncTokenRetentionDays,
 		"max_object_bytes": v.MaxObjectBytes, "max_calendars_per_user": v.MaxCalendarsPerUser,
 		"max_events_per_calendar": v.MaxEventsPerCalendar, "max_devices_per_user": v.MaxDevicesPerUser,
-		"enrolment_link_ttl_hours": v.EnrolmentLinkTTLHours, "session_ttl_days": v.SessionTTLDays,
+		"enrollment_link_ttl_hours": v.EnrollmentLinkTTLHours, "session_ttl_days": v.SessionTTLDays,
 		"app_sync_interval_minutes": v.AppSyncIntervalMinutes,
 	} {
 		if n < 1 {

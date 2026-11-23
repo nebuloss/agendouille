@@ -52,7 +52,7 @@ func QRDataURL(text string) (template.URL, error) {
 }
 
 // QRTerminal draws text as a QR code with half blocks, two rows of modules
-// per line, for agendouille user enrol in a terminal.
+// per line, for agendouille user enroll in a terminal.
 func QRTerminal(text string) (string, error) {
 	code, err := qr.Encode(text, qr.L)
 	if err != nil {

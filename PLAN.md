@@ -58,7 +58,7 @@ self host at home"). Three parts:
   "we stay compatible with other android app", "we use same protocol with
   additional api").
 - **What CalDAV has no standard for** goes through an **additional JSON
-  API** on the same server: sign-in (enrolment, approvals), sharing,
+  API** on the same server: sign-in (enrollment, approvals), sharing,
   devices, profile. The family web app uses it, and so does our app (its UI
   is the web app; its Java side uses the few `/api/app/*` calls).
 - Nothing in the additional API is needed to sync. A user with only DAVx5
@@ -184,7 +184,7 @@ agendouille/
   internal/store/                SQLite handle, migrations, queries
   internal/directory/            users, groups, visibility ("who can see whom")
   internal/sharing/              calendar ownership, shares, effective access
-  internal/auth/                 admin password, sessions, enrolment links, approvals,
+  internal/auth/                 admin password, sessions, enrollment links, approvals,
                                  devices (credentials), subscription links, Basic auth,
                                  client IP, same-origin
   internal/calendar/             calendars and objects: the one write path, changes,
@@ -254,7 +254,7 @@ alike (`LICENSE`). Module path `github.com/nebuloss/agendouille`, remote
   (section 8.3).
 - **Web session**: a browser (or the app's WebView) signed in to the family
   web app. 90 days, renewed on use (Default, a setting).
-- **Enrolment link**: a one-time URL made by the admin for a user, shown as
+- **Enrollment link**: a one-time URL made by the admin for a user, shown as
   a QR code; it signs in the first device (section 8.1).
 - **Approval**: a short-lived request from a browser that wants to sign in,
   approved from a device already signed in (section 8.2).
@@ -459,7 +459,7 @@ result.
 │  • Account authenticator (AccountManager)                │
 │  • Device credential in the Android Keystore             │
 │  • Sync adapter: standard CalDAV <-> CalendarContract    │
-│  • Enrolment by App Link / QR (/api/app/*)               │
+│  • Enrollment by App Link / QR (/api/app/*)               │
 │  • Camera permission for the scanner (the scanner is TS) │
 │  • Notifications (M9, UnifiedPush)                       │
 └──────────────────────────────────────────────────────────┘
@@ -470,13 +470,13 @@ result.
   next one, sees exactly the same calendars.
 - **The extras are the additional API**: the WebView shows the family web
   app (sharing, devices, sign-ins); the Java side only calls `/api/app/*`
-  to enrol and to open the WebView's session.
+  to enroll and to open the WebView's session.
 - **The server serves the UI**, so app and server cannot drift. The Java
   side keeps a small, versioned bridge contract (CONTRACTS 6).
 
-### 7.2 Enrolment (first sign-in on the phone)
+### 7.2 Enrollment (first sign-in on the phone)
 
-1. The admin makes an enrolment link for Léa: `https://<host>/enrol/<token>`,
+1. The admin makes an enrollment link for Léa: `https://<host>/enroll/<token>`,
    shown as a QR code in the admin UI (and as text, to send by SMS).
 2. Léa scans it with the phone camera. With the app installed, Android's
    App Link opens it in the app (the server serves
@@ -484,7 +484,7 @@ result.
    Without the app, the browser opens a page that offers the APK download
    (7.6), "set up DAVx5 instead", and "continue in the browser" (a plain
    web session; iPhone users take this path).
-3. The app `POST`s the token to `/api/app/enrol` with the phone's model; the
+3. The app `POST`s the token to `/api/app/enroll` with the phone's model; the
    server makes a device of kind `app` and returns its credential once.
 4. The app stores it in the Keystore, adds the Android account
    "agendouille (Léa)", turns sync on, and opens the web app signed in.
@@ -571,7 +571,7 @@ Google Play services.
 
 ## 8. Signing in (Decided, user: no passwords, no email, any platform)
 
-### 8.1 First device: the admin's enrolment link
+### 8.1 First device: the admin's enrollment link
 
 Section 7.2. Opened in a browser instead of the app, it signs that browser
 in. It is the only step that needs the admin: once per user, and after
@@ -611,7 +611,7 @@ in while the device is valid. Revoking the device ends that session.
 
 - One per device, 20 random bytes, `agd_` + base32 in groups, stored as
   SHA-256. `last_used_at`, `last_ip`, client user agent kept and shown.
-- Never typed: our app receives it at enrolment; DAVx5 gets it through the
+- Never typed: our app receives it at enrollment; DAVx5 gets it through the
   `davx5://` link (a button in the web app on the phone, or a QR on a
   computer); iPhones through a `.mobileconfig`; Thunderbird through a copy
   button.
@@ -623,10 +623,10 @@ in while the device is valid. Revoking the device ends that session.
   devices and browsers in the web app ("Signed in") and can revoke any; the
   admin sees and revokes them in the admin UI.
 - Lost phone, another device still signed in: approve the new phone's
-  browser from it, then enrol the app with a link the user makes for
-  themselves (Default: a signed-in user can make an enrolment link for
+  browser from it, then enroll the app with a link the user makes for
+  themselves (Default: a signed-in user can make an enrollment link for
   themselves, 10 minutes, shown as a QR), revoke the old phone.
-- Every device lost: the admin makes a new enrolment link.
+- Every device lost: the admin makes a new enrollment link.
 
 ### 8.6 Passkeys (optional, M10)
 
@@ -652,7 +652,7 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 | Surface | What | Where (Default layout) |
 |---|---|---|
 | `dav` | `/.well-known/caldav`, `/dav/`, `/ics/` | public listener, behind the DMZ proxy |
-| `app` | the family web app and the additional API: pages, `/api/*`, `/api/app/*`, `/api/live`, `/enrol/`, `/app/agendouille.apk`, `/.well-known/assetlinks.json`, `static/app/` | public listener |
+| `app` | the family web app and the additional API: pages, `/api/*`, `/api/app/*`, `/api/live`, `/enroll/`, `/app/agendouille.apk`, `/.well-known/assetlinks.json`, `static/app/` | public listener |
 | `admin` | the admin UI: `/admin/*`, `/api/admin/*`, `static/admin/` | admin listener, LAN only |
 
 - Each surface is served by exactly one listener; elsewhere its paths are
@@ -669,7 +669,7 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
   `src/` (cafard's `scripts/check-sinks.sh` in CI): titles come from every
   family member's phone.
 - Go serves an HTML shell per page; the bundle renders the rest. The
-  sign-in, enrolment and approval pages work without the bundle; the admin
+  sign-in, enrollment and approval pages work without the bundle; the admin
   UI's pages beyond its sign-in need it (DECISIONS 2026-11-23, M3 notes).
 - The family web app is **phone first** (it is also the Android app's UI).
   The admin UI is desktop first.
@@ -679,12 +679,12 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 | Path | Page |
 |---|---|
 | `/signin` | The approval screen (8.2) |
-| `/enrol/<token>` | First sign-in (7.2): opens the app, else offers the APK, DAVx5 or the browser |
+| `/enroll/<token>` | First sign-in (7.2): opens the app, else offers the APK, DAVx5 or the browser |
 | `/` | The calendar: agenda (phone default), week, month |
 | `/calendars` | My calendars and the ones shared with me: create, rename, colour, share, transfer, hide, delete, import, export |
 | `/approve` | Approve a sign-in: scanner and short-code field |
 | `/devices` | Sync devices: add (our app, DAVx5, iPhone, Thunderbird, subscription link), revoke; signed-in browsers: revoke |
-| `/me` | Display name, colour, groups (read only), "Enrol another phone" |
+| `/me` | Display name, colour, groups (read only), "Enroll another phone" |
 
 **The calendar views** (Default):
 - **Calendars list** (side panel on wide screens, a sheet on phones): own
@@ -710,7 +710,7 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 | `/signin` | Password |
 | `/` | Overview: users, groups, calendars, devices not synced for a week, storage used, last backup, version, warnings (no public listener yet, the admin surface on a public listener, a backup older than two days) |
 | `/users` | List: name, groups, calendars owned, devices, last seen. "Add user" |
-| `/users/<name>` | Profile, groups; **enrolment QR** (make, show, revoke, used or not); devices and browsers (revoke); calendars owned and shared with them (names, counts, sizes); disable, enable; remove (with the transfer-or-delete step, 6) |
+| `/users/<name>` | Profile, groups; **enrollment QR** (make, show, revoke, used or not); devices and browsers (revoke); calendars owned and shared with them (names, counts, sizes); disable, enable; remove (with the transfer-or-delete step, 6) |
 | `/groups` | Groups: name, colour, members; add, rename, delete (a group with shares asks first) |
 | `/calendars` | Every calendar: owner, name, events, size, shares. **No events.** The admin can remove a share, transfer a calendar, delete one (typing its name) |
 | `/activity` | Who did what, without event titles: "Léa created an event in maman~ecole from Pixel 8", "Maman shared École with Enfants", admin actions |
@@ -724,7 +724,7 @@ src/
   shared/  core/ (Api, Live, Dates, Bridge), render/, components/ (Dialog,
            Sheet, QrImage, Scanner, ColorPicker, UserChip), model/
   app/     main.ts, pages/ (Calendar, Calendars, Approve, Devices, Me,
-           Signin, Enrol), components/ (CalendarList, AgendaView, WeekView,
+           Signin, Enroll), components/ (CalendarList, AgendaView, WeekView,
            MonthView, EventSheet, EventEditor, RecurrencePicker, ScopeDialog,
            SharePanel), model/ (Event, Occurrence, Recurrence)
   admin/   main.ts, pages/ (Overview, Users, User, Groups, Calendars,
@@ -750,10 +750,10 @@ fixed palette of twelve checked for contrast (cafard's
   characters. Set by `agendouille admin passwd` (install.sh runs it with
   `--random` and prints the password once in the installer's terminal,
   never in a log). `serve` refuses to start without one.
-- **Secrets** (enrolment tokens, approval codes, device credentials,
+- **Secrets** (enrollment tokens, approval codes, device credentials,
   session ids, subscription secrets): from `crypto/rand`, stored as SHA-256,
   compared in constant time, logged by id only. Access logs redact
-  `/enrol/…`, `/ics/…` and `/api/app/*` bodies.
+  `/enroll/…`, `/ics/…` and `/api/app/*` bodies.
 - **Cookies**: `HttpOnly`, `Secure` when the listener's URL is https,
   `SameSite=Lax`, one per surface.
 - **CSRF**: state-changing web requests need `Sec-Fetch-Site: same-origin`
@@ -820,7 +820,7 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | | `max_devices_per_user` | 20 |
 | Defaults | `family_timezone` | `Europe/Paris` |
 | | `palette` | the twelve colours |
-| | `enrolment_link_ttl_hours` | 72 |
+| | `enrollment_link_ttl_hours` | 72 |
 | | `session_ttl_days` | 90 |
 | | `app_sync_interval_minutes` | 30 (at least 15: Android's floor) |
 
@@ -847,7 +847,7 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | `serve` | Run |
 | `config [migrate]` | Print (11); move old database settings into the file |
 | `admin passwd [--random]` | Set the admin password |
-| `user add <name> [--group g]...`, `user enrol <name>` (prints a link and a QR in the terminal), `user list`, `user disable\|enable\|remove` | |
+| `user add <name> [--group g]...`, `user enroll <name>` (prints a link and a QR in the terminal), `user list`, `user disable\|enable\|remove` | |
 | `group add\|list\|remove`, `group member add\|remove` | |
 | `backup [file]`, `restore <file>` (server stopped) | |
 | `calendar add <user> <slug>`, `calendar list|share|unshare|transfer|delete` | The operator's view until M3 and M4 |
@@ -964,10 +964,10 @@ M6, M7).
 - Migrations (CONTRACTS 5); settings with live apply; listeners and
   surfaces (the public listener from settings, rebinding); the admin
   password, admin sessions, `/admin/signin`; users, groups, visibility;
-  enrolment links; approvals; devices and Basic auth; web sessions; rate
+  enrollment links; approvals; devices and Basic auth; web sessions; rate
   limits; trusted proxies; same-origin.
 - CLI: `admin passwd`, `user …`, `group …`, `config set`.
-- *Done when:* tests show: an enrolment link works once; an approval with
+- *Done when:* tests show: an enrollment link works once; an approval with
   the wrong number fails and the right one signs the waiting browser in;
   a device credential opens a protected test route and nothing else;
   setting `public_listen` from a test starts the public listener without a
@@ -990,7 +990,7 @@ M6, M7).
 - `/api/admin/*`, the admin bundle, every page of 9.4, the activity log,
   settings with live apply, backups and restore.
 - *Done when:* from the admin UI alone: set the public listener, add a
-  group and two users, make an enrolment QR that a phone's browser opens
+  group and two users, make an enrollment QR that a phone's browser opens
   signed in, see it marked used, restore yesterday's backup; a test proves
   no `/api/admin` answer carries event data.
 
@@ -1014,10 +1014,10 @@ M6, M7).
 **M6. Android app: shell and sign-in**
 - First a **spike**: a "hello WebView + WebMessagePort" APK built by the
   Makefile in the container on dev-build, installed on a phone. Then: the
-  account authenticator, Keystore storage, App Links and `/api/app/enrol`,
+  account authenticator, Keystore storage, App Links and `/api/app/enroll`,
   `/api/app/session`, the bridge (`hello`, `scan`, `davx5.handoff`), the
   APK served by the server, the update check.
-- *Done when:* a phone with the APK scans the admin's enrolment QR and
+- *Done when:* a phone with the APK scans the admin's enrollment QR and
   lands in the web app signed in; "Scan to sign in a browser" signs a
   laptop in; revoking the device in the web app signs the WebView out; the
   whole APK builds with `scripts/android.sh` and in CI, with no Gradle.

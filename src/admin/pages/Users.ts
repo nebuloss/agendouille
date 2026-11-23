@@ -32,7 +32,7 @@ interface Group {
   color: string;
 }
 
-export interface Enrolment {
+export interface Enrollment {
   id: number;
   kind?: 'phone' | 'browser';
   state?: 'pending' | 'used' | 'expired';
@@ -75,7 +75,7 @@ interface CalendarMeta {
 interface UserDetail {
   user: User;
   groups: string[];
-  enrolments: Enrolment[];
+  enrollments: Enrollment[];
   devices: Device[];
   sessions: Session[];
   calendars_owned: CalendarMeta[];
@@ -85,8 +85,8 @@ interface UserDetail {
 /** "vu il y a 3 jours", or "jamais vu". */
 const seen = (iso: string | undefined): string => iso === undefined || iso === '' ? t('neverSeen') : t('seenAgo', { ago: ago(iso) });
 
-/** Shows a fresh enrolment's QR code and link, once (PLAN.md 7.2). */
-export async function showEnrolment(doc: Document, who: string, e: Enrolment): Promise<void> {
+/** Shows a fresh enrollment's QR code and link, once (PLAN.md 7.2). */
+export async function showEnrollment(doc: Document, who: string, e: Enrollment): Promise<void> {
   if (e.kind === 'browser') {
     await dialog(doc, t('browserTitle', { name: who }), [
       h('p', {}, t('browserBody', { name: who, until: when(e.expires_at) })),
@@ -130,7 +130,7 @@ export class UsersPage extends AdminPage {
     const name = h('input', { name: 'name', required: true, autocomplete: 'off', pattern: '[a-z][a-z0-9-]{0,31}', placeholder: 'lea' });
     const display = h('input', { name: 'display_name', placeholder: 'Léa' });
     const checks = groups.map((g) => h('input', { type: 'checkbox', value: g.name }));
-    let made: { user: User; enrolment?: Enrolment } | null = null;
+    let made: { user: User; enrollment?: Enrollment } | null = null;
     const ok = await formDialog(this.doc, t('newUser'), [
       field(t('username'), name, t('usernameHelp')),
       field(t('displayName'), display),
@@ -139,18 +139,18 @@ export class UsersPage extends AdminPage {
           h('div', { class: 'add-user-groups flex flex-wrap gap-x-5 gap-y-2' }, ...groups.map((g, i) => h('label', { class: ui.check }, checks[i]!, g.display_name))))
         : h('p', { class: 'text-sm' }, t('noGroupsYet')),
     ], t('add'), async () => {
-      made = await this.api.post<{ user: User; enrolment?: Enrolment }>('/users', {
+      made = await this.api.post<{ user: User; enrollment?: Enrollment }>('/users', {
         name: name.value.trim(),
         display_name: display.value.trim(),
         groups: checks.filter((c) => c.checked).map((c) => c.value),
-        enrol: true,
+        enroll: true,
       });
     });
     if (!ok || made === null) return;
-    const res: { user: User; enrolment?: Enrolment } = made;
+    const res: { user: User; enrollment?: Enrollment } = made;
     this.doc.dispatchEvent(new Event('agd:changed'));
     await this.refresh();
-    if (res.enrolment !== undefined) await showEnrolment(this.doc, res.user.display_name, res.enrolment);
+    if (res.enrollment !== undefined) await showEnrollment(this.doc, res.user.display_name, res.enrollment);
     else this.toasts.show(t('addedNoQr'));
   }
 }
@@ -178,7 +178,7 @@ export class UserPage extends AdminPage {
         // How this person gets in, on one page: the links that sign a
         // device in, the devices that sync, the browsers signed in.
         return [
-          this.signin(u, d.enrolments),
+          this.signin(u, d.enrollments),
           card(t('syncedDevices', { count: d.devices.length }), [],
             h('p', { class: 'text-sm text-on-surface-variant' }, t('devicesHelp')),
             entries(d.devices.map((x) => ({
@@ -313,20 +313,20 @@ export class UserPage extends AdminPage {
    * browser in (for testing). A pending one opens again, as often as
    * needed, until it is used, cancelled or expired.
    */
-  private signin(u: User, enrolments: Enrolment[]): HTMLElement {
+  private signin(u: User, enrollments: Enrollment[]): HTMLElement {
     const who = u.display_name || u.name;
     const make = async (kind: 'phone' | 'browser'): Promise<void> => {
       try {
-        const e = await this.api.post<Enrolment>(`${this.path()}/enrolments`, { kind });
-        await showEnrolment(this.doc, who, e);
+        const e = await this.api.post<Enrollment>(`${this.path()}/enrollments`, { kind });
+        await showEnrollment(this.doc, who, e);
         await this.refresh();
       } catch (err) {
         this.toasts.error(err);
       }
     };
-    const show = async (e: Enrolment): Promise<void> => {
+    const show = async (e: Enrollment): Promise<void> => {
       try {
-        await showEnrolment(this.doc, who, await this.api.get<Enrolment>(`${this.path()}/enrolments/${e.id}`));
+        await showEnrollment(this.doc, who, await this.api.get<Enrollment>(`${this.path()}/enrollments/${e.id}`));
       } catch (err) {
         this.toasts.error(err);
         await this.refresh();
@@ -338,7 +338,7 @@ export class UserPage extends AdminPage {
       action(t('makeBrowserLink'), () => make('browser'), 'tonal', 'laptop'),
     ],
     h('p', { class: 'text-sm text-on-surface-variant' }, t('signinHelp')),
-    entries(enrolments.map((e) => {
+    entries(enrollments.map((e) => {
       const state = e.state ?? (e.used_at !== undefined ? 'used' : 'pending');
       const [label, cls] = STATE[state] ?? STATE['pending']!;
       return {
@@ -348,7 +348,7 @@ export class UserPage extends AdminPage {
         sub: state === 'used' && e.used_at !== undefined ? `${t('usedAgo', { ago: ago(e.used_at) })} · ${t('createdOn', { date: when(e.created_at) })}`
           : state === 'expired' ? t('expiredOn', { date: when(e.expires_at) }) : `${t('createdOn', { date: when(e.created_at) })} · ${t('expiresOn', { date: when(e.expires_at) })}`,
         tags: [h('span', { class: cls }, label)],
-        actions: state === 'pending' ? [action(t('cancelLink'), () => this.act(() => this.api.delete(`${this.path()}/enrolments/${e.id}`), t('linkCancelled')), 'danger-text', 'close', 'sm')] : [],
+        actions: state === 'pending' ? [action(t('cancelLink'), () => this.act(() => this.api.delete(`${this.path()}/enrollments/${e.id}`), t('linkCancelled')), 'danger-text', 'close', 'sm')] : [],
       };
     }), t('noLinks')));
   }

@@ -1,11 +1,11 @@
 // Screenshots of the family web app, on dev-build. Signs in with an
-// enrolment link, then shoots every page and the dialogs. networkidle2,
+// enrollment link, then shoots every page and the dialogs. networkidle2,
 // not 0: the open /api/live stream keeps one connection busy.
-// Usage: node shoot-app.mjs <enrolment URL> <out dir>
+// Usage: node shoot-app.mjs <enrollment URL> <out dir>
 import puppeteer from 'puppeteer-core';
 
-const [enrol, out, pass] = process.argv.slice(2);
-const base = new URL(enrol).origin;
+const [enroll, out, pass] = process.argv.slice(2);
+const base = new URL(enroll).origin;
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'], headless: true });
 const errors = [];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -20,7 +20,7 @@ await page.emulateTimezone('America/New_York'); // the family zone wins over the
 // device, shoot the dialog with its certificate, and stop.
 if (pass === 'certs') {
   await page.setViewport({ width: 1280, height: 900 });
-  await page.goto(enrol, { waitUntil: 'networkidle2' });
+  await page.goto(enroll, { waitUntil: 'networkidle2' });
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
   await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
   await wait(400);
@@ -41,7 +41,7 @@ await page.goto(base + '/signin', { waitUntil: 'networkidle2' });
 await new Promise((r) => setTimeout(r, 1200));
 await page.screenshot({ path: `${out}/app-signin.png` });
 await page.setViewport({ width: 1280, height: 860 });
-await page.goto(enrol, { waitUntil: 'networkidle2' });
+await page.goto(enroll, { waitUntil: 'networkidle2' });
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
 
 const shot = async (name, full = false) => {
@@ -90,7 +90,7 @@ if (judo) {
 } else errors.push('no Judo in the week');
 await page.goto(base + '/me', { waitUntil: 'networkidle2' });
 await (await page.$('xpath/.//button[contains(., "Afficher le code")]')).click();
-await shot('me-enrol');
+await shot('me-enroll');
 await close();
 await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
 const add = await page.$('xpath/.//button[contains(., "Android (DAVx5)")]');

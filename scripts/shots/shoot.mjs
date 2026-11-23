@@ -41,7 +41,7 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
   } else errors.push(`${label}: no "Ajouter un utilisateur" button`);
   if (label === 'desktop') {
     await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle0' });
-    for (const [label2, file] of [['Créer un QR code', 'enrolment-dialog'], ['Créer un lien pour navigateur', 'browser-link-dialog']]) {
+    for (const [label2, file] of [['Créer un QR code', 'enrollment-dialog'], ['Créer un lien pour navigateur', 'browser-link-dialog']]) {
       const [button] = await page.$$(`xpath/.//button[contains(., "${label2}")]`);
       if (!button) {
         errors.push(`no "${label2}" button`);

@@ -158,3 +158,20 @@ func TestSettingsInTheFile(t *testing.T) {
 		t.Error("an unknown key was accepted")
 	}
 }
+
+// A file written with the old spelling of a key is read as the new one
+// (DECISIONS: enroll).
+func TestRenamedKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agendouille.yaml")
+	if err := os.WriteFile(path, []byte("admin_listen: 127.0.0.1:8792\nenrolment_link_ttl_hours: 24\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{"AGENDOUILLE_CONFIG": path}
+	cfg, _, err := NewLoader(flag.NewFlagSet("t", flag.ContinueOnError)).Load(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Settings.EnrollmentLinkTTLHours != 24 {
+		t.Errorf("enrollment_link_ttl_hours: %d", cfg.Settings.EnrollmentLinkTTLHours)
+	}
+}

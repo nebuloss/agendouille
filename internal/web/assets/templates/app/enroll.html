@@ -3,16 +3,16 @@
   <div class="flex items-center gap-3">
     <img src="/static/shared/icon.svg" alt="" width="44" height="44" class="rounded-md3-m">
     <div><p class="text-xs font-semibold tracking-wider text-on-surface-variant uppercase">agendouille</p>
-    <h1 class="text-2xl font-normal">{{t "app.enrol.title"}}</h1></div>
+    <h1 class="text-2xl font-normal">{{t "app.enroll.title"}}</h1></div>
     <div class="ml-auto self-start"><span data-lang-menu></span></div>
   </div>
   {{if .Error}}
   <p role="alert" class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">{{.Error}}</p>
-  <p class="text-on-surface-variant">{{t "app.enrol.askNew"}}</p>
+  <p class="text-on-surface-variant">{{t "app.enroll.askNew"}}</p>
   {{else}}
-  <p class="text-on-surface-variant">{{t "app.enrol.intro"}}</p>
-  <form method="post" action="/enrol/{{.Token}}" class="flex justify-end">
-    <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-6 text-sm font-medium text-on-primary">{{t "app.enrol.continue"}}</button>
+  <p class="text-on-surface-variant">{{t "app.enroll.intro"}}</p>
+  <form method="post" action="/enroll/{{.Token}}" class="flex justify-end">
+    <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-6 text-sm font-medium text-on-primary">{{t "app.enroll.continue"}}</button>
   </form>
   {{end}}
 </div>

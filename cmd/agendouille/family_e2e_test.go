@@ -57,8 +57,8 @@ func (x *e2e) browser(user string) webClient {
 	if err != nil {
 		x.t.Fatal(err)
 	}
-	e, _ := x.svc.auth.NewEnrolment(context.Background(), "test", u.ID, 0)
-	a := x.do("POST", x.public+"/enrol/"+e.Token, nil, nil)
+	e, _ := x.svc.auth.NewEnrollment(context.Background(), "test", u.ID, 0)
+	a := x.do("POST", x.public+"/enroll/"+e.Token, nil, nil)
 	return webClient{x: x, session: cookieOf(a, auth.AppCookie)}
 }
 
@@ -272,9 +272,9 @@ func TestM4FamilyAPI(t *testing.T) {
 	if !strings.Contains(asJSON(ss), `"current":true`) {
 		t.Errorf("sessions: %v", ss)
 	}
-	en, _ := L.json("POST", "/api/me/enrolment", nil, 201)
-	if !strings.Contains(en["url"].(string), "/enrol/") {
-		t.Errorf("self enrolment: %v", en)
+	en, _ := L.json("POST", "/api/me/enrollment", nil, 201)
+	if !strings.Contains(en["url"].(string), "/enroll/") {
+		t.Errorf("self enrollment: %v", en)
 	}
 
 	// Signing out ends this browser's session, and only it.

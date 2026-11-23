@@ -1,6 +1,6 @@
 package i18n
 
-// The family web app's pages: titles, navigation, signing in, enrolment
+// The family web app's pages: titles, navigation, signing in, enrollment
 // links and approvals (internal/web/assets/templates/app).
 func init() {
 	register(map[string]map[Lang]string{
@@ -38,17 +38,17 @@ func init() {
 		"app.signin.newCode":  {FR: "Obtenir un nouveau code", EN: "Get a new code"},
 		"app.signin.continue": {FR: "Continuer après l’approbation", EN: "Continue after approval"},
 
-		// An enrolment link opened in a browser.
-		"app.enrol.title": {FR: "Bienvenue", EN: "Welcome"},
-		"app.enrol.intro": {
+		// An enrollment link opened in a browser.
+		"app.enroll.title": {FR: "Bienvenue", EN: "Welcome"},
+		"app.enroll.intro": {
 			FR: "Ce lien de connexion relie cet appareil aux calendriers de la famille. Il ne peut servir qu’une seule fois.",
 			EN: "This sign-in link connects this device to the family’s calendars. It can be used only once.",
 		},
-		"app.enrol.askNew": {
+		"app.enroll.askNew": {
 			FR: "Demandez un nouveau lien de connexion à l’administrateur.",
 			EN: "Ask the administrator for a new sign-in link.",
 		},
-		"app.enrol.continue": {FR: "Continuer", EN: "Continue"},
+		"app.enroll.continue": {FR: "Continuer", EN: "Continue"},
 
 		// Approving a sign-in from a signed-in device.
 		"app.approve.title": {FR: "Approuver une connexion", EN: "Approve a sign-in"},

@@ -9,9 +9,9 @@ import (
 	"github.com/nebuloss/agendouille/internal/store"
 )
 
-// Enrolment is a one-time sign-in link for a user's first device (PLAN.md
+// Enrollment is a one-time sign-in link for a user's first device (PLAN.md
 // 7.2, 8.1). Token is in the URL and shown once.
-type Enrolment struct {
+type Enrollment struct {
 	ID        int64      `json:"id"`
 	UserID    int64      `json:"-"`
 	Token     string     `json:"-"`
@@ -28,58 +28,58 @@ type Enrolment struct {
 // for testing, opened at once.
 const BrowserLinkTTL = time.Hour
 
-// NewEnrolment makes a link for a user. madeBy is "admin", "cli", or the
-// user's own name when they enrol another phone of theirs. ttl 0 takes the
-// enrolment_link_ttl_hours setting.
-func (s *Service) NewEnrolment(ctx context.Context, madeBy string, userID int64, ttl time.Duration) (Enrolment, error) {
-	return s.NewEnrolmentKind(ctx, madeBy, userID, ttl, "phone")
+// NewEnrollment makes a link for a user. madeBy is "admin", "cli", or the
+// user's own name when they enroll another phone of theirs. ttl 0 takes the
+// enrollment_link_ttl_hours setting.
+func (s *Service) NewEnrollment(ctx context.Context, madeBy string, userID int64, ttl time.Duration) (Enrollment, error) {
+	return s.NewEnrollmentKind(ctx, madeBy, userID, ttl, "phone")
 }
 
-// NewEnrolmentKind is NewEnrolment for a kind of link: "phone" (a QR for a
+// NewEnrollmentKind is NewEnrollment for a kind of link: "phone" (a QR for a
 // phone's camera) or "browser" (to sign a browser in, for testing). The
 // token is kept while the link is pending, so it can be shown again.
-func (s *Service) NewEnrolmentKind(ctx context.Context, madeBy string, userID int64, ttl time.Duration, kind string) (Enrolment, error) {
+func (s *Service) NewEnrollmentKind(ctx context.Context, madeBy string, userID int64, ttl time.Duration, kind string) (Enrollment, error) {
 	if kind != "phone" && kind != "browser" {
-		return Enrolment{}, ErrInvalid
+		return Enrollment{}, ErrInvalid
 	}
 	if ttl == 0 && kind == "browser" {
 		ttl = BrowserLinkTTL
 	}
 	if ttl == 0 {
-		ttl = s.settings.Get().EnrolmentLinkTTL()
+		ttl = s.settings.Get().EnrollmentLinkTTL()
 	}
 	u, err := s.dir.UserByID(ctx, userID)
 	if err != nil || !u.Active() {
-		return Enrolment{}, ErrInvalid
+		return Enrollment{}, ErrInvalid
 	}
 	token := newToken(32)
 	now := s.now()
 	var id int64
 	err = store.InTx(ctx, s.db, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `INSERT INTO enrolments(user_id, token_hash, token, kind, made_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		res, err := tx.ExecContext(ctx, `INSERT INTO enrollments(user_id, token_hash, token, kind, made_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			userID, hash(token), token, kind, madeBy, store.Time(now), store.Time(now.Add(ttl)))
 		if err != nil {
 			return err
 		}
 		id, _ = res.LastInsertId()
-		_, err = tx.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, detail) VALUES (?, ?, 'enrolment', 'made', ?)`,
+		_, err = tx.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, detail) VALUES (?, ?, 'enrollment', 'made', ?)`,
 			store.Time(now), madeBy, u.Name)
 		return err
 	})
 	if err != nil {
-		return Enrolment{}, err
+		return Enrollment{}, err
 	}
-	return Enrolment{ID: id, UserID: userID, Token: token, Kind: kind, MadeBy: madeBy, CreatedAt: now, ExpiresAt: now.Add(ttl), State: "pending"}, nil
+	return Enrollment{ID: id, UserID: userID, Token: token, Kind: kind, MadeBy: madeBy, CreatedAt: now, ExpiresAt: now.Add(ttl), State: "pending"}, nil
 }
 
-// redeem marks an enrolment used and returns its user. Used, expired and
+// redeem marks an enrollment used and returns its user. Used, expired and
 // unknown links are told apart, so the page can say what happened: the
 // token is 256 random bits, so that tells an attacker nothing.
-func (s *Service) redeem(ctx context.Context, tx *sql.Tx, token string) (enrolmentID, userID int64, err error) {
+func (s *Service) redeem(ctx context.Context, tx *sql.Tx, token string) (enrollmentID, userID int64, err error) {
 	var expires string
 	var used, revoked sql.NullString
-	err = tx.QueryRowContext(ctx, `SELECT id, user_id, expires_at, used_at, revoked_at FROM enrolments WHERE token_hash = ?`, hash(token)).
-		Scan(&enrolmentID, &userID, &expires, &used, &revoked)
+	err = tx.QueryRowContext(ctx, `SELECT id, user_id, expires_at, used_at, revoked_at FROM enrollments WHERE token_hash = ?`, hash(token)).
+		Scan(&enrollmentID, &userID, &expires, &used, &revoked)
 	if errors.Is(err, sql.ErrNoRows) || revoked.Valid {
 		return 0, 0, ErrInvalid
 	} else if err != nil {
@@ -96,14 +96,14 @@ func (s *Service) redeem(ctx context.Context, tx *sql.Tx, token string) (enrolme
 	if err := tx.QueryRowContext(ctx, `SELECT (disabled = 0 AND removed_at IS NULL) FROM users WHERE id = ?`, userID).Scan(&active); err != nil || active == 0 {
 		return 0, 0, ErrInvalid
 	}
-	res, err := tx.ExecContext(ctx, `UPDATE enrolments SET used_at = ?, token = NULL WHERE id = ? AND used_at IS NULL`, store.Time(now), enrolmentID)
+	res, err := tx.ExecContext(ctx, `UPDATE enrollments SET used_at = ?, token = NULL WHERE id = ? AND used_at IS NULL`, store.Time(now), enrollmentID)
 	if err != nil {
 		return 0, 0, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return 0, 0, ErrUsed // a concurrent redeem won
 	}
-	return enrolmentID, userID, nil
+	return enrollmentID, userID, nil
 }
 
 // RedeemForBrowser uses a link to sign a browser in (an iPhone, or a phone
@@ -121,7 +121,7 @@ func (s *Service) RedeemForBrowser(ctx context.Context, token, userAgent string)
 	return s.newSession(ctx, SurfaceApp, userID, 0, userAgent, s.settings.Get().SessionTTL())
 }
 
-// RedeemForApp uses a link to enrol the agendouille app: it makes a device
+// RedeemForApp uses a link to enroll the agendouille app: it makes a device
 // of kind app and returns its credential, once (CONTRACTS.md 2.2).
 func (s *Service) RedeemForApp(ctx context.Context, token, model string) (DeviceSecret, error) {
 	if model == "" {
@@ -137,28 +137,28 @@ func (s *Service) RedeemForApp(ctx context.Context, token, model string) (Device
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE enrolments SET used_by_device = ? WHERE id = ?`, out.ID, eid)
+		_, err = tx.ExecContext(ctx, `UPDATE enrollments SET used_by_device = ? WHERE id = ?`, out.ID, eid)
 		return err
 	})
 	return out, err
 }
 
-// Enrolments lists a user's links, newest first, used ones included.
-func (s *Service) Enrolments(ctx context.Context, userID int64) ([]Enrolment, error) {
+// Enrollments lists a user's links, newest first, used ones included.
+func (s *Service) Enrollments(ctx context.Context, userID int64) ([]Enrollment, error) {
 	// An expired link's token is no use to anyone: forget it.
-	if _, err := s.db.ExecContext(ctx, `UPDATE enrolments SET token = NULL WHERE user_id = ? AND token IS NOT NULL AND expires_at <= ?`,
+	if _, err := s.db.ExecContext(ctx, `UPDATE enrollments SET token = NULL WHERE user_id = ? AND token IS NOT NULL AND expires_at <= ?`,
 		userID, store.Time(s.now())); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, kind, made_by, created_at, expires_at, used_at FROM enrolments
+	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, kind, made_by, created_at, expires_at, used_at FROM enrollments
 		WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []Enrolment{}
+	out := []Enrollment{}
 	for rows.Next() {
-		var e Enrolment
+		var e Enrollment
 		var created, expires string
 		var used sql.NullString
 		if err := rows.Scan(&e.ID, &e.UserID, &e.Kind, &e.MadeBy, &created, &expires, &used); err != nil {
@@ -179,9 +179,9 @@ func (s *Service) Enrolments(ctx context.Context, userID int64) ([]Enrolment, er
 	return out, rows.Err()
 }
 
-// RevokeEnrolment withdraws a link that was not used yet.
-func (s *Service) RevokeEnrolment(ctx context.Context, userID, id int64) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE enrolments SET revoked_at = ?, token = NULL WHERE id = ? AND user_id = ? AND used_at IS NULL AND revoked_at IS NULL`,
+// RevokeEnrollment withdraws a link that was not used yet.
+func (s *Service) RevokeEnrollment(ctx context.Context, userID, id int64) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE enrollments SET revoked_at = ?, token = NULL WHERE id = ? AND user_id = ? AND used_at IS NULL AND revoked_at IS NULL`,
 		store.Time(s.now()), id, userID)
 	if err != nil {
 		return err
@@ -192,27 +192,27 @@ func (s *Service) RevokeEnrolment(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-// PendingEnrolment is a link still waiting, with its token, to show again.
+// PendingEnrollment is a link still waiting, with its token, to show again.
 // A used, cancelled or expired one is ErrUsed, ErrInvalid or ErrExpired.
-func (s *Service) PendingEnrolment(ctx context.Context, userID, id int64) (Enrolment, error) {
-	var e Enrolment
+func (s *Service) PendingEnrollment(ctx context.Context, userID, id int64) (Enrollment, error) {
+	var e Enrollment
 	var created, expires string
 	var token, used, revoked sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT id, user_id, kind, made_by, created_at, expires_at, used_at, revoked_at, token FROM enrolments
+	err := s.db.QueryRowContext(ctx, `SELECT id, user_id, kind, made_by, created_at, expires_at, used_at, revoked_at, token FROM enrollments
 		WHERE id = ? AND user_id = ?`, id, userID).Scan(&e.ID, &e.UserID, &e.Kind, &e.MadeBy, &created, &expires, &used, &revoked, &token)
 	if errors.Is(err, sql.ErrNoRows) || revoked.Valid {
-		return Enrolment{}, ErrInvalid
+		return Enrollment{}, ErrInvalid
 	} else if err != nil {
-		return Enrolment{}, err
+		return Enrollment{}, err
 	}
 	if used.Valid {
-		return Enrolment{}, ErrUsed
+		return Enrollment{}, ErrUsed
 	}
 	e.CreatedAt, _ = store.ParseTime(created)
 	e.ExpiresAt, _ = store.ParseTime(expires)
 	if !s.now().Before(e.ExpiresAt) || !token.Valid {
-		_, _ = s.db.ExecContext(ctx, `UPDATE enrolments SET token = NULL WHERE id = ?`, id)
-		return Enrolment{}, ErrExpired
+		_, _ = s.db.ExecContext(ctx, `UPDATE enrollments SET token = NULL WHERE id = ?`, id)
+		return Enrollment{}, ErrExpired
 	}
 	e.Token, e.State = token.String, "pending"
 	return e, nil

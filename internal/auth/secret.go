@@ -10,7 +10,7 @@ import (
 )
 
 // newToken is n random bytes in base64url, for anything carried in a URL
-// or a cookie: session ids, enrolment tokens, approval codes.
+// or a cookie: session ids, enrollment tokens, approval codes.
 func newToken(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

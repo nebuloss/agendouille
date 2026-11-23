@@ -41,9 +41,9 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/users/{name}", h.user)
 	api("PATCH /api/admin/users/{name}", h.patchUser)
 	api("POST /api/admin/users/{name}/remove", h.removeUser)
-	api("POST /api/admin/users/{name}/enrolments", h.addEnrolment)
-	api("GET /api/admin/users/{name}/enrolments/{id}", h.showEnrolment)
-	api("DELETE /api/admin/users/{name}/enrolments/{id}", h.revokeEnrolment)
+	api("POST /api/admin/users/{name}/enrollments", h.addEnrollment)
+	api("GET /api/admin/users/{name}/enrollments/{id}", h.showEnrollment)
+	api("DELETE /api/admin/users/{name}/enrollments/{id}", h.revokeEnrollment)
 	api("DELETE /api/admin/users/{name}/devices/{id}", h.revokeDevice)
 	api("DELETE /api/admin/users/{name}/sessions/{id}", h.revokeSession)
 	api("GET /api/admin/groups", h.groups)
@@ -318,13 +318,13 @@ func (h *handlers) users(w http.ResponseWriter, r *http.Request) {
 	webx.JSON(w, http.StatusOK, map[string]any{"users": out})
 }
 
-// enrolmentView is an enrolment with its link and QR code, as made.
-func (h *handlers) enrolmentView(e auth.Enrolment) (map[string]any, error) {
+// enrollmentView is an enrollment with its link and QR code, as made.
+func (h *handlers) enrollmentView(e auth.Enrollment) (map[string]any, error) {
 	base := h.d.PublicURL()
 	if base == "" {
 		return nil, validation{key: "error.admin.noPublicURL"}
 	}
-	link := base + "/enrol/" + e.Token
+	link := base + "/enroll/" + e.Token
 	qr, err := webx.QRSVG(link)
 	if err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (h *handlers) addUser(w http.ResponseWriter, r *http.Request) {
 		DisplayName string   `json:"display_name"`
 		Color       string   `json:"color"`
 		Groups      []string `json:"groups"`
-		Enrol       bool     `json:"enrol"`
+		Enroll      bool     `json:"enroll"`
 	}
 	if !decode(w, r, &body) {
 		return
@@ -349,13 +349,13 @@ func (h *handlers) addUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{"user": u}
-	if body.Enrol && h.d.PublicURL() != "" {
-		e, err := h.d.Auth.NewEnrolment(r.Context(), "admin", u.ID, 0)
+	if body.Enroll && h.d.PublicURL() != "" {
+		e, err := h.d.Auth.NewEnrollment(r.Context(), "admin", u.ID, 0)
 		if err != nil {
 			h.failIn(w, r, err)
 			return
 		}
-		if out["enrolment"], err = h.enrolmentView(e); err != nil {
+		if out["enrollment"], err = h.enrollmentView(e); err != nil {
 			h.failIn(w, r, err)
 			return
 		}
@@ -387,7 +387,7 @@ func (h *handlers) user(w http.ResponseWriter, r *http.Request) {
 	for _, g := range gs {
 		groups = append(groups, g.Name)
 	}
-	enrolments, err := h.d.Auth.Enrolments(ctx, u.ID)
+	enrollments, err := h.d.Auth.Enrollments(ctx, u.ID)
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -412,7 +412,7 @@ func (h *handlers) user(w http.ResponseWriter, r *http.Request) {
 		h.failIn(w, r, err)
 		return
 	}
-	webx.JSON(w, http.StatusOK, map[string]any{"user": u, "groups": groups, "enrolments": enrolments, "devices": devices,
+	webx.JSON(w, http.StatusOK, map[string]any{"user": u, "groups": groups, "enrollments": enrollments, "devices": devices,
 		"sessions": sessions, "calendars_owned": owned, "calendars_shared": shared})
 }
 
@@ -515,7 +515,7 @@ func refsOf(is []calendar.Info) []string {
 	return out
 }
 
-func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
+func (h *handlers) addEnrollment(w http.ResponseWriter, r *http.Request) {
 	u, ok := h.lookupUser(w, r)
 	if !ok {
 		return
@@ -525,7 +525,7 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// {"kind": "phone"} (the default: a QR for the phone's camera, the
-	// enrolment_link_ttl_hours setting) or "browser" (an hour, to sign a
+	// enrollment_link_ttl_hours setting) or "browser" (an hour, to sign a
 	// browser in for testing). An empty body is a phone's.
 	var body struct {
 		Kind string `json:"kind"`
@@ -536,12 +536,12 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 	if body.Kind == "" {
 		body.Kind = "phone"
 	}
-	e, err := h.d.Auth.NewEnrolmentKind(r.Context(), "admin", u.ID, 0, body.Kind)
+	e, err := h.d.Auth.NewEnrollmentKind(r.Context(), "admin", u.ID, 0, body.Kind)
 	if err != nil {
 		h.failIn(w, r, err)
 		return
 	}
-	view, err := h.enrolmentView(e)
+	view, err := h.enrollmentView(e)
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -549,9 +549,9 @@ func (h *handlers) addEnrolment(w http.ResponseWriter, r *http.Request) {
 	webx.JSON(w, http.StatusCreated, view)
 }
 
-// showEnrolment shows a pending link again: its QR and its address. Gone
+// showEnrollment shows a pending link again: its QR and its address. Gone
 // (410) once used, cancelled or expired.
-func (h *handlers) showEnrolment(w http.ResponseWriter, r *http.Request) {
+func (h *handlers) showEnrollment(w http.ResponseWriter, r *http.Request) {
 	u, ok := h.lookupUser(w, r)
 	if !ok {
 		return
@@ -561,19 +561,19 @@ func (h *handlers) showEnrolment(w http.ResponseWriter, r *http.Request) {
 		h.failIn(w, r, auth.ErrInvalid)
 		return
 	}
-	e, err := h.d.Auth.PendingEnrolment(r.Context(), u.ID, id)
+	e, err := h.d.Auth.PendingEnrollment(r.Context(), u.ID, id)
 	switch {
 	case errors.Is(err, auth.ErrUsed):
-		webx.FailT(w, r, http.StatusGone, "used", "error.admin.enrolmentUsed")
+		webx.FailT(w, r, http.StatusGone, "used", "error.admin.enrollmentUsed")
 		return
 	case errors.Is(err, auth.ErrExpired):
-		webx.FailT(w, r, http.StatusGone, "expired", "error.admin.enrolmentExpired")
+		webx.FailT(w, r, http.StatusGone, "expired", "error.admin.enrollmentExpired")
 		return
 	case err != nil:
 		h.failIn(w, r, err)
 		return
 	}
-	view, err := h.enrolmentView(e)
+	view, err := h.enrollmentView(e)
 	if err != nil {
 		h.failIn(w, r, err)
 		return
@@ -581,13 +581,13 @@ func (h *handlers) showEnrolment(w http.ResponseWriter, r *http.Request) {
 	webx.JSON(w, http.StatusOK, view)
 }
 
-func (h *handlers) revokeEnrolment(w http.ResponseWriter, r *http.Request) {
+func (h *handlers) revokeEnrollment(w http.ResponseWriter, r *http.Request) {
 	u, ok := h.lookupUser(w, r)
 	id, idOK := pathID(r, "id")
 	if !ok || !idOK {
 		return
 	}
-	if err := h.d.Auth.RevokeEnrolment(r.Context(), u.ID, id); err != nil {
+	if err := h.d.Auth.RevokeEnrollment(r.Context(), u.ID, id); err != nil {
 		h.failIn(w, r, err)
 		return
 	}

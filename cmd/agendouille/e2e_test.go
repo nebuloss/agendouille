@@ -187,7 +187,7 @@ func TestM1(t *testing.T) {
 	if a := x.do("GET", x.admin+"/healthz", nil, nil); a.status != 200 {
 		t.Fatalf("admin /healthz: %d", a.status)
 	}
-	for _, p := range []string{"/dav/", "/.well-known/caldav", "/approve", "/enrol/x", "/api/me", "/static/app/app.js"} {
+	for _, p := range []string{"/dav/", "/.well-known/caldav", "/approve", "/enroll/x", "/api/me", "/static/app/app.js"} {
 		if a := x.do("GET", x.admin+p, nil, nil); a.status != http.StatusNotFound {
 			t.Errorf("admin listener %s: %d, want 404", p, a.status)
 		}
@@ -248,7 +248,7 @@ func TestM1(t *testing.T) {
 		t.Error("no CSP on the public listener")
 	}
 
-	// --- an enrolment link works once
+	// --- an enrollment link works once
 	if _, err := x.svc.dir.AddGroup(ctx, "cli", "famille", "Famille", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -256,11 +256,11 @@ func TestM1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	en, err := x.svc.auth.NewEnrolment(ctx, "admin", lea.ID, 0)
+	en, err := x.svc.auth.NewEnrollment(ctx, "admin", lea.ID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	link := x.public + "/enrol/" + en.Token
+	link := x.public + "/enroll/" + en.Token
 	if a := x.do("GET", link, nil, nil); a.status != 200 || cookieOf(a, auth.AppCookie) != "" {
 		t.Fatalf("opening the link: %d (a GET must not use it)", a.status)
 	}
@@ -275,8 +275,8 @@ func TestM1(t *testing.T) {
 	if a := x.do("GET", x.public+"/approve", nil, cookie(auth.AppCookie, leaPhone)); !strings.Contains(a.body, `name="code"`) {
 		t.Errorf("the approve page has no code field:\n%s", a.body)
 	}
-	if a := x.do("GET", link, nil, nil); !strings.Contains(a.body, `action="/enrol/`) {
-		t.Errorf("the enrolment page has no button:\n%s", a.body)
+	if a := x.do("GET", link, nil, nil); !strings.Contains(a.body, `action="/enroll/`) {
+		t.Errorf("the enrollment page has no button:\n%s", a.body)
 	}
 	if a := x.do("GET", x.public+"/", nil, cookie(auth.AppCookie, leaPhone)); a.status != 200 || !strings.Contains(a.body, "Léa") {
 		t.Errorf("home signed in: %d", a.status)
@@ -351,9 +351,9 @@ func TestM1(t *testing.T) {
 		t.Errorf("the admin UI with a device credential: %d", a.status)
 	}
 
-	// --- the Android app enrols and opens its WebView
-	en2, _ := x.svc.auth.NewEnrolment(ctx, "admin", lea.ID, 0)
-	a = x.do("POST", x.public+"/api/app/enrol", strings.NewReader(`{"token":"`+en2.Token+`","model":"Pixel 8","android":15,"app_version":"0.1.0"}`),
+	// --- the Android app enrolls and opens its WebView
+	en2, _ := x.svc.auth.NewEnrollment(ctx, "admin", lea.ID, 0)
+	a = x.do("POST", x.public+"/api/app/enroll", strings.NewReader(`{"token":"`+en2.Token+`","model":"Pixel 8","android":15,"app_version":"0.1.0"}`),
 		func(r *http.Request) { r.Header.Set("Content-Type", "application/json") })
 	var enrolled struct {
 		Username string `json:"username"`
@@ -361,10 +361,10 @@ func TestM1(t *testing.T) {
 		DavURL   string `json:"dav_url"`
 	}
 	if err := json.Unmarshal([]byte(a.body), &enrolled); err != nil || a.status != 200 {
-		t.Fatalf("app enrol: %d %s", a.status, a.body)
+		t.Fatalf("app enroll: %d %s", a.status, a.body)
 	}
 	if enrolled.Username != "lea" || !strings.HasPrefix(enrolled.Secret, "agd_") || enrolled.DavURL != x.public+"/dav/" {
-		t.Fatalf("app enrol answer: %s", a.body)
+		t.Fatalf("app enroll answer: %s", a.body)
 	}
 	appBasic := func(r *http.Request) { r.SetBasicAuth("lea", enrolled.Secret) }
 	a = x.do("POST", x.public+"/api/app/session", nil, appBasic)

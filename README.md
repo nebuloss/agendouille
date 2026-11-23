@@ -60,7 +60,7 @@ curl http://127.0.0.1:8792/healthz    # ok dev
 
 agendouille group add famille
 agendouille user add lea --display-name Léa --group famille
-agendouille user enrol lea            # a one-time sign-in link and QR code, 72 hours
+agendouille user enroll lea            # a one-time sign-in link and QR code, 72 hours
 
 agendouille calendar add lea perso --name "Perso"
 agendouille calendar share lea~perso g:famille read
@@ -73,7 +73,7 @@ Calendar, Accounts, Add, Other, CalDAV, with the server, username and
 password printed), Thunderbird (New calendar, On the network, the same).
 A calendar made in DAVx5 or on an iPhone belongs to its user.
 
-Users have no password and no email. The enrolment QR signs in their first
+Users have no password and no email. The enrollment QR signs in their first
 device; after that, any browser shows a QR code at `/signin` that a
 signed-in phone approves (`/approve`, or the agendouille app's scanner),
 picking the number the browser shows. `agendouille config` prints every

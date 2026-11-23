@@ -52,7 +52,7 @@ const ACTIONS: Record<string, Key> = {
 
 const KINDS: Record<string, Key> = {
   event: 'kindEvent', calendar: 'kindCalendar', share: 'kindShare', user: 'kindUser', group: 'kindGroup', device: 'kindDevice',
-  enrolment: 'kindEnrolment', setting: 'kindSetting', admin: 'kindAdmin', approval: 'kindApproval',
+  enrollment: 'kindEnrollment', setting: 'kindSetting', admin: 'kindAdmin', approval: 'kindApproval',
 };
 
 /** What an entry is about, in words ("événement"). */
@@ -94,7 +94,7 @@ const VERBS: Record<string, Key> = {
   'user disabled': 'verbUserDisabled', 'user enabled': 'verbUserEnabled', 'user groups': 'verbUserGroups',
   'group added': 'verbGroupAdded', 'group changed': 'verbGroupChanged', 'group removed': 'verbGroupRemoved',
   'group member_added': 'verbGroupMemberAdded', 'group member_removed': 'verbGroupMemberRemoved',
-  'device revoked': 'verbDeviceRevoked', 'enrolment made': 'verbEnrolmentMade',
+  'device revoked': 'verbDeviceRevoked', 'enrollment made': 'verbEnrollmentMade',
   'setting changed': 'verbSettingChanged', 'admin password': 'verbAdminPassword',
   'approval approved': 'verbApprovalApproved',
 };
@@ -135,7 +135,7 @@ export function describe(a: Activity): Described {
       user(first);
       if (a.action === 'groups') d.extra = parts[1] ? parts[1].split(',').join(', ') : t('noGroups');
       break;
-    case 'enrolment':
+    case 'enrollment':
       user(first);
       break;
     case 'group':

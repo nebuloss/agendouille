@@ -14,20 +14,20 @@ the two disagree on. Record every deviation, with the reason, in
 
 M0 and M1 are done. What exists:
 - `cmd/agendouille`: `serve`, `config [set k v ...]`, `admin passwd
-  [--random]`, `user add|enrol|list|disable|enable|remove`, `group
+  [--random]`, `user add|enroll|list|disable|enable|remove`, `group
   add|list|remove|member`, `version`. `serve` refuses to start without an
   admin password.
 - `internal/store` (migrations in `migrations/*.sql`, times as text in
   `store.TimeFormat`), `internal/settings` (typed, validated together,
   live: `Subscribe`, and `Watch` for changes another process made),
   `internal/directory` (users, groups, `Sees`), `internal/auth` (admin
-  password with argon2id, sessions per surface, enrolment links,
+  password with argon2id, sessions per surface, enrollment links,
   approvals with number matching, device credentials and Basic auth,
   `ClientIP`, `SameOrigin`), `internal/surface` (the admin listener from
   the bootstrap file, the public one from `public_listen`, rebound live).
 - `internal/web/app`: `/signin` (QR, short code, number), `/signin/wait`,
-  `/enrol/{token}`, `/approve`, `/api/me`, `/api/approvals/{code}`,
-  `/api/app/enrol|session|config`. `internal/web/admin`: `/admin/signin`
+  `/enroll/{token}`, `/approve`, `/api/me`, `/api/approvals/{code}`,
+  `/api/app/enroll|session|config`. `internal/web/admin`: `/admin/signin`
   and a placeholder home. `internal/dav`: only the Basic check (`501`
   once signed in). `src/app/pages`: `SigninPage` (waits on the long-poll),
   `ApprovePage` (reads the code from a scanned QR's fragment).

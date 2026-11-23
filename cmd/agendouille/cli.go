@@ -122,16 +122,16 @@ func isTerminal(f *os.File) bool {
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
-// cmdUser: add, enrol, list, disable, enable, remove.
+// cmdUser: add, enroll, list, disable, enable, remove.
 func cmdUser(ctx context.Context, e env, args []string) error {
-	const usage = "user add <name> [--display-name N] [--color #rrggbb] [--group G]... | enrol <name> [--ttl 72h] | list | disable|enable|remove <name>"
+	const usage = "user add <name> [--display-name N] [--color #rrggbb] [--group G]... | enroll <name> [--ttl 72h] | list | disable|enable|remove <name>"
 	set := flag.NewFlagSet("agendouille user", flag.ContinueOnError)
 	loader := config.NewLoader(set)
 	display := set.String("display-name", "", "display name (add)")
 	color := set.String("color", "", "colour, #rrggbb (add; default: the next of the palette)")
 	var groups stringList
 	set.Var(&groups, "group", "a group to put the user in (add; repeatable)")
-	ttl := set.Duration("ttl", 0, "how long the enrolment link stays valid (enrol; default: the enrolment_link_ttl_hours setting)")
+	ttl := set.Duration("ttl", 0, "how long the enrollment link stays valid (enroll; default: the enrollment_link_ttl_hours setting)")
 	help, pos, err := parseArgs(set, e, args)
 	if help || err != nil {
 		return err
@@ -153,10 +153,10 @@ func cmdUser(ctx context.Context, e env, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(e.stdout, "Added %s (%s).\nGive them their first sign-in with: agendouille user enrol %s\n", u.Name, u.DisplayName, u.Name)
+		fmt.Fprintf(e.stdout, "Added %s (%s).\nGive them their first sign-in with: agendouille user enroll %s\n", u.Name, u.DisplayName, u.Name)
 		return nil
-	case "enrol":
-		if err := want(pos, 2, "user enrol <name> [--ttl 72h]"); err != nil {
+	case "enroll", "enrol": // enrol: the spelling before (DECISIONS: enroll)
+		if err := want(pos, 2, "user enroll <name> [--ttl 72h]"); err != nil {
 			return err
 		}
 		base := strings.TrimRight(svc.settings.Get().PublicURL, "/")
@@ -167,11 +167,11 @@ func cmdUser(ctx context.Context, e env, args []string) error {
 		if err != nil {
 			return fmt.Errorf("user %q: %w", pos[1], err)
 		}
-		en, err := svc.auth.NewEnrolment(ctx, "cli", u.ID, *ttl)
+		en, err := svc.auth.NewEnrollment(ctx, "cli", u.ID, *ttl)
 		if err != nil {
 			return err
 		}
-		link := base + "/enrol/" + en.Token
+		link := base + "/enroll/" + en.Token
 		code, err := webx.QRTerminal(link)
 		if err != nil {
 			return err

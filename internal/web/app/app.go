@@ -1,13 +1,14 @@
 // Package app serves the app surface: the family web app's pages and the
 // additional API (CONTRACTS.md 2.2), the Android app's own calls included.
-// In M1 that is signing in: enrolment links, approvals of a browser from a
-// signed-in device, and the app's enrolment and WebView session.
+// In M1 that is signing in: enrollment links, approvals of a browser from a
+// signed-in device, and the app's enrollment and WebView session.
 package app
 
 import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -45,8 +46,13 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	h.registerFamily(mux, guard)
 	mux.HandleFunc("GET /signin", h.signin)
 	mux.HandleFunc("GET /signin/wait/{id}", h.wait)
-	mux.HandleFunc("GET /enrol/{token}", h.enrolPage)
-	mux.Handle("POST /enrol/{token}", guard(http.HandlerFunc(h.enrol)))
+	mux.HandleFunc("GET /enroll/{token}", h.enrollPage)
+	// The links made before the spelling changed (DECISIONS: enroll): a QR
+	// code already handed out still opens the page.
+	mux.HandleFunc("GET /enrol/{token}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/enroll/"+url.PathEscape(r.PathValue("token")), http.StatusMovedPermanently)
+	})
+	mux.Handle("POST /enroll/{token}", guard(http.HandlerFunc(h.enroll)))
 	mux.Handle("POST /signout", guard(http.HandlerFunc(h.signout)))
 	mux.Handle("GET /approve", h.page(h.approvePage))
 	mux.Handle("POST /approve", guard(h.page(h.approvePost)))
@@ -55,7 +61,7 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.Handle("GET /api/approvals/{code}", h.api(h.approvalView))
 	mux.Handle("POST /api/approvals/{code}", guard(h.api(h.approvalPost)))
 
-	mux.HandleFunc("POST /api/app/enrol", h.appEnrol)
+	mux.HandleFunc("POST /api/app/enroll", h.appEnroll)
 	mux.Handle("POST /api/app/session", h.basic(h.appSession))
 	mux.Handle("GET /api/app/config", h.basic(h.appConfig))
 	return nil
@@ -192,32 +198,32 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 	webx.JSON(w, status, map[string]string{"status": state})
 }
 
-// enrolPage only shows a button: a GET never burns the link, since chat
+// enrollPage only shows a button: a GET never burns the link, since chat
 // apps and mail scanners open links to preview them.
-func (h *handlers) enrolPage(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, http.StatusOK, "app/enrol.html", "app.title.welcome", map[string]any{"Token": r.PathValue("token")})
+func (h *handlers) enrollPage(w http.ResponseWriter, r *http.Request) {
+	h.render(w, r, http.StatusOK, "app/enroll.html", "app.title.welcome", map[string]any{"Token": r.PathValue("token")})
 }
 
-func enrolError(err error) (int, string) {
+func enrollError(err error) (int, string) {
 	switch {
 	case errors.Is(err, auth.ErrUsed):
-		return http.StatusGone, "error.enrol.used"
+		return http.StatusGone, "error.enroll.used"
 	case errors.Is(err, auth.ErrExpired):
-		return http.StatusGone, "error.enrol.expired"
+		return http.StatusGone, "error.enroll.expired"
 	case errors.Is(err, auth.ErrInvalid):
-		return http.StatusNotFound, "error.enrol.invalid"
+		return http.StatusNotFound, "error.enroll.invalid"
 	}
 	return http.StatusInternalServerError, "error.internal"
 }
 
-func (h *handlers) enrol(w http.ResponseWriter, r *http.Request) {
+func (h *handlers) enroll(w http.ResponseWriter, r *http.Request) {
 	secret, err := h.d.Auth.RedeemForBrowser(r.Context(), r.PathValue("token"), r.UserAgent())
 	if err != nil {
-		status, key := enrolError(err)
+		status, key := enrollError(err)
 		if status == http.StatusInternalServerError {
-			h.d.Log.Error("redeeming an enrolment", "err", err)
+			h.d.Log.Error("redeeming an enrollment", "err", err)
 		}
-		h.render(w, r, status, "app/enrol.html", "app.title.welcome", map[string]any{"Error": i18n.T(i18n.FromRequest(r), key)})
+		h.render(w, r, status, "app/enroll.html", "app.title.welcome", map[string]any{"Error": i18n.T(i18n.FromRequest(r), key)})
 		return
 	}
 	auth.SetCookie(w, auth.SurfaceApp, secret, h.secure(), h.d.Settings.Get().SessionTTL())
@@ -319,9 +325,9 @@ func (h *handlers) approvalPost(w http.ResponseWriter, r *http.Request, p *auth.
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// appEnrol is the Android app redeeming the admin's enrolment link it was
+// appEnroll is the Android app redeeming the admin's enrollment link it was
 // opened with (PLAN.md 7.2). The answer carries the device credential, once.
-func (h *handlers) appEnrol(w http.ResponseWriter, r *http.Request) {
+func (h *handlers) appEnroll(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token      string `json:"token"`
 		Model      string `json:"model"`
@@ -333,7 +339,7 @@ func (h *handlers) appEnrol(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := h.d.Auth.RedeemForApp(r.Context(), body.Token, body.Model)
 	if err != nil {
-		status, key := enrolError(err)
+		status, key := enrollError(err)
 		code := map[int]string{http.StatusGone: "used", http.StatusNotFound: "not_found"}[status]
 		if errors.Is(err, auth.ErrExpired) {
 			code = "expired"

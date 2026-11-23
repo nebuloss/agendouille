@@ -116,7 +116,7 @@ func (s *Service) AdminSharedWith(ctx context.Context, userID int64) ([]SharedWi
 // who did what, never what the event said.
 type Activity struct {
 	At       time.Time `json:"at"`
-	Kind     string    `json:"kind"` // event, calendar, share, user, group, device, enrolment, setting, admin, approval
+	Kind     string    `json:"kind"` // event, calendar, share, user, group, device, enrollment, setting, admin, approval
 	Action   string    `json:"action"`
 	By       string    `json:"by"`
 	Calendar string    `json:"calendar,omitempty"`

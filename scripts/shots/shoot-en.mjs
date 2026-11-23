@@ -1,10 +1,10 @@
 // The English pass: a few pages of both UIs with Accept-Language: en, to
-// check the translation reads and fits. Usage: node shoot-en.mjs <enrol> <out> <admin cookie jar>
+// check the translation reads and fits. Usage: node shoot-en.mjs <enroll> <out> <admin cookie jar>
 import puppeteer from 'puppeteer-core';
 import { readFileSync } from 'node:fs';
 
-const [enrol, out, jar] = process.argv.slice(2);
-const base = new URL(enrol).origin;
+const [enroll, out, jar] = process.argv.slice(2);
+const base = new URL(enroll).origin;
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'], headless: true });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const page = await browser.newPage();
@@ -12,8 +12,8 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(`page: ${e.message}`));
 await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-GB,en' });
 await page.setViewport({ width: 1280, height: 860 });
-await page.goto(enrol, { waitUntil: 'networkidle2' });
-await page.screenshot({ path: `${out}/en-enrol.png` });
+await page.goto(enroll, { waitUntil: 'networkidle2' });
+await page.screenshot({ path: `${out}/en-enroll.png` });
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
 for (const [name, path] of [['calendar', '/'], ['devices', '/devices'], ['me', '/me'], ['calendars', '/calendars']]) {
   await page.goto(base + path, { waitUntil: 'networkidle2' });

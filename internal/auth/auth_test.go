@@ -56,10 +56,10 @@ func withCookie(name, value string) *http.Request {
 	return r
 }
 
-func TestEnrolmentWorksOnce(t *testing.T) {
+func TestEnrollmentWorksOnce(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	e, err := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, 0)
+	e, err := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,16 +85,16 @@ func TestEnrolmentWorksOnce(t *testing.T) {
 	}
 }
 
-func TestEnrolmentExpiresAndCanBeRevoked(t *testing.T) {
+func TestEnrollmentExpiresAndCanBeRevoked(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	e, _ := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, time.Hour)
+	e, _ := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, time.Hour)
 	f.clock.Add(time.Hour)
 	if _, err := f.auth.RedeemForBrowser(ctx, e.Token, ""); !errors.Is(err, ErrExpired) {
 		t.Errorf("after its hour: %v", err)
 	}
-	e2, _ := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, 0)
-	if err := f.auth.RevokeEnrolment(ctx, f.lea.ID, e2.ID); err != nil {
+	e2, _ := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, 0)
+	if err := f.auth.RevokeEnrollment(ctx, f.lea.ID, e2.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.auth.RedeemForBrowser(ctx, e2.Token, ""); !errors.Is(err, ErrInvalid) {
@@ -102,10 +102,10 @@ func TestEnrolmentExpiresAndCanBeRevoked(t *testing.T) {
 	}
 }
 
-func TestTheAppEnrolsAsADeviceAndOpensItsWebView(t *testing.T) {
+func TestTheAppEnrollsAsADeviceAndOpensItsWebView(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	e, _ := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, 0)
+	e, _ := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, 0)
 	d, err := f.auth.RedeemForApp(ctx, e.Token, "Pixel 8")
 	if err != nil {
 		t.Fatal(err)
@@ -334,7 +334,7 @@ func TestAdminPasswordAndSessionsStayOnTheirSurface(t *testing.T) {
 		t.Errorf("an admin session on the app surface: %v", err)
 	}
 	// And an app session never opens the admin surface.
-	e, _ := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, 0)
+	e, _ := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, 0)
 	app, _ := f.auth.RedeemForBrowser(ctx, e.Token, "")
 	if _, err := f.auth.Session(withCookie(AdminCookie, app), SurfaceAdmin); !errors.Is(err, ErrInvalid) {
 		t.Errorf("an app session on the admin surface: %v", err)
@@ -355,7 +355,7 @@ func TestAdminPasswordAndSessionsStayOnTheirSurface(t *testing.T) {
 func TestAppSessionsRenewWhileUsed(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	e, _ := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, 0)
+	e, _ := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, 0)
 	secret, _ := f.auth.RedeemForBrowser(ctx, e.Token, "")
 	for range 4 { // 4 x 60 days, used each time: still alive at 240 days
 		f.clock.Add(60 * 24 * time.Hour)
@@ -368,7 +368,7 @@ func TestAppSessionsRenewWhileUsed(t *testing.T) {
 		t.Errorf("after 91 idle days: %v", err)
 	}
 	// Removing the user ends their sessions at once.
-	e2, _ := f.auth.NewEnrolment(ctx, "admin", f.lea.ID, 0)
+	e2, _ := f.auth.NewEnrollment(ctx, "admin", f.lea.ID, 0)
 	s2, _ := f.auth.RedeemForBrowser(ctx, e2.Token, "")
 	f.dir.Remove(ctx, "admin", "lea")
 	if _, err := f.auth.Session(withCookie(AppCookie, s2), SurfaceApp); !errors.Is(err, ErrInvalid) {

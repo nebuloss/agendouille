@@ -24,7 +24,7 @@ Commands:
   config    print the configuration (every setting, and where it came from);
             config migrate: moves settings an older version kept in the database into the file
   admin     admin passwd [--random] [--if-unset]: set the admin password
-  user      add, enrol (a one-time sign-in link and QR), list, disable,
+  user      add, enroll (a one-time sign-in link and QR), list, disable,
             enable, remove
   group     add, list, remove, member add|remove
   calendar  add, list, share, unshare, transfer, delete

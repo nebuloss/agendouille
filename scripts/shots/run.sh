@@ -53,7 +53,7 @@ e() { printf 'DTEND;TZID=Europe/Paris:%sT%s00' "$(d "$1")" "$2"; }
 } >"$D/perso.ics"
 $B import maman~ecole "$D/ecole.ics" >/dev/null
 $B import lea~perso "$D/perso.ics" >/dev/null
-enrol=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
+enroll=$($B user enroll lea | grep -o 'http://[^ ]*/enroll/[^ ]*')
 $B serve 2>"$D/log" &
 pid=$!
 trap 'kill $pid 2>/dev/null; rm -rf "$D"' EXIT
@@ -63,16 +63,16 @@ curl -s -o /dev/null -c "$jar" --data-urlencode "password=$pw" http://127.0.0.1:
 curl -s -o /dev/null -b "$jar" -X POST -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:18892/api/admin/backups
 ln -sfn "$HOME/shots/node_modules" scripts/shots/node_modules
 node scripts/shots/shoot.mjs http://127.0.0.1:18892 "$pw" "$out"
-node scripts/shots/shoot-app.mjs "$enrol" "$out"
+node scripts/shots/shoot-app.mjs "$enroll" "$out"
 # The certificate pass: CalDAV in "both" mode, a DAVx5 device added.
 curl -s -o /dev/null -b "$jar" -X PUT -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: same-origin' \
   --data '{"mode":"both"}' http://127.0.0.1:18892/api/admin/dav-auth
-enrol2=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
-node scripts/shots/shoot-app.mjs "$enrol2" "$out" certs
+enroll2=$($B user enroll lea | grep -o 'http://[^ ]*/enroll/[^ ]*')
+node scripts/shots/shoot-app.mjs "$enroll2" "$out" certs
 # The calendar's hover states and the event editor, light and dark.
-enrol3=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
-node scripts/shots/shoot-editor.mjs "$enrol3" "$out"
+enroll3=$($B user enroll lea | grep -o 'http://[^ ]*/enroll/[^ ]*')
+node scripts/shots/shoot-editor.mjs "$enroll3" "$out"
 # The English pass, both UIs.
-enrol4=$($B user enrol lea | grep -o 'http://[^ ]*/enrol/[^ ]*')
-node scripts/shots/shoot-en.mjs "$enrol4" "$out" "$jar"
+enroll4=$($B user enroll lea | grep -o 'http://[^ ]*/enroll/[^ ]*')
+node scripts/shots/shoot-en.mjs "$enroll4" "$out" "$jar"
 ls "$out"

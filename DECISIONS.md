@@ -3,6 +3,17 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: enroll, with two l
+
+The user's spelling: "enroll" and "enrollment" everywhere, in the
+addresses (`/enroll/{token}`, `/api/app/enroll`), the API's fields, the
+code, the setting (`enrollment_link_ttl_hours`), the English texts and
+the docs. Migration 0008 renames the table and the audit lines; the
+applied migrations keep the old names. What was already out keeps
+working: `/enrol/{token}` redirects (QR codes handed out), the CLI takes
+`user enrol` too, and a configuration file with the old key is read as
+the new one.
+
 ## 2026-11-23: admin password, 8 characters at least
 
 The minimum was 12. The operator wants a short one they choose
@@ -66,14 +77,14 @@ The user: "we should be able to show it again while it is not used. and
 also for testing we should be able to generate sign in link for web view".
 
 - **A pending link can be shown again**, as often as needed: its token is
-  kept, readable, in `enrolments.token` while the link is pending, and
+  kept, readable, in `enrollments.token` while the link is pending, and
   cleared when it is used, cancelled, or seen expired (migration 0005;
-  `GET /api/admin/users/{name}/enrolments/{id}`, 410 once gone). Until
+  `GET /api/admin/users/{name}/enrollments/{id}`, 410 once gone). Until
   now only its hash was stored. Kept readable for at most the link's
   life, in a database that already holds everything a family has: it adds
   no reach. redeem still looks the hash up.
-- **Two kinds of link** (`enrolments.kind`): "phone", the QR for a phone's
-  camera (`enrolment_link_ttl_hours`), and "browser", a link that signs
+- **Two kinds of link** (`enrollments.kind`): "phone", the QR for a phone's
+  camera (`enrollment_link_ttl_hours`), and "browser", a link that signs
   the browser opening it in as that user, for an hour, to try the web app
   as they see it. Same redemption; the admin's dialog opens it in a new
   tab and says to sign that browser out when done.
@@ -473,7 +484,7 @@ found nine defects; all are fixed, each with a test:
 
 - **No rate limits** (the user: "rate limit is useless"). Every secret
   agendouille checks but one is random and at least 128 bits (device
-  credentials 160, sessions and enrolment tokens 256), and an approval
+  credentials 160, sessions and enrollment tokens 256), and an approval
   needs a signed-in approver and dies on a wrong number. The exception,
   the admin password, sits on the LAN-only listener behind argon2id.
   What stays is resource protection, not guessing protection: at most two
@@ -484,7 +495,7 @@ found nine defects; all are fixed, each with a test:
   about 28 bits from a 27-letter alphabet without look-alikes. Enough for
   a code that lives two minutes and only signed-in users can try.
 - **Setting names carry their unit**: `session_ttl_days`,
-  `enrolment_link_ttl_hours`, `app_sync_interval_minutes`,
+  `enrollment_link_ttl_hours`, `app_sync_interval_minutes`,
   `sync_token_retention_days`. `config set session_ttl 90` cannot then mean
   90 seconds to one reader and 90 days to another.
 - **Admin sessions are in the database** (cafard keeps them in memory), so
@@ -533,7 +544,7 @@ and what follows from them:
 - **Admin is the operator, as in claudication.** "a single admin ui that
   allow to create / remove users, manage server storage port use, ... give
   them one time login qrcode". One admin account with a password, not a
-  family member, LAN only. It manages users, groups, enrolment QR codes and
+  family member, LAN only. It manages users, groups, enrollment QR codes and
   every setting (network, storage and backups, limits, defaults: all four
   groups the user picked), and sees **metadata only** ("No, metadata
   only"). Settings live in the database and apply live; a small bootstrap
@@ -552,7 +563,7 @@ and what follows from them:
 - **No passwords, no email, nothing outside.** "the goal is to not rely on
   external provider and self host at home": email was dropped (home mail
   servers land in spam; providers are outside). Sign-in is an admin's
-  one-time enrolment QR for the first device, then **approval** of any
+  one-time enrollment QR for the first device, then **approval** of any
   browser from a signed-in device (QR or short code, with number matching),
   long sessions, optional passkeys later. *Replaces* "member passwords,
   optional" and the email-link idea.

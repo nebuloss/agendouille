@@ -106,7 +106,29 @@ func (l *Loader) Load(getenv func(string) string) (*Config, string, error) {
 	return &cfg, path, nil
 }
 
+// renamedKeys are configuration keys spelt differently before: a file that
+// still uses the old name is read as if it used the new one.
+var renamedKeys = map[string]string{
+	"enrolment_link_ttl_hours": "enrollment_link_ttl_hours", // DECISIONS: enroll
+}
+
 func decodeYAML(data []byte, cfg *Config) error {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err == nil && len(doc.Content) == 1 && doc.Content[0].Kind == yaml.MappingNode {
+		m := doc.Content[0]
+		changed := false
+		for i := 0; i+1 < len(m.Content); i += 2 {
+			if to, ok := renamedKeys[m.Content[i].Value]; ok {
+				m.Content[i].Value = to
+				changed = true
+			}
+		}
+		if changed {
+			if out, err := yaml.Marshal(&doc); err == nil {
+				data = out
+			}
+		}
+	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(cfg); err != nil && !errors.Is(err, io.EOF) {

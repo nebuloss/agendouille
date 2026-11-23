@@ -1,6 +1,6 @@
 // Package auth signs people and devices in (PLAN.md 8, 10): the admin's
 // password and sessions, users' web sessions, the admin's one-time
-// enrolment links, approvals of a browser from a signed-in device, and the
+// enrollment links, approvals of a browser from a signed-in device, and the
 // device credentials CalDAV clients use.
 //
 // No user has a password, and nothing here sends email. Every secret but

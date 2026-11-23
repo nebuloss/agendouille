@@ -38,15 +38,15 @@ func init() {
 			FR: "Trop de connexions sont en attente. Réessayez dans une minute.",
 			EN: "Too many sign-ins are waiting. Try again in a minute.",
 		},
-		"error.enrol.used": {
+		"error.enroll.used": {
 			FR: "Ce lien de connexion a déjà été utilisé. Demandez-en un nouveau.",
 			EN: "This sign-in link has already been used. Ask for a new one.",
 		},
-		"error.enrol.expired": {
+		"error.enroll.expired": {
 			FR: "Ce lien de connexion a expiré. Demandez-en un nouveau.",
 			EN: "This sign-in link has expired. Ask for a new one.",
 		},
-		"error.enrol.invalid": {
+		"error.enroll.invalid": {
 			FR: "Ce lien de connexion n’est pas valable. Vérifiez qu’il est complet, ou demandez-en un nouveau.",
 			EN: "This sign-in link is not valid. Check that it is complete, or ask for a new one.",
 		},
@@ -232,11 +232,11 @@ func init() {
 			FR: "Aucune adresse publique n’est configurée : le lien de connexion ne peut pas être créé. Renseignez public_url dans le fichier de configuration.",
 			EN: "No public address is set, so the sign-in link cannot be made. Set public_url in the configuration file.",
 		},
-		"error.admin.enrolmentUsed": {
+		"error.admin.enrollmentUsed": {
 			FR: "Ce lien de connexion a déjà été utilisé.",
 			EN: "This sign-in link has already been used.",
 		},
-		"error.admin.enrolmentExpired": {
+		"error.admin.enrollmentExpired": {
 			FR: "Ce lien de connexion a expiré. Créez-en un nouveau.",
 			EN: "This sign-in link has expired. Create a new one.",
 		},
