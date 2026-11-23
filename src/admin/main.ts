@@ -3,6 +3,7 @@
 import './admin.css';
 import { adminApi } from '@/admin/pages/base.ts';
 import { NoticeCenter } from '@/admin/Notices.ts';
+import { CalendarPage, CalendarsPage } from '@/admin/pages/Calendar.ts';
 import { ActivityPage, BackupsPage, GroupPage, GroupsPage, SettingsPage } from '@/admin/pages/More.ts';
 import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UserPage, UsersPage } from '@/admin/pages/Users.ts';
@@ -16,6 +17,8 @@ export const pages = new Pages({
   user: (doc) => new UserPage(doc, api),
   groups: (doc) => new GroupsPage(doc, api),
   group: (doc) => new GroupPage(doc, api),
+  calendar: (doc) => new CalendarPage(doc, api),
+  calendars: (doc) => new CalendarsPage(doc, api),
   activity: (doc) => new ActivityPage(doc, api),
   settings: (doc) => new SettingsPage(doc, api),
   backups: (doc) => new BackupsPage(doc, api),

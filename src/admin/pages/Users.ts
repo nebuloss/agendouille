@@ -178,7 +178,7 @@ export class UserPage extends AdminPage {
               action('Révoquer', () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), 'Appareil révoqué.'), 'danger-text', 'trash', 'sm')]),
             'Aucun appareil. La personne en ajoute depuis Appareils, dans l’application.'))];
       case 'calendars':
-        return [this.calendarsCard(d, users)];
+        return [this.calendarsCard(d)];
       case 'groups':
         return [this.groupsCard(d.groups, groups)];
       case 'activity': {
@@ -224,45 +224,30 @@ export class UserPage extends AdminPage {
     ];
   }
 
-  private calendarsCard(d: UserDetail, users: UserRow[]): HTMLElement {
-    return section('Calendriers',
-        h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements."),
-        h('h3', { class: 'text-sm font-semibold' }, 'Les siens'),
-        table(['Calendrier', 'Événements', 'Taille', 'Partagé avec', ''],
-          d.calendars_owned.map((c) => [
-            h('span', { class: 'inline-flex items-center' }, swatch(c.color), c.name),
-            String(c.events),
-            bytes(c.bytes),
-            h('span', { class: 'flex flex-wrap gap-1' }, ...c.shares.map((s) => h('span', { class: 'inline-flex h-7 items-center gap-1 rounded-md3-s bg-surface-high pl-2 text-xs font-semibold text-on-surface' },
-              `${s.target} · ${accessLabel(s.access)}`,
-              iconButtonSm('close', `Retirer le partage avec ${s.target}`, () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(s.target)}`), 'Partage retiré.'))))),
-            h('span', { class: 'flex flex-wrap items-center justify-end gap-1' },
-              action('Donner', () => this.transferCalendar(c, users), 'text', 'give', 'sm'),
-              action('Supprimer', () => this.removeCalendar(c), 'danger-text', 'trash', 'sm')),
-          ]), 'Aucun.'),
-        h('h3', { class: 'text-sm font-semibold' }, 'Partagés avec lui ou elle'),
-        table(['Calendrier', 'Accès', 'Par'], d.calendars_shared.map((c) => [c.name, accessLabel(c.access), c.via]), 'Aucun.'),
-      );
+  /** The user's calendars as a list, each opening its page (stats, shares, activity). */
+  private calendarsCard(d: UserDetail): HTMLElement {
+    const entry = (href: string, color: string, name: string, line: string, right: Child[]): HTMLElement =>
+      h('a', { href, class: 'state-layer flex min-h-16 items-center gap-3 border-b border-outline-variant/50 px-4 py-3 text-on-surface no-underline last:border-0' },
+        swatch(color, 'md'),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('b', { class: 'truncate font-semibold' }, name), h('span', { class: 'truncate text-xs text-on-surface-variant' }, line)),
+        ...right,
+        h('span', { class: 'text-on-surface-variant' }, icon('right')));
+    const stat = (n: string, label: string): HTMLElement =>
+      h('span', { class: 'hidden w-24 shrink-0 flex-col items-end sm:flex' }, h('b', { class: 'font-semibold tabular-nums' }, n), h('span', { class: 'text-[11px] text-on-surface-variant' }, label));
+    const sharesLine = (c: CalendarMeta): string => c.shares.length === 0 ? 'partagé avec personne'
+      : `partagé avec ${c.shares.map((s) => `${s.target.startsWith('g:') ? 'groupe ' : ''}${s.target.slice(2)} (${accessLabel(s.access)})`).join(', ')}`;
+    const owned = d.calendars_owned.map((c) => entry(`/calendars/${seg(c.ref)}`, c.color, c.name, `${c.ref} · ${sharesLine(c)}`,
+      [stat(String(c.events), 'événements'), stat(bytes(c.bytes), 'taille')]));
+    const shared = d.calendars_shared.map((c) => entry(`/calendars/${seg(c.ref)}`, '', c.name, `de ${c.ref.split('~')[0]} · par ${c.via.startsWith('g:') ? 'le groupe ' + c.via.slice(2) : 'un partage direct'}`,
+      [h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))]));
+    return h('div', { class: 'flex flex-col gap-4' },
+      section(`Ses calendriers (${owned.length})`,
+        h('p', { class: 'text-sm text-on-surface-variant' }, "L'administration voit les calendriers, jamais leurs événements. Ouvrez-en un pour ses statistiques."),
+        owned.length > 0 ? h('div', { class: ui.well }, ...owned) : h('p', { class: ui.empty }, "Aucun : la personne en crée depuis l'application ou son téléphone.")),
+      section(`Partagés avec lui ou elle (${shared.length})`,
+        shared.length > 0 ? h('div', { class: ui.well }, ...shared) : h('p', { class: ui.empty }, 'Aucun.')));
   }
 
-  private async transferCalendar(c: CalendarMeta, users: UserRow[]): Promise<void> {
-    const select = h('select', {}, ...users.filter((u) => u.name !== this.name).map((u) => h('option', { value: u.name }, u.display_name)));
-    const keep = h('input', { type: 'checkbox', checked: true });
-    const v = await dialog(this.doc, `Donner ${c.name}`, [field('À', select), h('label', { class: ui.check }, keep, `${this.name} garde lecture et écriture`)],
-      [{ label: 'Annuler', value: 'no' }, { label: 'Donner', value: 'yes', kind: 'filled' }]);
-    if (v !== 'yes' || select.value === '') return;
-    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: select.value, keep: keep.checked }), 'Calendrier donné.');
-  }
-
-  private async removeCalendar(c: CalendarMeta): Promise<void> {
-    const typed = h('input', { autocomplete: 'off' });
-    const v = await dialog(this.doc, `Supprimer ${c.name} ?`, [
-      h('p', {}, `Ses ${c.events} événement(s) disparaissent pour tout le monde. Seule une sauvegarde peut les rendre.`),
-      field(`Tapez « ${c.name} » pour confirmer`, typed),
-    ], [{ label: 'Annuler', value: 'no' }, { label: 'Supprimer', value: 'yes', kind: 'danger' }]);
-    if (v !== 'yes') return;
-    await this.act(() => this.api.delete(`/calendars/${seg(c.ref)}`, { confirm: typed.value }), 'Calendrier supprimé.');
-  }
 
   private profile(u: User): HTMLElement {
     const display = h('input', { value: u.display_name });
@@ -340,7 +325,7 @@ export class UserPage extends AdminPage {
 export { confirmDialog };
 
 /** A small round icon button inside a chip. */
-function iconButtonSm(ic: 'close', label: string, run: () => Promise<void>): HTMLButtonElement {
+export function iconButtonSm(ic: 'close', label: string, run: () => Promise<void>): HTMLButtonElement {
   const b = h('button', { type: 'button', class: 'state-layer grid size-7 place-items-center rounded-full [&_.ic]:size-4', 'aria-label': label, title: label }, icon(ic));
   b.addEventListener('click', () => void run());
   return b;

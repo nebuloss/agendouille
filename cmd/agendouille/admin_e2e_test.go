@@ -82,11 +82,11 @@ func TestM3AdminUI(t *testing.T) {
 		}
 	}
 	// The old calendars page lands on the users: calendars are under their owner.
-	if a := x.do("GET", x.admin+"/calendars", nil, cookie(auth.AdminCookie, A.session)); a.status != http.StatusSeeOther || a.header.Get("Location") != "/users" {
-		t.Errorf("/calendars: %d %s", a.status, a.header.Get("Location"))
+	if a := x.do("GET", x.admin+"/calendars", nil, cookie(auth.AdminCookie, A.session)); a.status != 200 || !strings.Contains(a.body, "admin-content") {
+		t.Errorf("/calendars: %d", a.status)
 	}
 	// Links from before, with the /admin prefix, land on the same page.
-	for old, now := range map[string]string{"/admin": "/", "/admin/users/lea": "/users/lea", "/admin/calendars": "/users"} {
+	for old, now := range map[string]string{"/admin": "/", "/admin/users/lea": "/users/lea", "/admin/calendars": "/calendars"} {
 		if a := x.do("GET", x.admin+old, nil, nil); a.status != http.StatusMovedPermanently || a.header.Get("Location") != now {
 			t.Errorf("%s: %d %s, want %s", old, a.status, a.header.Get("Location"), now)
 		}
@@ -196,13 +196,45 @@ func TestM3AdminUI(t *testing.T) {
 	dev, _ := x.svc.auth.NewDevice(ctx, leaU.ID, "davx5", "Pixel", "readwrite")
 	davClient{x, "lea", dev.Secret}.req("PUT", "/dav/calendars/lea/lea~perso/secret.ics", secret)
 	for _, p := range []string{"/overview", "/users", "/users/lea", "/users/maman", "/groups", "/calendars", "/activity",
-		"/activity?user=lea", "/activity?kind=event", "/settings", "/backups", "/system"} {
+		"/activity?user=lea", "/activity?kind=event", "/settings", "/backups", "/system", "/calendars/lea~perso/stats",
+		"/activity/export", "/activity?calendar=lea~perso"} {
 		a := A.call("GET", p, nil)
 		if a.status != 200 {
 			t.Errorf("GET %s: %d", p, a.status)
 		}
 		if strings.Contains(a.body, "SECRET") {
 			t.Errorf("GET /api/admin%s carries event data: %s", p, a.body)
+		}
+	}
+	// The calendar's stats: counts and who, from the change log.
+	st := A.json("GET", "/calendars/lea~perso/stats", nil, 200)
+	if st["events"] != float64(1) || st["changes"] != float64(1) || len(st["daily"].([]any)) != 90 ||
+		!strings.Contains(asJSON(st["by_user"]), `"user":"lea"`) || !strings.Contains(asJSON(st["by_device"]), `"label":"Pixel"`) ||
+		!strings.Contains(asJSON(st["by_via"]), `"via":"caldav"`) {
+		t.Errorf("stats: %v", st)
+	}
+	// The admin manages a calendar's members: add, change access, remove.
+	if a := A.call("PUT", "/calendars/lea~perso/shares/u:maman", map[string]any{"access": "read"}); a.status != http.StatusNoContent {
+		t.Fatalf("admin share: %d %s", a.status, a.body)
+	}
+	A.call("PUT", "/calendars/lea~perso/shares/u:maman", map[string]any{"access": "readwrite"})
+	if st := A.json("GET", "/calendars/lea~perso/stats", nil, 200); !strings.Contains(asJSON(st["shares"]), `{"access":"readwrite","target":"u:maman"}`) {
+		t.Errorf("after changing the access: %v", st["shares"])
+	}
+	if a := A.call("PUT", "/calendars/lea~perso/shares/u:lea", map[string]any{"access": "read"}); a.status != http.StatusBadRequest {
+		t.Errorf("sharing with the owner: %d", a.status)
+	}
+	if a := A.call("PUT", "/calendars/lea~perso/shares/u:nobody", map[string]any{"access": "read"}); a.status != http.StatusNotFound {
+		t.Errorf("sharing with no one: %d", a.status)
+	}
+	A.call("DELETE", "/calendars/lea~perso/shares/u:maman", nil)
+	if a := A.call("GET", "/calendars/lea~nope/stats", nil); a.status != http.StatusNotFound {
+		t.Errorf("stats of no calendar: %d", a.status)
+	}
+	for _, p := range []string{"/calendars/lea~perso", "/calendars/lea~perso/shares", "/calendars/lea~perso/activity"} {
+		a := x.do("GET", x.admin+p, nil, cookie(auth.AdminCookie, A.session))
+		if a.status != 200 || !strings.Contains(a.body, `<span>Calendriers</span>`) || !strings.Contains(a.body, "data-item-name") {
+			t.Errorf("calendar page %s: %d", p, a.status)
 		}
 	}
 	act := A.json("GET", "/activity?kind=event", nil, 200)

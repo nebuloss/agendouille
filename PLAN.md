@@ -712,7 +712,7 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 | `/users` | List: name, groups, calendars owned, devices, last seen. "Add user" |
 | `/users/<name>` | Profile, groups; **enrolment QR** (make, show, revoke, used or not); devices and browsers (revoke); calendars owned and shared with them (names, counts, sizes); disable, enable; remove (with the transfer-or-delete step, 6) |
 | `/groups` | Groups: name, colour, members; add, rename, delete (a group with shares asks first) |
-| (on `/users/<name>`) | Every calendar: owner, name, events, size, shares. **No events.** The admin can remove a share, transfer a calendar, delete one (typing its name) |
+| `/calendars` | Every calendar: owner, name, events, size, shares. **No events.** The admin can remove a share, transfer a calendar, delete one (typing its name) |
 | `/activity` | Who did what, without event titles: "Léa created an event in maman~ecole from Pixel 8", "Maman shared École with Enfants", admin actions |
 | `/settings` | Every setting of 11.2, grouped: Network, Storage and backups, Limits, Defaults. Applied live |
 | `/backups` | List, download, back up now, restore (13.6) |

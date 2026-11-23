@@ -32,7 +32,7 @@ export class OverviewPage extends AdminPage {
       h('div', { class: 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]' },
         tile(o.users, 'utilisateurs', '/users'),
         tile(o.groups, 'groupes', '/groups'),
-        tile(o.calendars, 'calendriers'),
+        tile(o.calendars, 'calendriers', '/calendars'),
         tile(o.events, 'événements'),
         tile(o.devices, 'appareils'),
       ),

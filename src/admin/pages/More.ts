@@ -168,8 +168,8 @@ export class GroupPage extends AdminPage {
         shared.map((c) => {
           const s = c.shares.find((x) => x.target === target)!;
           return [
-            h('span', { class: 'inline-flex items-center' }, swatch(c.color), c.name),
-            h('a', { href: `/users/${seg(c.owner)}/calendars`, class: ui.link }, c.owner),
+            h('a', { href: `/calendars/${seg(c.ref)}`, class: `${ui.link} inline-flex items-center` }, swatch(c.color), c.name),
+            h('a', { href: `/users/${seg(c.owner)}`, class: ui.link }, c.owner),
             accessLabel(s.access),
             String(c.events),
             action('Retirer le partage', () => this.act(() => this.api.delete(`/calendars/${seg(c.ref)}/shares/${seg(target)}`), 'Partage retiré.'), 'text', 'close', 'sm'),

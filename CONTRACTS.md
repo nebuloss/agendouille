@@ -275,7 +275,7 @@ no same-origin):
 |---|---|---|
 | GET, POST | `/signin` | none; password (two argon2 derivations at once at most) |
 | POST | `/signout` | `agd_admin`, same-origin |
-| GET | `/`, `/users[/{name}[/{page}]]`, `/groups[/{name}[/{page}]]`, `/activity`, `/settings`, `/backups` (pages: nav.go) | `agd_admin`; on the admin listener only, so no `/admin` prefix (DECISIONS); `/calendars` and every old `/admin/...` path redirect |
+| GET | `/`, `/users[/{name}[/{page}]]`, `/groups[/{name}[/{page}]]`, `/calendars[/{ref}[/{page}]]`, `/activity`, `/settings`, `/backups` (pages: nav.go) | `agd_admin`; on the admin listener only, so no `/admin` prefix (DECISIONS); `/calendars` and every old `/admin/...` path redirect |
 | GET | `/static/admin/...`, `/static/shared/...` | none |
 | | `/api/admin/*` (3.5) | `agd_admin`; writes same-origin |
 
@@ -424,10 +424,14 @@ errors are 3.1's, with messages in French for the UI to show as they are.
 | PATCH | `/groups/{name}` | `{display_name?, color?, members?}` (members: the exact list) -> 204 |
 | DELETE | `/groups/{name}` | 409 `has_shares` unless `?confirm=1` |
 | GET | `/calendars` | `?owner=`; every calendar: `ref`, `owner`, `name`, `color`, `timezone`, `events`, `bytes`, `shares`. **No events** |
+| GET | `/calendars/{ref}/stats` | metadata only: events, size, changes, per day over 90 days, by user, by way in, by device, shares (`calendar.CalendarStats`) |
+| PUT | `/calendars/{ref}/shares/{target}` | `{access}`: add a member or change their access; not bounded by the owner's groups; the owner is refused |
 | DELETE | `/calendars/{ref}/shares/{target}` | remove a share |
 | POST | `/calendars/{ref}/transfer` | `{to, keep}` -> `{ref}` |
 | DELETE | `/calendars/{ref}?confirm=<name>` | the calendar's display name, typed |
 | GET | `/activity?user=&calendar=&kind=&before=` | 3.5.2, 100 per page, newest first; `before` is the last line's `at` |
+| GET | `/activity/export?user=&calendar=&kind=` | the same as CSV, up to 50 000 rows |
+| GET, POST | `/notices`, `/notices/read` | the notification centre: `{notices}`; `{ids}` marks read |
 | GET, PATCH | `/settings` | `[{key, group, type, default, value}]` ; `{"<key>": <JSON value>, ...}` applied together -> the list |
 | GET, POST | `/backups` | `[{name, size, made, before_restore}]` ; make one now (201) |
 | GET | `/backups/{file}` | download |

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Api } from '@/shared/core/Api.ts';
-import { ActivityLog, stamp, type Activity } from '@/admin/ActivityLog.ts';
+import { ActivityLog, describe as describeEntry, stamp, type Activity } from '@/admin/ActivityLog.ts';
 
 const rows: Activity[] = [
-  { at: '2026-11-23T10:00:00Z', kind: 'event', action: 'created', by: 'lea', calendar: 'lea~perso', via: 'dav', device: 'Pixel' },
+  { at: '2026-11-23T10:00:00Z', kind: 'event', action: 'created', by: 'lea', calendar: 'lea~perso', via: 'caldav', device: 'Pixel' },
   { at: '2026-11-23T11:00:00Z', kind: 'share', action: 'shared', by: 'maman', calendar: 'maman~ecole', detail: 'g:famille' },
   { at: '2026-11-23T12:00:00Z', kind: 'event', action: 'changed', by: 'lea', calendar: 'maman~ecole', via: 'web' },
 ];
@@ -32,7 +32,9 @@ describe('ActivityLog', () => {
     document.body.append(log.root);
     await log.load();
     const first = log.root.querySelector('tbody tr td:nth-child(3)')!;
-    expect(first.textContent).toBe('événement · modifié'); // 12:00, newest
+    expect(first.textContent).toBe('a modifié un événement'); // 12:00, newest
+    // Every row fills every column.
+    for (const td of log.root.querySelectorAll('tbody td')) expect(td.textContent?.trim()).not.toBe('');
     // A value in a row narrows to itself.
     [...log.root.querySelectorAll<HTMLButtonElement>('tbody button')].find((b) => b.textContent === 'maman')!.click();
     await settle();
@@ -53,7 +55,7 @@ describe('ActivityLog', () => {
     const log = new ActivityLog(document, api);
     document.body.append(log.root);
     await log.load();
-    [...log.root.querySelectorAll<HTMLButtonElement>('thead button')].find((b) => b.textContent?.startsWith('Quoi'))!.click();
+    [...log.root.querySelectorAll<HTMLButtonElement>('thead button')].find((b) => b.textContent?.startsWith('Action'))!.click();
     const menu = document.querySelector('[role="menu"]')!;
     expect(menu.textContent).toContain('événement2');
     expect(menu.textContent).toContain('partage1');
@@ -68,6 +70,15 @@ describe('ActivityLog', () => {
     expect([...log.root.querySelectorAll('thead button')].some((b) => b.textContent?.startsWith('Qui'))).toBe(false);
     expect(log.root.querySelector('a[download]')?.getAttribute('href')).toBe('/api/admin/activity/export?user=lea');
     log.dispose();
+  });
+
+  it('describes every kind of entry, with a source for each', () => {
+    const d = (x: Partial<Activity>) => describeEntry({ at: '', kind: 'event', action: 'created', by: 'lea', ...x });
+    expect(d({ via: 'caldav', device: 'Pixel', calendar: 'lea~perso' })).toMatchObject({ verb: 'a créé un événement', subject: 'lea~perso', source: 'Pixel · CalDAV' });
+    expect(d({ kind: 'share', action: 'shared', by: 'maman', calendar: 'maman~ecole', detail: 'g:famille readwrite' })).toMatchObject({ extra: 'g:famille · lecture et écriture', source: 'application web' });
+    expect(d({ kind: 'user', action: 'added', by: 'admin', detail: 'lea' })).toMatchObject({ who: 'administration', subject: 'lea', href: '/users/lea', source: "interface d'administration" });
+    expect(d({ kind: 'setting', action: 'changed', by: 'cli', detail: 'backup_keep 14 -> 30' })).toMatchObject({ who: 'console', subject: 'backup_keep', extra: '→ 30', source: 'ligne de commande' });
+    expect(d({ kind: 'group', action: 'member_added', by: 'admin', detail: 'famille lea' })).toMatchObject({ subject: 'famille', extra: 'lea' });
   });
 
   it('stamps today with the time alone', () => {

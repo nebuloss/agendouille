@@ -43,11 +43,13 @@ const (
 	icCalendar = "M4 7a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2z M4 10h16 M8 3v4 M16 3v4"
 	icPerson   = "M12 11.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"
 	icBack     = "M15 5l-7 7 7 7"
+	icShare    = "M18 8a3 3 0 100-6 3 3 0 000 6z M6 15a3 3 0 100-6 3 3 0 000 6z M18 22a3 3 0 100-6 3 3 0 000 6z M8.6 13.5l6.8 4 M15.4 6.5l-6.8 4"
 )
 
 var sections = []navPage{
 	{"users", "Utilisateurs", icUsers},
 	{"groups", "Groupes", icGroups},
+	{"calendars", "Calendriers", icCalendar},
 	{"activity", "Activité", icActivity},
 	{"backups", "Sauvegardes", icBackups},
 	{"settings", "Réglages", icSettings},
@@ -65,6 +67,12 @@ var itemPages = map[string][]navPage{
 	"groups": {
 		{"members", "Membres", icPerson},
 		{"calendars", "Calendriers", icCalendar},
+	},
+	// A calendar is an item of its own, with an owner and members the admin
+	// manages (the user's call).
+	"calendars": {
+		{"shares", "Membres", icShare},
+		{"activity", "Activité", icActivity},
 	},
 }
 

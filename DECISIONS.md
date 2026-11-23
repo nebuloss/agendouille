@@ -3,6 +3,40 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: calendars back at the top, with owner, members and stats
+
+The user: "activity should use relevant column that cover all type of
+events instead of showing empty columns. also work on calendar list and
+add a calendar stats view" (admin UI, asked and answered), then "admin
+must be able to manage calendar owner and members ... so it can transfer
+it to another account ... so perhaps calendar should be at top level".
+
+- **Activity columns every row fills:** Quand, Qui (a user, or
+  "administration", "console"), Action (a verb: "a créé un événement", "a
+  partagé un calendrier", "a ajouté un utilisateur"), Sur (what it is
+  about, whatever the kind: a calendar, a user, a group, a setting, a
+  device, a browser, with a word more: the access given, the new value),
+  Depuis (the device and the way in for an event, else the admin UI, the
+  console, the web app). Worked out on the page from the entry
+  (`describe` in `ActivityLog.ts`); the raw detail is in the record.
+- **Calendriers is a section again** (it was taken off at the user's
+  earlier request, before a calendar had anything to manage): the list of
+  every calendar with a search; a calendar's page is its stats; beside it,
+  Membres and Activité. Users' and groups' pages link to their calendars.
+- **Stats, metadata only** (`calendar.AdminStats`, `GET
+  /api/admin/calendars/{ref}/stats`): events (recurring, all-day), size,
+  changes and the last one, changes per day over 90 days (created,
+  changed, deleted: a stacked bar chart on the theme's series colours,
+  validated light and dark, with a legend, a hover and a table), who
+  changes it, through what, and which devices. The privacy walk covers it.
+- **The admin manages the owner and the members:** "Changer de
+  propriétaire" (the transfer that existed; the old owner may stay a
+  member), and members added, their access changed, removed (`PUT
+  /api/admin/calendars/{ref}/shares/{target}`). Unlike the owner's own
+  sharing, the admin's is not bounded by the owner's groups: the admin
+  manages the groups too. Every change tells open family pages that
+  access changed.
+
 ## 2026-11-23: the activity log is claudication's request log
 
 The user: "reuse claudication requests widget for logging widget to have

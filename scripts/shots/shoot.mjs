@@ -15,7 +15,7 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 860 }], ['ph
   await page.goto(base + '/signin', { waitUntil: 'networkidle0' });
   await page.type('input[name=password]', password);
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type=submit]')]);
-  for (const path of ['/', '/users', '/users/lea', '/users/lea/calendars', '/users/lea/signin', '/groups', '/groups/famille', '/groups/famille/members', '/users/lea/activity', '/activity', '/settings', '/backups']) {
+  for (const path of ['/', '/users', '/calendars', '/users/lea', '/users/lea/calendars', '/users/lea/signin', '/groups', '/groups/famille', '/groups/famille/members', '/users/lea/activity', '/calendars/maman~ecole', '/calendars/maman~ecole/shares', '/activity', '/settings', '/backups']) {
     await page.goto(base + path, { waitUntil: 'networkidle0' });
     await new Promise((r) => setTimeout(r, 300));
     const name = path.replaceAll('/', '_').replace(/^_/, '') || 'overview';

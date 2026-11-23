@@ -44,7 +44,7 @@ export const KINDS: Record<string, string> = {
   enrolment: 'QR de connexion', setting: 'réglage', admin: 'administration', approval: 'connexion',
 };
 
-const FIELD_WORDS: Record<Field, string> = { user: 'qui', kind: 'quoi', calendar: 'calendrier' };
+const FIELD_WORDS: Record<Field, string> = { user: 'qui', kind: 'type', calendar: 'calendrier' };
 
 const valueOf = (a: Activity, f: Field): string => (f === 'user' ? a.by : f === 'kind' ? a.kind : (a.calendar ?? ''));
 const labelOf = (f: Field, v: string): string => (f === 'kind' ? (KINDS[v] ?? v) : v === '' ? 'aucun' : v);
@@ -52,6 +52,101 @@ const labelOf = (f: Field, v: string): string => (f === 'kind' ? (KINDS[v] ?? v)
 /** What a row did, in words. */
 export function what(a: Activity): string {
   return `${KINDS[a.kind] ?? a.kind} · ${ACTIONS[a.action] ?? a.action}`;
+}
+
+/** What the columns show for one entry: every kind fills every column. */
+export interface Described {
+  who: string; // the actor, as shown: a user name, "administration", "console"
+  actor?: string; // a user name the log can narrow to
+  verb: string; // "a créé un événement"
+  subject: string; // what it is about: a calendar, a user, a group, a setting, a device
+  calendar?: string; // when the subject is a calendar: narrows the log
+  href?: string; // where the subject's page is
+  extra?: string; // a word more: the share's access, the setting's new value
+  source: string; // where it came from: a device, CalDAV, the web app, the console
+}
+
+const VIA: Record<string, string> = { caldav: 'CalDAV', dav: 'CalDAV', web: 'application web', app: "l'app agendouille", import: 'import', ics: 'lien .ics', cli: 'console', test: 'test' };
+const ACCESS_WORD: Record<string, string> = { read: 'lecture', readwrite: 'lecture et écriture' };
+
+const VERBS: Record<string, string> = {
+  'event created': 'a créé un événement', 'event changed': 'a modifié un événement', 'event deleted': 'a supprimé un événement',
+  'calendar created': 'a créé un calendrier', 'calendar deleted': 'a supprimé un calendrier', 'calendar transferred': 'a donné un calendrier',
+  'calendar changed': 'a modifié un calendrier',
+  'share shared': 'a partagé un calendrier', 'share unshared': 'a retiré un partage',
+  'user added': 'a ajouté un utilisateur', 'user changed': 'a modifié un utilisateur', 'user removed': 'a supprimé un utilisateur',
+  'user disabled': 'a désactivé un utilisateur', 'user enabled': 'a réactivé un utilisateur', 'user groups': 'a changé les groupes de',
+  'group added': 'a créé un groupe', 'group changed': 'a modifié un groupe', 'group removed': 'a supprimé un groupe',
+  'group member_added': 'a ajouté au groupe', 'group member_removed': 'a retiré du groupe',
+  'device revoked': 'a révoqué un appareil', 'enrolment made': 'a créé un QR de connexion pour',
+  'setting changed': 'a changé un réglage', 'admin password': "a changé le mot de passe d'administration",
+  'approval approved': 'a connecté un navigateur',
+};
+
+export function describe(a: Activity): Described {
+  const parts = (a.detail ?? '').split(' ');
+  const first = parts[0] ?? '';
+  const who = a.by === 'admin' ? 'administration' : a.by === 'cli' || a.by === '' ? 'console' : a.by;
+  const actor = a.by !== 'admin' && a.by !== 'cli' && a.by !== '' ? a.by : undefined;
+  let source: string;
+  if (a.kind === 'event') source = a.device ? `${a.device} · ${VIA[a.via ?? ''] ?? a.via ?? ''}` : (VIA[a.via ?? ''] ?? (a.via || 'console'));
+  else if (a.by === 'admin') source = "interface d'administration";
+  else if (a.by === 'cli' || a.by === '') source = 'ligne de commande';
+  else source = 'application web';
+  const d: Described = { who, actor, verb: VERBS[`${a.kind} ${a.action}`] ?? `${ACTIONS[a.action] ?? a.action}`, subject: '—', source };
+  const user = (n: string): void => {
+    d.subject = n;
+    d.href = `/users/${encodeURIComponent(n)}`;
+  };
+  switch (a.kind) {
+    case 'event':
+    case 'calendar':
+      d.subject = a.calendar || first || '—';
+      if (a.calendar) d.calendar = a.calendar;
+      if (a.action === 'transferred') d.extra = (a.detail ?? '').split(' -> ')[1] !== undefined ? `à ${(a.detail ?? '').split(' -> ')[1]}` : undefined;
+      break;
+    case 'share':
+      d.subject = a.calendar || '—';
+      if (a.calendar) d.calendar = a.calendar;
+      d.extra = `${first}${parts[1] ? ` · ${ACCESS_WORD[parts[1]] ?? parts[1]}` : ''}`;
+      break;
+    case 'user':
+      user(first);
+      if (a.action === 'groups') d.extra = parts[1] ? parts[1].split(',').join(', ') : 'aucun groupe';
+      break;
+    case 'enrolment':
+      user(first);
+      break;
+    case 'group':
+      d.subject = first;
+      d.href = `/groups/${encodeURIComponent(first)}`;
+      if (parts[1]) d.extra = parts[1];
+      break;
+    case 'device':
+      d.subject = `appareil n° ${first}`;
+      break;
+    case 'setting': {
+      d.subject = first;
+      d.href = '/settings';
+      const arrow = (a.detail ?? '').indexOf(' -> ');
+      if (arrow >= 0) d.extra = `→ ${(a.detail ?? '').slice(arrow + 4)}`;
+      break;
+    }
+    case 'admin':
+      d.subject = "mot de passe d'administration";
+      break;
+    case 'approval':
+      d.subject = browserOf(a.detail ?? '');
+      break;
+  }
+  return d;
+}
+
+/** A browser's name from its user agent, roughly. */
+function browserOf(ua: string): string {
+  const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'navigateur';
+  return os === '' ? b : `${b}, ${os}`;
 }
 
 /** Same day: the time; else the date and the time (claudication's sameDayStamp). */
@@ -80,11 +175,11 @@ export class ActivityLog {
     void this.load();
   };
 
-  /** scope: the page's own user, applied always and never shown as a filter. */
+  /** scope: the page's own user or calendar, applied always and never shown as a filter. */
   constructor(
     private readonly doc: Document,
     private readonly api: Api,
-    private readonly scope: { user?: string } = {},
+    private readonly scope: Partial<Record<Field, string>> = {},
   ) {
     this.filter = this.fromURL();
     this.doc.defaultView?.addEventListener('popstate', this.onPop);
@@ -100,13 +195,13 @@ export class ActivityLog {
     const f: Partial<Record<Field, string>> = {};
     for (const k of ['user', 'kind', 'calendar'] as const) {
       const v = q.get(k);
-      if (v !== null && v !== '' && !(k === 'user' && this.scope.user !== undefined)) f[k] = v;
+      if (v !== null && v !== '' && this.scope[k] === undefined) f[k] = v;
     }
     return f;
   }
 
   private query(before?: string): Record<string, string | undefined> {
-    return { ...this.filter, user: this.scope.user ?? this.filter.user, before };
+    return { ...this.filter, ...this.scope, before };
   }
 
   /** Narrows (or widens) the log, keeping the URL in step. */
@@ -173,10 +268,9 @@ export class ActivityLog {
     const head = h('tr', {},
       h('th', { class: TH, 'aria-sort': this.sort === 'desc' ? 'descending' : 'ascending' }, sortBtn),
       this.facetHead('Qui', 'user'),
-      this.facetHead('Quoi', 'kind'),
-      this.facetHead('Calendrier', 'calendar'),
-      h('th', { class: TH }, 'Par'),
-      h('th', { class: TH }, 'Détail'));
+      this.facetHead('Action', 'kind'),
+      this.facetHead('Sur', 'calendar'),
+      h('th', { class: TH }, 'Depuis'));
     const body = h('tbody', {}, ...rows.map((a) => this.row(a)));
     return h('div', { class: 'isolate max-h-[34rem] overflow-auto rounded-md3-l bg-surface-lowest ring-1 ring-outline-variant/60' },
       h('table', { class: 'w-full min-w-max text-sm [&>tbody>tr>td]:border-r [&>tbody>tr>td]:border-outline-variant/50 [&>tbody>tr>td:last-child]:border-r-0 [&>thead>tr>th]:border-r [&>thead>tr>th]:border-outline-variant/50 [&>thead>tr>th:last-child]:border-r-0' },
@@ -185,7 +279,7 @@ export class ActivityLog {
 
   /** A heading that opens the values its column holds. */
   private facetHead(label: string, field: Field): HTMLElement {
-    const scoped = field === 'user' && this.scope.user !== undefined;
+    const scoped = this.scope[field] !== undefined;
     if (scoped) return h('th', { class: TH }, label);
     const on = this.filter[field] !== undefined;
     const b = h('button', { type: 'button', 'aria-haspopup': 'menu',
@@ -253,7 +347,7 @@ export class ActivityLog {
   /** A value that narrows the log to itself; the click does not open the row. */
   private narrowing(field: Field, value: string, shown: string): Child {
     if (value === '') return '—';
-    if (field === 'user' && this.scope.user !== undefined) return shown;
+    if (this.scope[field] !== undefined) return shown;
     const b = h('button', { type: 'button', class: CELL_LINK, title: `Seulement ce ${FIELD_WORDS[field]}` }, shown);
     b.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -263,23 +357,33 @@ export class ActivityLog {
   }
 
   private row(a: Activity): HTMLElement {
+    const d = describe(a);
+    const subject: Node[] = [];
+    if (d.calendar !== undefined) subject.push(this.asNode(this.narrowing('calendar', d.calendar, d.subject)));
+    else if (d.href !== undefined) subject.push(h('a', { href: d.href, class: CELL_LINK }, d.subject));
+    else subject.push(document.createTextNode(d.subject));
+    if (d.extra !== undefined) subject.push(h('span', { class: 'ml-1.5 text-xs text-on-surface-variant' }, d.extra));
     const tr = h('tr', { class: 'cursor-pointer border-b border-outline-variant/50 last:border-0 hover:bg-surface-low' },
       h('td', { class: `${TD} whitespace-nowrap tabular-nums text-on-surface-variant`, title: a.at }, stamp(a.at)),
-      h('td', { class: TD }, this.narrowing('user', a.by, a.by || '—')),
-      h('td', { class: `${TD} whitespace-nowrap` }, this.narrowing('kind', a.kind, KINDS[a.kind] ?? a.kind), ` · ${ACTIONS[a.action] ?? a.action}`),
-      h('td', { class: `${TD} font-mono text-[12.5px]` }, this.narrowing('calendar', a.calendar ?? '', a.calendar ?? '')),
-      h('td', { class: `${TD} text-on-surface-variant` }, [a.via, a.device].filter((x) => x !== undefined && x !== '').join(' · ') || '—'),
-      h('td', { class: `${TD} max-w-[22rem] truncate text-on-surface-variant`, title: a.detail ?? '' }, a.detail || '—'));
+      h('td', { class: `${TD} whitespace-nowrap` }, d.actor !== undefined ? this.narrowing('user', d.actor, d.actor) : h('span', { class: 'italic text-on-surface-variant' }, d.who)),
+      h('td', { class: `${TD} whitespace-nowrap`, title: KINDS[a.kind] ?? a.kind }, d.verb),
+      h('td', { class: `${TD} max-w-[18rem] truncate` }, ...subject),
+      h('td', { class: `${TD} whitespace-nowrap text-on-surface-variant` }, d.source));
     tr.addEventListener('click', () => void this.open(a));
     return tr;
+  }
+
+  private asNode(c: Child): Node {
+    return typeof c === 'string' ? document.createTextNode(c) : (c as Node);
   }
 
   /** A row's whole record, in a dialog. */
   private async open(a: Activity): Promise<void> {
     const line = (k: string, v: string | undefined): Child[] => [h('dt', {}, k), h('dd', {}, v === undefined || v === '' ? '—' : v)];
-    await dialog(this.doc, what(a), [h('dl', { class: ui.kv },
-      ...line('Quand', when(a.at)), ...line('Qui', a.by), ...line('Quoi', what(a)), ...line('Calendrier', a.calendar),
-      ...line('Par', a.via), ...line('Appareil', a.device), ...line('Détail', a.detail))],
+    const d = describe(a);
+    await dialog(this.doc, `${d.who} ${d.verb}`, [h('dl', { class: ui.kv },
+      ...line('Quand', when(a.at)), ...line('Qui', d.who), ...line('Action', what(a)), ...line('Sur', d.extra !== undefined ? `${d.subject} (${d.extra})` : d.subject),
+      ...line('Depuis', d.source), ...line('Calendrier', a.calendar), ...line('Détail brut', a.detail))],
     [{ label: 'Fermer', value: '', kind: 'filled' }]);
   }
 

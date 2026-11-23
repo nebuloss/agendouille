@@ -14,6 +14,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/backup"
 	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/directory"
+	"github.com/nebuloss/agendouille/internal/hub"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/sharing"
 	"github.com/nebuloss/agendouille/internal/store"
@@ -46,6 +47,8 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("PATCH /api/admin/groups/{name}", h.patchGroup)
 	api("DELETE /api/admin/groups/{name}", h.deleteGroup)
 	api("GET /api/admin/calendars", h.calendars)
+	api("GET /api/admin/calendars/{ref}/stats", h.calendarStats)
+	api("PUT /api/admin/calendars/{ref}/shares/{target}", h.share)
 	api("DELETE /api/admin/calendars/{ref}/shares/{target}", h.unshare)
 	api("POST /api/admin/calendars/{ref}/transfer", h.transfer)
 	api("DELETE /api/admin/calendars/{ref}", h.deleteCalendar)
@@ -637,6 +640,67 @@ func (h *handlers) calendars(w http.ResponseWriter, r *http.Request) {
 	webx.JSON(w, http.StatusOK, map[string]any{"calendars": cs})
 }
 
+// calendarStats is one calendar's stats page: counts, times, who and from
+// what, never an event (calendar.AdminStats).
+func (h *handlers) calendarStats(w http.ResponseWriter, r *http.Request) {
+	st, err := h.d.Calendar.AdminStats(r.Context(), r.PathValue("ref"))
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	webx.JSON(w, http.StatusOK, st)
+}
+
+// share adds a member to a calendar, or changes their access: a user or a
+// group, read or readwrite. The admin manages who is in a calendar (the
+// user's call), so the owner's group visibility does not bound it; the
+// owner always has it, and is not a member.
+func (h *handlers) share(w http.ResponseWriter, r *http.Request) {
+	ref, err := calendar.ParseRef(r.PathValue("ref"))
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	t, err := sharing.ParseTarget(r.PathValue("target"))
+	if err != nil {
+		h.fail(w, validation{err.Error()})
+		return
+	}
+	var body struct {
+		Access string `json:"access"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	acc, err := sharing.ParseAccess(body.Access)
+	if err != nil {
+		h.fail(w, validation{err.Error()})
+		return
+	}
+	i, err := h.d.Calendar.Info(r.Context(), calendar.Operator("admin"), ref)
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	if err := h.d.Calendar.Sharing().ShareWith(r.Context(), "admin", i.OwnerID, false, i.ID, t, acc, store.Time(h.d.Clock())); err != nil {
+		if errors.Is(err, sharing.ErrNotFound) {
+			h.fail(w, err)
+			return
+		}
+		h.fail(w, validation{err.Error()})
+		return
+	}
+	h.accessChanged(i)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// accessChanged tells the open family pages that who sees what changed.
+func (h *handlers) accessChanged(i calendar.Info) {
+	if h.d.Hub != nil {
+		h.d.Hub.Publish(hub.Event{CalendarID: i.ID, Calendar: i.Ref.String(), Action: "access"})
+	}
+}
+
 func (h *handlers) unshare(w http.ResponseWriter, r *http.Request) {
 	ref, err := calendar.ParseRef(r.PathValue("ref"))
 	if err != nil {
@@ -657,6 +721,7 @@ func (h *handlers) unshare(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, err)
 		return
 	}
+	h.accessChanged(i)
 	w.WriteHeader(http.StatusNoContent)
 }
 

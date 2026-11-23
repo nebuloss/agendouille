@@ -37,18 +37,12 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.Handle("GET /users/{name}/{sub}", h.page(h.shell("user", "users", "")))
 	mux.Handle("GET /groups/{name}", h.page(h.shell("group", "groups", "")))
 	mux.Handle("GET /groups/{name}/{sub}", h.page(h.shell("group", "groups", "")))
-	// Calendars are under their owner now, as on claudication's pages: an
-	// old link lands on the users.
-	mux.Handle("GET /calendars", h.page(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/users", http.StatusSeeOther)
-	}))
+	mux.Handle("GET /calendars/{name}", h.page(h.shell("calendar", "calendars", "")))
+	mux.Handle("GET /calendars/{name}/{sub}", h.page(h.shell("calendar", "calendars", "")))
 	// Links from before (/admin, /admin/users/lea, a bookmark) land on the
 	// same page without the prefix.
 	legacy := func(w http.ResponseWriter, r *http.Request) {
 		to := "/" + r.PathValue("rest")
-		if to == "/calendars" {
-			to = "/users"
-		}
 		http.Redirect(w, r, to, http.StatusMovedPermanently)
 	}
 	mux.HandleFunc("GET /admin", legacy)
