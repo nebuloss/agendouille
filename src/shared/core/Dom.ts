@@ -17,6 +17,20 @@ export function isSafeUrl(url: string): boolean {
 }
 
 /**
+ * Whether a URL is an image in base64 that an <img> may show: the QR codes
+ * the server draws. An SVG shown by <img> runs no script, and the CSP
+ * allows data: for images only.
+ */
+export function isImageDataUrl(url: string): boolean {
+  return /^data:image\/(svg\+xml|png);base64,[A-Za-z0-9+/=]+$/.test(url);
+}
+
+/** An <img> source for an SVG the server drew (qr_svg in the API). */
+export function svgDataUrl(svg: string): string {
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+/**
  * Builds an element. Text goes in through text nodes only, so a string from
  * the network can never become markup. Event handler attributes, inline
  * styles and unsafe URLs throw: they are programming errors, not input.
@@ -43,7 +57,7 @@ export function setAttributes(element: Element, attrs: Readonly<Record<string, A
       continue;
     }
     const text = value === true ? '' : String(value);
-    if (URL_ATTRIBUTES.has(lower) && !isSafeUrl(text)) {
+    if (URL_ATTRIBUTES.has(lower) && !isSafeUrl(text) && !(lower === 'src' && element.tagName === 'IMG' && isImageDataUrl(text))) {
       throw new Error(`refusing ${name}=${JSON.stringify(text)}`);
     }
     element.setAttribute(name, text);

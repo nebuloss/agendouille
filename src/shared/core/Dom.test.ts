@@ -25,7 +25,12 @@ describe('h', () => {
 
   it('refuses script URLs', () => {
     expect(() => h('a', { href: 'javascript:alert(1)' })).toThrow();
-    expect(() => h('img', { src: 'data:image/png;base64,AA' })).toThrow();
+    // A base64 image may be an <img>'s source (the server's QR codes), and
+    // nothing else: not a link, not another type.
+    expect(h('img', { src: 'data:image/png;base64,AA' }).getAttribute('src')).toBe('data:image/png;base64,AA');
+    expect(() => h('a', { href: 'data:image/png;base64,AA' })).toThrow();
+    expect(() => h('img', { src: 'data:text/html;base64,PHNjcmlwdD4=' })).toThrow();
+    expect(() => h('img', { src: 'data:image/svg+xml,<svg onload=alert(1)>' })).toThrow();
     expect(h('a', { href: '/projects/lab/c/dut1' }).getAttribute('href')).toBe('/projects/lab/c/dut1');
   });
 });

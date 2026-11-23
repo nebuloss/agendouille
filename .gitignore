@@ -30,3 +30,6 @@ android/local.properties
 
 # Claude Code worktrees and local settings.
 .claude/
+
+# The screenshot script links puppeteer from dev-build.
+scripts/shots/node_modules

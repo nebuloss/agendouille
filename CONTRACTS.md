@@ -161,8 +161,13 @@ func (s *Service) Prune(ctx) (int64, error)
 func Token(base string, i Info) string
 func ParseToken(base string, i Info, token string) (int64, error)
 
-// Not built yet: Move (M4), and the admin's metadata calls AdminCalendars
-// and AdminActivity (M3).
+// The admin's metadata calls (internal/web/admin may call only these):
+func (s *Service) AdminCalendars(ctx, owner string) ([]CalendarMeta, error) // "" for all
+func (s *Service) AdminSharedWith(ctx, userID int64) ([]SharedWith, error)
+func (s *Service) AdminActivity(ctx, f ActivityFilter) ([]Activity, error)  // never a summary
+func (s *Service) AdminCounts(ctx) (Counts, error)
+
+// Not built yet: Move (M4).
 ```
 
 Only `Create`, `Update`, `DeleteCalendar`, `Transfer`, `Put`, `Delete`,
@@ -403,24 +408,30 @@ reaches a server log; the approve page reads it from `location.hash`.
 
 ### 3.5 Admin API (`/api/admin`)
 
+As built in M3. Every write needs the `agd_admin` session and same-origin;
+errors are 3.1's, with messages in French for the UI to show as they are.
+
 | Method | Path | Body / answer |
 |---|---|---|
-| GET | `/overview` | counts, stale devices, storage, last backup, version, warnings |
-| GET, POST | `/users` | list ; create `{name, display_name, color, groups}` -> user + an enrolment |
-| GET, PATCH | `/users/{name}` | detail (3.5.1) ; `display_name`, `color`, `groups`, `disabled` |
-| POST | `/users/{name}/remove` | `{"calendars": {"<ref>": {"transfer_to": "<user>"} or {"delete": true}}}` |
-| POST, DELETE | `/users/{name}/enrolments[/{id}]` | make (`{url, qr_svg, expires_at}`) ; revoke |
-| DELETE | `/users/{name}/devices/{id}`, `/users/{name}/sessions/{id}`, `/users/{name}/links/{id}` | revoke |
-| GET, POST | `/groups` | list ; create `{name, display_name, color}` |
-| PATCH, DELETE | `/groups/{name}` | rename/recolour ; delete (`?confirm=1` when shares use it) |
-| GET | `/calendars` | every calendar: ref, owner, name, colour, events, bytes, shares. **No events** |
+| GET | `/overview` | `users`, `groups`, `calendars`, `events`, `devices`, `stale_devices`, `storage` {database, backups}, `last_backup`, `version`, `public_url`, `warnings` [{code, message}] |
+| GET | `/system` | `version`, `data_dir`, `listeners` [{surfaces, listen, public_url, bound, error, from}] |
+| GET, POST | `/users` | list ; create `{name, display_name, color, groups, enrol}` -> `{user, enrolment?}` (201) |
+| GET, PATCH | `/users/{name}` | 3.5.1 ; `{display_name?, color?, groups?, disabled?}` -> 3.5.1 |
+| POST | `/users/{name}/remove` | `{"calendars": {"<ref>": {"transfer_to": "<user>"} or {"delete": true}}}` -> 204; 409 `owns_calendars` with `calendars` when one is missing |
+| POST | `/users/{name}/enrolments` | -> `{id, url, qr_svg, created_at, expires_at}` (201); 400 without `public_url` |
+| DELETE | `/users/{name}/enrolments/{id}`, `/users/{name}/devices/{id}`, `/users/{name}/sessions/{id}` | revoke -> 204 |
+| GET, POST | `/groups` | list with `members` and `shares` ; create `{name, display_name, color}` |
+| PATCH | `/groups/{name}` | `{display_name?, color?, members?}` (members: the exact list) -> 204 |
+| DELETE | `/groups/{name}` | 409 `has_shares` unless `?confirm=1` |
+| GET | `/calendars` | `?owner=`; every calendar: `ref`, `owner`, `name`, `color`, `timezone`, `events`, `bytes`, `shares`. **No events** |
 | DELETE | `/calendars/{ref}/shares/{target}` | remove a share |
-| POST | `/calendars/{ref}/transfer` ; DELETE `/calendars/{ref}?confirm=<name>` | |
-| GET | `/activity?user=&calendar=&kind=&before=` | 3.5.2, 100 per page |
-| GET, PATCH | `/settings` | every setting with its value, default and group ; change some |
-| GET, POST | `/backups` | list ; make one now |
+| POST | `/calendars/{ref}/transfer` | `{to, keep}` -> `{ref}` |
+| DELETE | `/calendars/{ref}?confirm=<name>` | the calendar's display name, typed |
+| GET | `/activity?user=&calendar=&kind=&before=` | 3.5.2, 100 per page, newest first; `before` is the last line's `at` |
+| GET, PATCH | `/settings` | `[{key, group, type, default, value}]` ; `{"<key>": <JSON value>, ...}` applied together -> the list |
+| GET, POST | `/backups` | `[{name, size, made, before_restore}]` ; make one now (201) |
 | GET | `/backups/{file}` | download |
-| POST | `/backups/{file}/restore` | `{"confirm": "<file>"}` |
+| POST | `/backups/{file}/restore` | `{"confirm": "<file>"}` -> 202 `{status: "restarting"}`; the server restarts on it (PLAN 13.6) |
 
 #### 3.5.1 User (admin view)
 

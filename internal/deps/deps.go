@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/backup"
 	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/directory"
@@ -24,8 +25,15 @@ type Deps struct {
 	Directory *directory.Service
 	Auth      *auth.Service
 	Calendar  *calendar.Service
+	Backup    *backup.Service
 	Clock     func() time.Time
 	Version   string
+	// PublicStatus is the public listener's bound address ("" when down)
+	// and the error of its last start ("" when none).
+	PublicStatus func() (addr, err string)
+	// Restart stops the server so its supervisor starts it again (a staged
+	// restore is applied then). nil in tests that do not restart.
+	Restart func(reason string)
 }
 
 // Trusted is the trusted_proxies setting, now.

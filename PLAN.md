@@ -668,8 +668,9 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 - Plain TypeScript classes on the DOM, no framework. **No HTML sinks** in
   `src/` (cafard's `scripts/check-sinks.sh` in CI): titles come from every
   family member's phone.
-- Go serves an HTML shell per page; the bundle renders the rest. Sign-in
-  and the admin's forms work without the bundle.
+- Go serves an HTML shell per page; the bundle renders the rest. The
+  sign-in, enrolment and approval pages work without the bundle; the admin
+  UI's pages beyond its sign-in need it (DECISIONS 2026-11-23, M3 notes).
 - The family web app is **phone first** (it is also the Android app's UI).
   The admin UI is desktop first.
 
@@ -910,12 +911,14 @@ cafard's `install.sh`, hardened systemd unit, OpenRC, LXC drop-in, renamed;
 
 ### 13.6 Backups
 
-`serve` writes `VACUUM INTO data_dir/backups/agendouille-YYYY-MM-DD.db` on
+`serve` writes `VACUUM INTO data_dir/backups/agendouille-<UTC time>.db` on
 `backup_schedule` and keeps `backup_keep`. The admin UI lists, downloads and
-makes backups, and **restores** one: the server stops serving writes,
-swaps the database file, reopens it and resumes (a copy of the current one
-is kept as `before-restore-<time>.db`). `agendouille restore` does the same
-with the server stopped.
+makes backups, and **restores** one: it checks the file (SQLite's
+integrity check), stages it as `restore-pending.db`, and the server exits
+with code 75; the service manager starts it again (`Restart=on-failure`),
+and the start puts the staged file in place before opening the database,
+keeping the old one as `backups/before-restore-<time>.db`. `agendouille
+restore <file>` does the same at once with the server stopped.
 
 ### 13.7 `scripts/devdeploy.sh`
 

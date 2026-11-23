@@ -1,5 +1,4 @@
 <h1>Bienvenue</h1>
-{{with .Data}}
 {{if .Error}}
 <p role="alert">{{.Error}}</p>
 <p>Demandez un nouveau lien à la personne qui gère agendouille.</p>
@@ -8,5 +7,4 @@
 <form method="post" action="/enrol/{{.Token}}">
   <button type="submit">Continuer</button>
 </form>
-{{end}}
 {{end}}

@@ -1,5 +1,4 @@
 <h1>Approuver une connexion</h1>
-{{with .Data}}
 {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
 {{if .Done}}
 <p>C'est fait : l'autre appareil est connecté.</p>
@@ -20,5 +19,4 @@
   </label>
   <button type="submit">Suivant</button>
 </form>
-{{end}}
 {{end}}

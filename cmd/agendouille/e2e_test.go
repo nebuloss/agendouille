@@ -194,6 +194,11 @@ func TestM1(t *testing.T) {
 		t.Errorf("a cross-site sign-out: %d, want 403", a.status)
 	}
 
+	// --- every form page shows its form (an empty page once passed this test)
+	if a := x.do("GET", x.admin+"/admin/signin", nil, nil); !strings.Contains(a.body, `name="password"`) {
+		t.Errorf("the admin sign-in page has no password field:\n%s", a.body)
+	}
+
 	// --- setting public_listen starts the public listener without a restart
 	x.publicOn()
 	if a := x.do("GET", x.public+"/healthz", nil, nil); a.status != 200 {
@@ -234,6 +239,12 @@ func TestM1(t *testing.T) {
 	}
 	if a := x.do("POST", link, nil, nil); a.status != http.StatusGone {
 		t.Errorf("using the link again: %d, want 410", a.status)
+	}
+	if a := x.do("GET", x.public+"/approve", nil, cookie(auth.AppCookie, leaPhone)); !strings.Contains(a.body, `name="code"`) {
+		t.Errorf("the approve page has no code field:\n%s", a.body)
+	}
+	if a := x.do("GET", link, nil, nil); !strings.Contains(a.body, `action="/enrol/`) {
+		t.Errorf("the enrolment page has no button:\n%s", a.body)
 	}
 	if a := x.do("GET", x.public+"/", nil, cookie(auth.AppCookie, leaPhone)); a.status != 200 || !strings.Contains(a.body, "Léa") {
 		t.Errorf("home signed in: %d", a.status)

@@ -43,8 +43,18 @@ M0 and M1 are done. What exists:
   `export`. Tests: `caldav_e2e_test.go` (M2's "done when" with raw CalDAV
   requests) and `clients_test.go` (replays `internal/dav/testdata/clients`).
 
-Next is M3, the admin UI (PLAN section 15). M2's by-hand checks with real
-DAVx5, iOS and Thunderbird are still to do.
+- **M3, the admin UI:** `internal/web/admin/api.go` (CONTRACTS 3.5),
+  `internal/backup` (scheduled `VACUUM INTO`, list, download, restore by
+  staging and restarting), the admin bundle (`src/admin/pages`: Overview,
+  Users and User, Groups, Calendars, Activity, Settings, Backups), the
+  shared stylesheet (`static/shared/app.css`), `src/shared/core/Api.ts`,
+  `src/shared/components/Ui.ts`. CLI: `backup`, `restore`. Tests:
+  `admin_e2e_test.go` (M3's "done when", the privacy walk over every
+  `/api/admin` answer, a real restore). `scripts/shots/run.sh` takes
+  screenshots of the admin UI on dev-build.
+
+Next is M4, the family web app (PLAN section 15). M2's by-hand checks with
+real DAVx5, iOS and Thunderbird are still to do.
 
 ## Conventions come from cafard and claudication
 
@@ -122,5 +132,14 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **The remote tree is rsynced with `--delete`:** a `go get` or `npm
   install` run there is undone by the next `scripts/remote.sh` unless
   `go.mod`/`go.sum`/`package-lock.json` are copied back with `scp` first.
+- **A page template's dot is its Data**, not the `webx.Page`: never wrap a
+  page in `{{with .Data}}` (an empty map is false and the page vanished;
+  it happened to the admin sign-in).
+- **A restore restarts the server** (`ErrRestart`, exit 75): the service
+  must run under `Restart=on-failure` or a supervisor, which `deploy/`
+  sets up (M5).
+- **Screenshots before saying a page works:** `scripts/remote.sh 'bash
+  scripts/shots/run.sh'`, then look at them. Happy-dom tests do not catch
+  layout.
 - **Templates and static files live under `internal/web/assets/`**:
   `go:embed` cannot reach a parent directory.

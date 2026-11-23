@@ -1,0 +1,21 @@
+<div class="admin">
+<header class="topbar admin-bar">
+  <a class="brand" href="/admin">agendouille · administration</a>
+  <form method="post" action="/admin/signout"><button class="btn text" type="submit">Se déconnecter</button></form>
+</header>
+<nav class="sidenav" aria-label="Administration">
+  <a href="/admin" {{if eq .Page "overview"}}aria-current="page"{{end}}>Vue d'ensemble</a>
+  <a href="/admin/users" {{if or (eq .Page "users") (eq .Page "user")}}aria-current="page"{{end}}>Utilisateurs</a>
+  <a href="/admin/groups" {{if eq .Page "groups"}}aria-current="page"{{end}}>Groupes</a>
+  <a href="/admin/calendars" {{if eq .Page "calendars"}}aria-current="page"{{end}}>Calendriers</a>
+  <a href="/admin/activity" {{if eq .Page "activity"}}aria-current="page"{{end}}>Activité</a>
+  <a href="/admin/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>Réglages</a>
+  <a href="/admin/backups" {{if eq .Page "backups"}}aria-current="page"{{end}}>Sauvegardes</a>
+</nav>
+<section class="content" id="admin-content" data-name="{{.Name}}">
+  <h1>{{.Title}}</h1>
+  <noscript><p class="banner error">L'interface d'administration a besoin de JavaScript.</p></noscript>
+  <p class="loading" id="admin-loading">Chargement…</p>
+</section>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+</div>

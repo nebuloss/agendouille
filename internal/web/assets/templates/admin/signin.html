@@ -1,5 +1,4 @@
 <h1>Administration</h1>
-{{with .Data}}
 {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
 <form method="post" action="/admin/signin">
   <label>Mot de passe administrateur
@@ -7,4 +6,3 @@
   </label>
   <button type="submit">Se connecter</button>
 </form>
-{{end}}

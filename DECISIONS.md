@@ -3,6 +3,61 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M3 notes, and the fixes of the M2 review
+
+**An independent review of M2** (a separate agent reading the code cold)
+found nine defects; all are fixed, each with a test:
+
+- **Critical, one PUT could take the server down.** An `INTERVAL` of 2^55
+  overflowed to a step of zero and looped forever; repeated `BYHOUR` and
+  `BYMINUTE` values multiplied into billions of instances. `INTERVAL` is
+  now at most 1000, `COUNT` at most 100 000, BY lists are deduplicated,
+  and a rule whose BY parts allow more than 50 000 instances in one period
+  is refused as invalid data.
+- **Expansion is budgeted by periods**, skips whole days and hours a
+  sub-daily rule rules out, and starts near the asked range when the rule
+  has no COUNT: an hourly event made twelve years ago has instances today,
+  and `FREQ=SECONDLY;BYHOUR=9` no longer stops after its first day.
+- **Quadratic work on hostile text** (thousands of continuation lines, an
+  XML body of many small chunks, a TZID of a hundred thousand segments)
+  is linear now; TZIDs are capped at 128 characters and cached.
+- **The write path re-checks access inside its transaction**
+  (`calendar.recheck`, `sharing.AccessTx`), as PLAN 4.3 said: a share
+  removed, or a calendar deleted, between the check and the write no
+  longer lets the write through.
+- **PROPPATCH** refuses a read-only device, answers 403/424 for what it
+  does not set (a sharee's description, an owner removing the name) rather
+  than 200, and the owner can set the calendar's zone with
+  `calendar-timezone`.
+- **Index times are clamped to the year 9999** (they are stored as text);
+  durations over a century are invalid.
+- **A request at the bare-slug URL gets hrefs under it**, so a client that
+  insists on the URL it MKCALENDARed at finds its objects.
+
+**M3:**
+
+- **The admin UI needs JavaScript** beyond its sign-in (PLAN said its forms
+  would work without the bundle). It is used by one person, on the LAN,
+  from a recent browser; one code path (the JSON API the bundle calls) is
+  worth more than server-rendered duplicates of eight pages.
+- **A restore restarts the server** instead of swapping the database
+  while it runs: every service holds the open handle, and a swap under
+  them is a class of bugs for a feature used once a year. The backup is
+  checked (`PRAGMA integrity_check`) and staged; the server exits with 75;
+  systemd's `Restart=on-failure` (cafard's unit) starts it again, and the
+  start applies the staged file before opening anything.
+- **Backup files are named by UTC time to the second**, not by day:
+  `VACUUM INTO` refuses an existing file, and "back up now" may run twice
+  a day. Backups kept from before a restore are never pruned.
+- **Admin answers are in French**, the UI's language; the API's own error
+  codes stay English.
+- **Found by looking at screenshots, not by tests:** the admin sign-in
+  page rendered no form at all (an empty `map` is false in
+  `{{with .Data}}`), and so did `/approve`. Page templates now get their
+  data as their dot, and a test checks each form page has its form.
+- **The QR SVG draws runs of modules** as one rectangle each, a fifth of
+  the size.
+
 ## 2026-11-23: M2 notes
 
 - **No iCalendar or recurrence library** (the user: "i am not sure it is

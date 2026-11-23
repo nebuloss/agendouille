@@ -93,6 +93,28 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	return s, nil
 }
 
+// OpenReadOnly opens a database file without writing to it or migrating
+// it: for checking a backup before it is restored.
+func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
+	if strings.ContainsAny(path, "?#") {
+		return nil, fmt.Errorf("database path %q must not contain ? or #", path)
+	}
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return nil, err
+	}
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, err
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("not an agendouille database: %w", err)
+	}
+	return &Store{db: db, path: path}, nil
+}
+
 // tightenModes sets 0600 on the database and its WAL files. SQLite creates
 // them with the process umask.
 func (s *Store) tightenModes() error {

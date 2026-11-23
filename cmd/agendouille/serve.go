@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/backup"
 	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/dav"
@@ -62,6 +64,13 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintln(w, "ok "+version)
 }
 
+// noFavicon answers the browsers' favicon request with nothing, rather than
+// a 404 in every console (an icon comes with the web app's manifest, M4).
+func noFavicon(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Cache-Control", "max-age=86400")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // services is everything that reads and writes the database.
 type services struct {
 	store    *store.Store
@@ -73,6 +82,13 @@ type services struct {
 }
 
 func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
+	// A restore staged by the admin UI is put in place before anything
+	// opens the database.
+	if kept, err := backup.ApplyPending(cfg.DataDir, time.Now()); err != nil {
+		return nil, fmt.Errorf("applying the staged restore: %w", err)
+	} else if kept != "" {
+		slog.Info("restored a backup; the database before it is kept", "as", kept)
+	}
 	st, err := store.OpenDir(ctx, cfg.DataDir)
 	if err != nil {
 		return nil, err
@@ -94,12 +110,14 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 func muxes(d *deps.Deps) (public, adminMux http.Handler, err error) {
 	pub := http.NewServeMux()
 	pub.HandleFunc("GET /healthz", healthz)
+	pub.HandleFunc("GET /favicon.ico", noFavicon)
 	dav.Register(pub, d)
 	if err := app.Register(pub, d); err != nil {
 		return nil, nil, err
 	}
 	adm := http.NewServeMux()
 	adm.HandleFunc("GET /healthz", healthz)
+	adm.HandleFunc("GET /favicon.ico", noFavicon)
 	if err := admin.Register(adm, d); err != nil {
 		return nil, nil, err
 	}
@@ -124,6 +142,10 @@ func prune(ctx context.Context, cal *calendar.Service, log *slog.Logger) {
 	}
 }
 
+// ErrRestart is what serve returns when the admin UI asked for a restart
+// (a restore): main exits with a code the service manager restarts on.
+var ErrRestart = errors.New("restart requested")
+
 // serve runs the server until ctx is cancelled, then shuts it down within
 // surface.DrainTimeout. ready, when set, gets the running listeners.
 func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func(*surface.Server)) error {
@@ -140,13 +162,32 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 		return errors.New("no admin password is set: run `agendouille admin passwd` first (install.sh does it with --random)")
 	}
 
+	restart := make(chan string, 1)
+	var pubMu sync.Mutex
+	pubErr := ""
+	bk := backup.New(svc.store.DB(), cfg.DataDir, svc.settings, time.Now, log)
 	d := &deps.Deps{Config: cfg, Settings: svc.settings, Log: log, Store: svc.store, Directory: svc.dir, Auth: svc.auth,
-		Calendar: svc.calendar, Clock: time.Now, Version: version}
+		Calendar: svc.calendar, Backup: bk, Clock: time.Now, Version: version,
+		Restart: func(reason string) {
+			select {
+			case restart <- reason:
+			default:
+			}
+		}}
 	public, adminHandler, err := muxes(d)
 	if err != nil {
 		return err
 	}
 	srv := surface.New(ctx, log, public)
+	d.PublicStatus = func() (string, string) {
+		pubMu.Lock()
+		defer pubMu.Unlock()
+		addr := ""
+		if a := srv.PublicAddr(); a != nil {
+			addr = a.String()
+		}
+		return addr, pubErr
+	}
 	if _, err := srv.StartAdmin(cfg.AdminListen, adminHandler); err != nil {
 		return err
 	}
@@ -156,7 +197,14 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	// The public listener follows the public_listen setting from now on.
 	// A failure to bind is logged and leaves the admin UI up to fix it.
 	apply := func(address string) {
-		if err := srv.ApplyPublic(address); err != nil {
+		err := srv.ApplyPublic(address)
+		pubMu.Lock()
+		pubErr = ""
+		if err != nil {
+			pubErr = err.Error()
+		}
+		pubMu.Unlock()
+		if err != nil {
 			log.Error("public listener", "err", err)
 		}
 	}
@@ -174,6 +222,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	defer stopWatch()
 	go svc.settings.Watch(watchCtx, settingsPoll, func(err error) { log.Error("reloading settings", "err", err) })
 	go prune(watchCtx, svc.calendar, log)
+	go bk.Run(watchCtx)
 
 	if ready != nil {
 		ready(srv)
@@ -182,6 +231,9 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	select {
 	case runErr = <-srv.Errors():
 	case <-ctx.Done():
+	case reason := <-restart:
+		log.Info("restarting", "why", reason)
+		runErr = ErrRestart
 	}
 	log.Info("shutting down")
 	stopWatch()

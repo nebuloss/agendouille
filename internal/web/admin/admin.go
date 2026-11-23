@@ -28,8 +28,29 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.HandleFunc("GET /admin/signin", h.signinPage)
 	mux.Handle("POST /admin/signin", guard(http.HandlerFunc(h.signin)))
 	mux.Handle("POST /admin/signout", guard(http.HandlerFunc(h.signout)))
-	mux.Handle("GET /admin", h.page(h.home))
+	mux.Handle("GET /admin", h.page(h.shell("overview", "Vue d'ensemble")))
+	for path, page := range map[string][2]string{
+		"GET /admin/users":        {"users", "Utilisateurs"},
+		"GET /admin/users/{name}": {"user", "Utilisateur"},
+		"GET /admin/groups":       {"groups", "Groupes"},
+		"GET /admin/calendars":    {"calendars", "Calendriers"},
+		"GET /admin/activity":     {"activity", "Activité"},
+		"GET /admin/settings":     {"settings", "Réglages"},
+		"GET /admin/backups":      {"backups", "Sauvegardes"},
+	} {
+		mux.Handle(path, h.page(h.shell(page[0], page[1])))
+	}
+	h.registerAPI(mux, guard)
 	return nil
+}
+
+// shell is a page of the admin UI: the layout, the navigation, and a
+// mount point the admin bundle fills from /api/admin (PLAN.md 9.4).
+func (h *handlers) shell(page, title string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		webx.Render(w, h.d.Log, http.StatusOK, "admin/shell.html", webx.Page{Title: title, Page: page, Bundle: assets.Admin,
+			Data: map[string]any{"Page": page, "Title": title, "Name": r.PathValue("name")}})
+	}
 }
 
 func (h *handlers) secure() bool { return webx.Secure(h.d.Config.AdminURL()) }
@@ -74,19 +95,4 @@ func (h *handlers) signout(w http.ResponseWriter, r *http.Request) {
 	h.d.Auth.SignOut(r, auth.SurfaceAdmin)
 	auth.ClearCookie(w, auth.SurfaceAdmin, h.secure())
 	http.Redirect(w, r, "/admin/signin", http.StatusSeeOther)
-}
-
-func (h *handlers) home(w http.ResponseWriter, r *http.Request) {
-	users, err := h.d.Directory.Users(r.Context())
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	groups, err := h.d.Directory.Groups(r.Context())
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	h.render(w, http.StatusOK, "admin/home.html", "home", map[string]any{"Users": len(users), "Groups": len(groups),
-		"PublicURL": h.d.PublicURL()})
 }

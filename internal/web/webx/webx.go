@@ -53,7 +53,9 @@ func Render(w http.ResponseWriter, log *slog.Logger, status int, name string, p 
 		t, err = t.Clone()
 	}
 	if err == nil {
-		_, err = t.New("content-holder").Parse(`{{define "content"}}{{template "` + name + `" .}}{{end}}`)
+		// The page template gets Data as its dot, so it never needs a
+		// {{with .Data}}: an empty map is false there, and the page vanished.
+		_, err = t.New("content-holder").Parse(`{{define "content"}}{{template "` + name + `" .Data}}{{end}}`)
 	}
 	var buf bytes.Buffer
 	if err == nil {

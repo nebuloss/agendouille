@@ -1,5 +1,4 @@
 <h1>Se connecter</h1>
-{{with .Data}}
 {{if .Error}}<p role="alert">{{.Error}}</p>{{end}}
 {{if .Approval}}
 <p>Sur un appareil déjà connecté (votre téléphone, dans l'application agendouille), touchez
@@ -14,5 +13,4 @@ ci-dessous.</p>
   <button type="submit">C'est approuvé, continuer</button>
 </form>
 <p><a href="/signin">Nouveau code</a></p>
-{{end}}
 {{end}}

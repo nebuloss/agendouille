@@ -30,6 +30,8 @@ Commands:
   calendar  add, list, share, unshare, transfer, delete
   device    add (a sync credential, with DAVx5's QR), list, revoke
   import    import an .ics file into a calendar
+  backup    make a backup of the database now
+  restore   put a backup in place of the database (server stopped)
   export    write a calendar as one .ics
   version   print the version
 
@@ -49,6 +51,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	err := run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr, os.Getenv)
 	stop()
+	if errors.Is(err, ErrRestart) {
+		// EX_TEMPFAIL: systemd's Restart=on-failure and OpenRC's supervisor
+		// start the server again, which applies the staged restore.
+		os.Exit(75)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "agendouille: "+err.Error())
 		os.Exit(1)
@@ -74,6 +81,8 @@ var commands = map[string]command{
 	"device":   cmdDevice,
 	"import":   cmdImport,
 	"export":   cmdExport,
+	"backup":   cmdBackup,
+	"restore":  cmdRestore,
 	"version":  cmdVersion,
 }
 

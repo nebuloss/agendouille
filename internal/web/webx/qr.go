@@ -20,11 +20,19 @@ func QRSVG(text string) (string, error) {
 	const quiet = 4
 	n := code.Size
 	var path strings.Builder
+	// One rectangle per horizontal run of black modules.
 	for y := range n {
-		for x := range n {
-			if code.Black(x, y) {
-				fmt.Fprintf(&path, "M%d %dh1v1h-1z", x+quiet, y+quiet)
+		for x := 0; x < n; {
+			if !code.Black(x, y) {
+				x++
+				continue
 			}
+			run := 1
+			for x+run < n && code.Black(x+run, y) {
+				run++
+			}
+			fmt.Fprintf(&path, "M%d %dh%dv1h-%dz", x+quiet, y+quiet, run, run)
+			x += run
 		}
 	}
 	side := n + 2*quiet
