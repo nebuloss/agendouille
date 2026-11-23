@@ -1,0 +1,27 @@
+# The database holds the family's calendar. It never belongs in the
+# repository.
+*.db
+*.db-wal
+*.db-shm
+/data/
+
+# The local configuration may hold addresses.
+/agendouille.yaml
+
+# Binaries.
+/agendouille
+/agendouille-*
+
+# The compiled frontend. Built by `npm run build` and embedded by Go. The
+# README.txt is committed because embed needs the directory to be non-empty.
+internal/web/assets/static/app/*
+!internal/web/assets/static/app/README.txt
+
+node_modules/
+
+# Android (M7, if ever).
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.keystore
