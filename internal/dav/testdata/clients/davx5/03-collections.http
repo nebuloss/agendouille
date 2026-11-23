@@ -1,0 +1,6 @@
+PROPFIND /dav/calendars/lea/
+Depth: 1
+User-Agent: DAVx5/4.5-ose (dav4jvm; okhttp/4.12.0) Android/15
+Content-Type: application/xml; charset=utf-8
+
+<?xml version='1.0' encoding='UTF-8' ?><propfind xmlns="DAV:" xmlns:CAL="urn:ietf:params:xml:ns:caldav" xmlns:CS="http://calendarserver.org/ns/" xmlns:ICAL="http://apple.com/ns/ical/"><prop><resourcetype /><displayname /><owner /><current-user-privilege-set /><ICAL:calendar-color /><CAL:calendar-description /><CAL:calendar-timezone /><CAL:supported-calendar-component-set /><CS:source /><CS:getctag /><sync-token /><supported-report-set /><CS:push-transports /><CS:pushkey /></prop></propfind>

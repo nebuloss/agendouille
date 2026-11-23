@@ -45,7 +45,7 @@ between its parts**:
 | `internal/directory` | users, groups, membership, `Sees(a, b)` | store |
 | `internal/sharing` | ownership, shares, hidden flags, `Access(user, cal)` | store, directory |
 | `internal/auth` | admin password and sessions, app sessions, enrolment links, approvals, devices, subscription links, Basic auth, client IP, same-origin | store, directory, settings |
-| `internal/ical` | parse, validate, index, expand, patch (pure) | go-ical, rrule-go |
+| `internal/ical` | parse, encode, validate, index, RRULE, expand (pure, in-house) | — |
 | `internal/calendar` | calendars and objects: the one write path (1.3), changes, tokens, quotas, import/export | store, ical, hub, sharing, settings |
 | `internal/hub` | in-process fan-out of `calendar.Change` and access events | — |
 | `internal/surface` | `Surface` (`dav`, `app`, `admin`), listeners, per-surface muxes, live rebinding, each surface's public URL | config, settings |
@@ -136,28 +136,33 @@ var (
     ErrTokenExpired    = errors.New("sync token expired")       // 403 valid-sync-token
 )
 
-// Calendars
-func (s *Service) Home(ctx, a Actor) ([]CalendarInfo, error)              // what the actor may read, hidden ones left out
-func (s *Service) Info(ctx, a Actor, c Ref) (CalendarInfo, error)
-func (s *Service) Create(ctx, a Actor, slug string, p CalendarProps) (CalendarInfo, error)
-func (s *Service) Update(ctx, a Actor, c Ref, p CalendarProps) (CalendarInfo, error) // owner: for all; sharee: own view
-func (s *Service) DeleteCalendar(ctx, a Actor, c Ref) error              // owner (or admin)
-func (s *Service) Transfer(ctx, a Actor, c Ref, to string) (Ref, error)  // owner (or admin)
+// Calendars. a.UserID 0 is the operator (CLI, admin metadata).
+func (s *Service) Home(ctx, a Actor, withHidden bool) ([]Info, error)       // what the actor may read
+func (s *Service) Info(ctx, a Actor, r Ref) (Info, error)                   // ErrNotFound without read access
+func (s *Service) Create(ctx, a Actor, owner, slug string, p Props) (Info, error)
+func (s *Service) Update(ctx, a Actor, r Ref, p Props) (Info, error)        // owner: for all; sharee: own view
+func (s *Service) DeleteCalendar(ctx, a Actor, r Ref) error                 // owner or operator
+func (s *Service) Transfer(ctx, a Actor, r Ref, to string, keep bool) (Info, error)
+func (s *Service) Owned(ctx, userID int64) ([]Info, error)
 
 // Objects
-func (s *Service) Get(ctx, a Actor, c Ref, name string) (*Object, error)
-func (s *Service) List(ctx, a Actor, c Ref) ([]Object, error)            // Name and ETag only
-func (s *Service) GetMany(ctx, a Actor, c Ref, names []string) ([]Object, error)
-func (s *Service) Range(ctx, a Actor, cals []Ref, from, to time.Time) ([]Object, error)
-func (s *Service) ChangesSince(ctx, a Actor, c Ref, seq int64, limit int) ([]Change, int64, error)
-func (s *Service) Put(ctx, a Actor, c Ref, name string, data []byte, p Precondition) (*Object, bool, error)
-func (s *Service) Delete(ctx, a Actor, c Ref, name string, p Precondition) error
-func (s *Service) Move(ctx, a Actor, from Ref, name string, to Ref, p Precondition) (*Object, error)
-func (s *Service) Import(ctx, a Actor, c Ref, r io.Reader, replace bool) (ImportResult, error)
+func (s *Service) Get(ctx, a Actor, r Ref, name string) (Info, Object, error)
+func (s *Service) List(ctx, i Info) ([]Object, error)
+func (s *Service) GetMany(ctx, i Info, names []string) (map[string]Object, error)
+func (s *Service) Range(ctx, i Info, from, to time.Time) ([]Object, error)  // index, then expansion
+func (s *Service) ChangesSince(ctx, i Info, seq int64, limit int) (Changes, error)
+func (s *Service) Put(ctx, a Actor, r Ref, name string, data []byte, p Precondition) (Object, bool, error)
+func (s *Service) Delete(ctx, a Actor, r Ref, name string, p Precondition) error
+func (s *Service) Import(ctx, a Actor, r Ref, data []byte, replace bool) (ImportResult, error)
+func (s *Service) Export(ctx, a Actor, r Ref) ([]byte, error)
+func (s *Service) Prune(ctx) (int64, error)
 
-// Metadata (the only calls internal/web/admin may make)
-func (s *Service) AdminCalendars(ctx) ([]CalendarMeta, error)   // owner, name, counts, size, shares
-func (s *Service) AdminActivity(ctx, f ActivityFilter) ([]ChangeMeta, error) // Summary stripped
+// Tokens: https://<public host>/ns/sync/<calendar id>/<seq>
+func Token(base string, i Info) string
+func ParseToken(base string, i Info, token string) (int64, error)
+
+// Not built yet: Move (M4), and the admin's metadata calls AdminCalendars
+// and AdminActivity (M3).
 ```
 
 Only `Create`, `Update`, `DeleteCalendar`, `Transfer`, `Put`, `Delete`,
@@ -460,7 +465,9 @@ Namespaces: `D` = `DAV:`, `C` = `urn:ietf:params:xml:ns:caldav`,
 | `D:current-user-privilege-set` | | | `read`, `bind` | `read` + (`write`, `write-content`, `write-properties`, `bind`, `unbind` if effective readwrite) | as calendar |
 | `D:supported-report-set` | | | | multiget, query, sync-collection | |
 | `C:supported-calendar-component-set` | | | | `VEVENT` | |
-| `C:calendar-description`, `C:calendar-timezone` | | | | ✓ | |
+| `C:calendar-description` | | | | ✓ | |
+| `C:calendar-timezone` | | | | not reported (404): Go cannot write a VTIMEZONE; events carry their own | |
+| `D:principal-collection-set` | ✓ | ✓ | | | |
 | `C:max-resource-size` | | | | `max_object_bytes` | |
 | `CS:getctag`, `D:sync-token` | | | | ✓ | |
 | `A:calendar-color`, `A:calendar-order` | | | | ✓ (per user view) | |
@@ -549,7 +556,9 @@ CREATE TABLE calendars (
   id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id),
   slug TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, timezone TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
-  seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, deleted_at TEXT,
+  seq INTEGER NOT NULL DEFAULT 0,       -- the last change in this calendar: ctag and token
+  pruned_seq INTEGER NOT NULL DEFAULT 0, -- changes at or below it are pruned: older tokens are invalid
+  created_at TEXT NOT NULL, deleted_at TEXT,
   UNIQUE (owner_id, slug));            -- a slug is never reused by its owner, even after delete
 CREATE TABLE shares (
   calendar_id INTEGER NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
@@ -582,8 +591,8 @@ CREATE TABLE objects (
   UNIQUE (calendar_id, name), UNIQUE (calendar_id, uid));
 CREATE INDEX objects_range ON objects (calendar_id, start_utc, end_utc);
 
-CREATE TABLE changes (
-  seq INTEGER PRIMARY KEY, calendar_id INTEGER NOT NULL REFERENCES calendars(id),
+CREATE TABLE changes (                -- AUTOINCREMENT: a seq is never reused, even after pruning
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, calendar_id INTEGER NOT NULL REFERENCES calendars(id),
   name TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '',
   action TEXT NOT NULL, user_id INTEGER REFERENCES users(id),
   device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,

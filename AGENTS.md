@@ -33,7 +33,18 @@ M0 and M1 are done. What exists:
   `ApprovePage` (reads the code from a scanned QR's fragment).
 - `cmd/agendouille/e2e_test.go` drives M1's "done when" over HTTP.
 
-Next is M2, CalDAV (PLAN section 15).
+- **M2, CalDAV:** `internal/ical` (our own RFC 5545 parser and encoder,
+  and our own RRULE engine: `rrule_test.go` runs every example of RFC 5545
+  3.8.5.3), `internal/sharing` (access: owner, user and group shares,
+  device cap; views), `internal/calendar` (the one write path, change log,
+  tokens, quotas, import/export, prune), `internal/hub`, `internal/dav`
+  (PROPFIND, the three reports, GET/PUT/DELETE with ETags, MKCALENDAR and
+  extended MKCOL, PROPPATCH). CLI: `calendar`, `device`, `import`,
+  `export`. Tests: `caldav_e2e_test.go` (M2's "done when" with raw CalDAV
+  requests) and `clients_test.go` (replays `internal/dav/testdata/clients`).
+
+Next is M3, the admin UI (PLAN section 15). M2's by-hand checks with real
+DAVx5, iOS and Thunderbird are still to do.
 
 ## Conventions come from cafard and claudication
 
@@ -94,6 +105,12 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **DAVx5's code is GPLv3; we are MIT.** Read `synctools` and
   `davx5-ose` for rules and quirks, write them down as tests, never copy or
   translate their code (PLAN 7.3).
+- **No iCalendar or CalDAV library, on purpose** (DECISIONS 2026-11-23). A
+  recurrence bug is fixed in `internal/ical/rrule.go` with a test, not by
+  adding a dependency.
+- **The client fixtures in `internal/dav/testdata/clients` are hand-written**
+  until the by-hand checks capture real ones; a captured request that
+  fails is a server bug, never a fixture to edit.
 - **iCalendar fixtures are shared** between Go and the Android JVM tests
   (`testdata/ical/`). Change one side, run both.
 - **No rate limits, on purpose** (DECISIONS 2026-11-23). Do not add one to

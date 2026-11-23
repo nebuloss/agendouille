@@ -1,0 +1,5 @@
+status 207
+contains <c:calendar-home-set><d:href>/dav/calendars/lea/</d:href></c:calendar-home-set>
+contains <d:principal-URL><d:href>/dav/principals/lea/</d:href></d:principal-URL>
+contains schedule-inbox-URL
+contains 404 Not Found

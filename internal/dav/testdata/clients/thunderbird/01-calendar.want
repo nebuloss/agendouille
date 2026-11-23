@@ -1,0 +1,4 @@
+status 207
+contains <c:calendar/>
+contains <cs:getctag>
+contains <d:write/>

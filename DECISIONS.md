@@ -3,6 +3,43 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: M2 notes
+
+- **No iCalendar or recurrence library** (the user: "i am not sure it is
+  good idea to rely on external go libraries for that", then "own both").
+  `internal/ical` has its own parser and encoder (RFC 5545 3.1: folding,
+  quoted parameters, TEXT escapes) and its own RRULE engine, run against
+  every example of RFC 5545 3.8.5.3 (38 cases) plus DST, all-day, floating
+  and Windows-zone cases. go-ical and rrule-go are gone from the plan, and
+  so is go-webdav as a test client: the end-to-end test writes CalDAV
+  requests by hand, which is closer to what phones send anyway.
+- **The client fixtures are hand-written**, from what DAVx5, iOS and
+  Thunderbird are known to ask, not captured: no client can be run from
+  here. The by-hand checks of M2 replace them with captures.
+- **Two shell commands the plan did not list**, needed before the admin UI
+  and the web app exist: `calendar add|list|share|unshare|transfer|delete`
+  and `device add|list|revoke` (with DAVx5's login QR in the terminal).
+  `user remove` refuses while the user owns calendars (PLAN 6).
+- **A sync token names the calendar by id**
+  (`<public_url>/ns/sync/<id>/<seq>`), so transferring a calendar, which
+  changes its ref, does not invalidate its clients' tokens for nothing.
+- **The URL a client MKCALENDARs at keeps working** for its owner: the
+  calendar lives at `<user>~<slug>` (said in `Location`) and the bare slug
+  resolves to it in the owner's home (PLAN 5.2's fallback, built in at
+  once since it costs a line).
+- **`calendar-timezone` is not reported** (404): writing a correct
+  VTIMEZONE needs transition rules Go's zone database does not expose, and
+  every event carries its own TZID. A PROPPATCH of it is accepted and
+  ignored; MKCALENDAR takes the TZID from it.
+- **A missing `Depth` on PROPFIND is 0**, not infinity: every target client
+  sends one, and infinity is refused anyway. **OPTIONS needs no
+  credential**, as clients probe it first.
+- **A sharee's PROPPATCH changes their own view** (name, colour, order), a
+  read-only sharee's included; the description stays the owner's.
+- **The settings watcher reloads on its first tick**: it took its first
+  snapshot inside its goroutine, so a change written between the server's
+  start and that snapshot was missed (found by a flaky test).
+
 ## 2026-11-23: M1 notes
 
 - **No rate limits** (the user: "rate limit is useless"). Every secret

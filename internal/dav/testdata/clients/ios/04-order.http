@@ -1,0 +1,6 @@
+PROPPATCH /dav/calendars/lea/lea~perso/
+User-Agent: iOS/18.1 (22B83) dataaccessd/1.0
+Content-Type: text/xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<A:propertyupdate xmlns:A="DAV:"><A:set><A:prop><B:calendar-order xmlns:B="http://apple.com/ns/ical/">3</B:calendar-order></A:prop></A:set></A:propertyupdate>

@@ -1,0 +1,4 @@
+status 207
+contains <c:calendar-home-set><d:href>/dav/calendars/lea/</d:href></c:calendar-home-set>
+contains addressbook-home-set
+contains 404 Not Found

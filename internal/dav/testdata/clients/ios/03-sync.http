@@ -1,0 +1,8 @@
+REPORT /dav/calendars/lea/lea~perso/
+Depth: 1
+User-Agent: iOS/18.1 (22B83) dataaccessd/1.0
+Content-Type: text/xml
+Brief: t
+
+<?xml version="1.0" encoding="UTF-8"?>
+<A:sync-collection xmlns:A="DAV:"><A:sync-token></A:sync-token><A:sync-level>1</A:sync-level><A:prop><A:getcontenttype/><A:getetag/></A:prop></A:sync-collection>

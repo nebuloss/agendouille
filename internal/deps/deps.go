@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/settings"
@@ -22,6 +23,7 @@ type Deps struct {
 	Store     *store.Store
 	Directory *directory.Service
 	Auth      *auth.Service
+	Calendar  *calendar.Service
 	Clock     func() time.Time
 	Version   string
 }

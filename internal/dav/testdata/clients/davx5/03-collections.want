@@ -1,0 +1,7 @@
+status 207
+contains <d:href>/dav/calendars/lea/lea~perso/</d:href>
+contains <c:calendar/>
+contains <c:comp name="VEVENT"/>
+contains <d:write-content/>
+contains <d:sync-collection/>
+contains <cs:getctag>

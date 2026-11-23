@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const usage = `agendouille - the family's calendars, at home
@@ -26,6 +27,10 @@ Commands:
   user      add, enrol (a one-time sign-in link and QR), list, disable,
             enable, remove
   group     add, list, remove, member add|remove
+  calendar  add, list, share, unshare, transfer, delete
+  device    add (a sync credential, with DAVx5's QR), list, revoke
+  import    import an .ics file into a calendar
+  export    write a calendar as one .ics
   version   print the version
 
 Run "agendouille <command> -h" for the flags of one command. Every key of
@@ -33,6 +38,9 @@ the bootstrap file is also a flag (-admin-listen) and an environment
 variable (AGENDOUILLE_ADMIN_LISTEN); the file is /etc/agendouille.yaml
 unless -config or AGENDOUILLE_CONFIG says otherwise.
 `
+
+// svcNow is the clock the CLI writes audit times with.
+var svcNow = time.Now
 
 // version is overridden at build time with -ldflags "-X main.version=...".
 var version = "dev"
@@ -57,12 +65,16 @@ type env struct {
 type command func(ctx context.Context, e env, args []string) error
 
 var commands = map[string]command{
-	"serve":   cmdServe,
-	"config":  cmdConfig,
-	"admin":   cmdAdmin,
-	"user":    cmdUser,
-	"group":   cmdGroup,
-	"version": cmdVersion,
+	"serve":    cmdServe,
+	"config":   cmdConfig,
+	"admin":    cmdAdmin,
+	"user":     cmdUser,
+	"group":    cmdGroup,
+	"calendar": cmdCalendar,
+	"device":   cmdDevice,
+	"import":   cmdImport,
+	"export":   cmdExport,
+	"version":  cmdVersion,
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) error {

@@ -1,0 +1,6 @@
+REPORT /dav/calendars/lea/lea~perso/
+Depth: 0
+User-Agent: DAVx5/4.5-ose (dav4jvm; okhttp/4.12.0) Android/15
+Content-Type: application/xml; charset=utf-8
+
+<?xml version='1.0' encoding='UTF-8' ?><CAL:calendar-multiget xmlns="DAV:" xmlns:CAL="urn:ietf:params:xml:ns:caldav"><prop><getcontenttype /><getetag /><CAL:calendar-data /></prop><href>/dav/calendars/lea/lea~perso/judo.ics</href></CAL:calendar-multiget>

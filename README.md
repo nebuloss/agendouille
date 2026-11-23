@@ -20,8 +20,10 @@ A self-hosted calendar server for a family, at home, with nothing outside.
 Sync is standard CalDAV for everyone; sharing and sign-in go through an
 additional API. One Go binary, SQLite, behind a reverse proxy in the DMZ.
 
-**Status: M1.** Users, groups, settings, both listeners and signing in
-work; calendars do not exist yet (M2). See `PLAN.md` for the design,
+**Status: M2.** CalDAV works, read and write, with calendars owned by
+users and shared with users or groups; the admin UI (M3) and the family web
+app (M4) are next, so for now calendars, shares and devices are made with
+the CLI. See `PLAN.md` for the design,
 `CONTRACTS.md` for the interfaces and `DECISIONS.md` for what was decided
 and why.
 
@@ -52,7 +54,17 @@ agendouille config set public_listen 0.0.0.0:8791 public_url https://agenda.exam
 agendouille group add famille
 agendouille user add lea --display-name Léa --group famille
 agendouille user enrol lea            # a one-time sign-in link and QR code, 72 hours
+
+agendouille calendar add lea perso --name "Perso"
+agendouille calendar share lea~perso g:famille read
+agendouille import lea~perso google-export.ics
+agendouille device add lea --label "Pixel de Léa"   # DAVx5's QR; or --kind ios|thunderbird
 ```
+
+Any CalDAV client then syncs: DAVx5 from the QR, an iPhone (Settings,
+Calendar, Accounts, Add, Other, CalDAV, with the server, username and
+password printed), Thunderbird (New calendar, On the network, the same).
+A calendar made in DAVx5 or on an iPhone belongs to its user.
 
 Users have no password and no email. The enrolment QR signs in their first
 device; after that, any browser shows a QR code at `/signin` that a

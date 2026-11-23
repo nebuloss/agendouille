@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/nebuloss/agendouille/internal/auth"
+	"github.com/nebuloss/agendouille/internal/calendar"
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/dav"
 	"github.com/nebuloss/agendouille/internal/deps"
 	"github.com/nebuloss/agendouille/internal/directory"
+	"github.com/nebuloss/agendouille/internal/hub"
 	"github.com/nebuloss/agendouille/internal/settings"
+	"github.com/nebuloss/agendouille/internal/sharing"
 	"github.com/nebuloss/agendouille/internal/store"
 	"github.com/nebuloss/agendouille/internal/surface"
 	"github.com/nebuloss/agendouille/internal/web/admin"
@@ -65,6 +68,8 @@ type services struct {
 	settings *settings.Service
 	dir      *directory.Service
 	auth     *auth.Service
+	calendar *calendar.Service
+	hub      *hub.Hub
 }
 
 func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
@@ -78,7 +83,9 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 		return nil, err
 	}
 	dir := directory.New(st.DB(), time.Now, func() []string { return set.Get().Palette })
-	return &services{store: st, settings: set, dir: dir, auth: auth.New(st.DB(), time.Now, set, dir)}, nil
+	h := hub.New()
+	cal := calendar.New(st.DB(), time.Now, set, dir, sharing.New(st.DB(), dir), h)
+	return &services{store: st, settings: set, dir: dir, auth: auth.New(st.DB(), time.Now, set, dir), calendar: cal, hub: h}, nil
 }
 
 // muxes builds each listener's routes once: the public one holds the dav
@@ -99,6 +106,24 @@ func muxes(d *deps.Deps) (public, adminMux http.Handler, err error) {
 	return webx.Headers(pub), webx.Headers(adm), nil
 }
 
+// prune drops old change rows once an hour (sync_token_retention_days).
+func prune(ctx context.Context, cal *calendar.Service, log *slog.Logger) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		if n, err := cal.Prune(ctx); err != nil && ctx.Err() == nil {
+			log.Error("pruning the change log", "err", err)
+		} else if n > 0 {
+			log.Info("pruned the change log", "rows", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
 // serve runs the server until ctx is cancelled, then shuts it down within
 // surface.DrainTimeout. ready, when set, gets the running listeners.
 func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func(*surface.Server)) error {
@@ -116,7 +141,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	}
 
 	d := &deps.Deps{Config: cfg, Settings: svc.settings, Log: log, Store: svc.store, Directory: svc.dir, Auth: svc.auth,
-		Clock: time.Now, Version: version}
+		Calendar: svc.calendar, Clock: time.Now, Version: version}
 	public, adminHandler, err := muxes(d)
 	if err != nil {
 		return err
@@ -148,6 +173,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	watchCtx, stopWatch := context.WithCancel(ctx)
 	defer stopWatch()
 	go svc.settings.Watch(watchCtx, settingsPoll, func(err error) { log.Error("reloading settings", "err", err) })
+	go prune(watchCtx, svc.calendar, log)
 
 	if ready != nil {
 		ready(srv)

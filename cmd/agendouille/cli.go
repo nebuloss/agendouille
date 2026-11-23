@@ -206,6 +206,24 @@ func cmdUser(ctx context.Context, e env, args []string) error {
 		if err := want(pos, 2, "user remove <name>"); err != nil {
 			return err
 		}
+		// A removed user's calendars are transferred or deleted first
+		// (PLAN.md 6): there is no orphan calendar.
+		u, err := svc.dir.User(ctx, pos[1])
+		if err != nil {
+			return fmt.Errorf("user %q: %w", pos[1], err)
+		}
+		owned, err := svc.calendar.Owned(ctx, u.ID)
+		if err != nil {
+			return err
+		}
+		if len(owned) > 0 {
+			var refs []string
+			for _, i := range owned {
+				refs = append(refs, i.Ref.String())
+			}
+			return fmt.Errorf("%s still owns %s: run agendouille calendar transfer <calendar> <user>, or calendar delete <calendar>, first",
+				u.Name, strings.Join(refs, ", "))
+		}
 		return svc.dir.Remove(ctx, "cli", pos[1])
 	}
 	return fmt.Errorf("usage: agendouille %s", usage)

@@ -133,8 +133,8 @@ with QR codes; nothing outside the home.
 | Server language | Go, `go 1.26.0` in `go.mod` (as cafard) | |
 | cgo | **Disabled everywhere** (`CGO_ENABLED=0`) | Cross-compiles to linux amd64/arm64/armv7 |
 | Database | `modernc.org/sqlite` (pure Go), WAL, foreign keys on | As cafard |
-| iCalendar | `github.com/emersion/go-ical` (MIT) | Parse and write RFC 5545; keeps unknown properties |
-| Recurrence | `github.com/teambition/rrule-go` (MIT) | Expansion for time-range queries and the web app |
+| iCalendar | **In-house**, `internal/ical` (Decided, user: no outside library in the calendar core) | Parse and write RFC 5545; the stored text is never rewritten |
+| Recurrence | **In-house** RRULE engine, `internal/ical/rrule.go` (Decided, same) | Every example of RFC 5545 3.8.5.3 is a test |
 | CalDAV/WebDAV server | **In-house**, `internal/dav` (Default) | go-webdav's server has no `sync-collection`, no `getctag` (DECISIONS) |
 | Time zones | `time` + `time/tzdata` embedded | |
 | Admin password | `golang.org/x/crypto/argon2` (argon2id) | The only password |
@@ -147,7 +147,6 @@ with QR codes; nothing outside the home.
 | Frontend tests | `vitest` + `happy-dom` | |
 | Android app | **Java**, Android framework APIs only: no Kotlin, no AndroidX, no Gradle (Decided, user dislikes the Android build) | Built by a Makefile in a container (section 13.5) |
 | Android tests | JUnit 5 on the JVM, for the pure Java parts | Same container |
-| Test-only (Go) | `github.com/emersion/go-webdav` (client) | An independent CalDAV client |
 | Passkeys (optional, M10) | `github.com/go-webauthn/webauthn` (BSD-3) | Only if M10 happens |
 
 Ask in `DECISIONS.md` before adding any other dependency, on any side.
@@ -849,6 +848,8 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | `user add <name> [--group g]...`, `user enrol <name>` (prints a link and a QR in the terminal), `user list`, `user disable\|enable\|remove` | |
 | `group add\|list\|remove`, `group member add\|remove` | |
 | `backup [file]`, `restore <file>` (server stopped) | |
+| `calendar add <user> <slug>`, `calendar list|share|unshare|transfer|delete` | The operator's view until M3 and M4 |
+| `device add <user> [--kind] [--label] [--read]`, `device list|revoke` | Sync credentials by hand until M4 (DAVx5's QR in the terminal) |
 | `import <user>~<slug> <file.ics>`, `export <user>~<slug>` | |
 | `version` | |
 
@@ -972,7 +973,7 @@ M6, M7).
 **M2. CalDAV, read and write, with ownership and shares**
 - `internal/ical`, `internal/calendar`, `internal/sharing`, `internal/dav`
   (section 5, CONTRACTS 4), the hub, quotas; import/export.
-- *Done when:* the go-webdav client test makes a calendar with `MKCALENDAR`,
+- *Done when:* a test sending CalDAV requests by hand makes a calendar with `MKCALENDAR`,
   shares it read-only with a second user, and checks: the second user sees
   it and cannot write; time-range queries with a weekly rule and an
   `EXDATE`; `If-Match` and `412`; `sync-collection` through creates,
@@ -1059,7 +1060,8 @@ M6, M7).
   fixtures live in `testdata/ical/` and are **shared with the Android JVM
   tests**.
 - **`internal/dav`** against recorded client requests.
-- **End to end** with go-webdav's client through the real auth.
+- **End to end** with CalDAV requests written out by hand, through the real auth
+  (`cmd/agendouille/caldav_e2e_test.go`).
 - **Write path**: concurrent puts (one `412`), increasing tokens,
   tombstones, pruning.
 - **Access**: owner, user share, group share, highest wins, device cap,

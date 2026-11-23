@@ -292,8 +292,8 @@ func TestM1(t *testing.T) {
 		t.Fatal(err)
 	}
 	basic := func(r *http.Request) { r.SetBasicAuth("lea", dev.Secret) }
-	if a := x.do("PROPFIND", x.public+"/dav/", nil, basic); a.status != http.StatusNotImplemented {
-		t.Errorf("/dav/ with the device: %d, want 501 (signed in, CalDAV not built)", a.status)
+	if a := x.do("PROPFIND", x.public+"/dav/", nil, basic); a.status != http.StatusMultiStatus {
+		t.Errorf("/dav/ with the device: %d, want 207", a.status)
 	}
 	if a := x.do("PROPFIND", x.public+"/dav/", nil, nil); a.status != http.StatusUnauthorized || a.header.Get("WWW-Authenticate") == "" {
 		t.Errorf("/dav/ without: %d", a.status)

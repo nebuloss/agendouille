@@ -1,0 +1,6 @@
+PROPFIND /dav/principals/lea/
+Depth: 0
+User-Agent: DAVx5/4.5-ose (dav4jvm; okhttp/4.12.0) Android/15
+Content-Type: application/xml; charset=utf-8
+
+<?xml version='1.0' encoding='UTF-8' ?><propfind xmlns="DAV:" xmlns:CAL="urn:ietf:params:xml:ns:caldav" xmlns:CARD="urn:ietf:params:xml:ns:carddav"><prop><CAL:calendar-home-set /><CARD:addressbook-home-set /><CAL:calendar-user-address-set /><group-membership /><displayname /></prop></propfind>

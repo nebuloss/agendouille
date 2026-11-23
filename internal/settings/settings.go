@@ -391,7 +391,10 @@ func (s *Service) Set(ctx context.Context, actor string, changes map[string]stri
 // config set) changed them, and tells the subscribers. It returns when ctx
 // ends.
 func (s *Service) Watch(ctx context.Context, interval time.Duration, onError func(error)) {
-	last := s.stamp(ctx)
+	// No stamp yet: the first tick always reloads and compares with what
+	// this service holds, so a change written between Open and the start of
+	// this goroutine is not missed.
+	last := ""
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	for {

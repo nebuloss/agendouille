@@ -1,0 +1,6 @@
+status 207
+contains <d:href>/dav/calendars/lea/lea~perso/</d:href>
+contains <a:calendar-order>
+contains <a:calendar-color>
+contains <d:sync-token>
+contains <c:comp name="VEVENT"/>
