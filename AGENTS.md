@@ -77,7 +77,7 @@ M0 and M1 are done. What exists:
   Java: `MainActivity` serving the screens and the bridge v2,
   `Credentials` in the Keystore and an Android account,
   `AuthenticatorService`, `SyncService`, `CalendarSync` and `EventSync`
-  (server to phone; the phone's changes next), `ICal` and `EventMapper`
+  and `UploadSync` (both ways), `ICal`, `EventMapper` and `EventWriter`
   (tested over `testdata/ical`), `Dav` and `RawHttp` for CalDAV, `EnrollLink`,
   `ServerAddress`, `BridgeCodec`, `Versions`; `Makefile` without Gradle;
   JVM tests in `android/test`), `scripts/android.sh`, the APK embedded by

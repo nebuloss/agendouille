@@ -49,6 +49,21 @@ final class Http {
         return a;
     }
 
+    /** A PUT or DELETE of a calendar object, with If-Match or If-None-Match. */
+    static Answer object(String method, String url, String user, String pass, String ics, String ifMatch, String ifNoneMatch, String userAgent) throws IOException {
+        java.util.Map<String, String> h = new java.util.LinkedHashMap<>();
+        h.put("User-Agent", userAgent);
+        String raw = user + ":" + pass;
+        h.put("Authorization", "Basic " + android.util.Base64.encodeToString(raw.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
+        if (ifMatch != null) h.put("If-Match", ifMatch);
+        if (ifNoneMatch != null) h.put("If-None-Match", ifNoneMatch);
+        if (ics != null) h.put("Content-Type", "text/calendar; charset=utf-8");
+        RawHttp.Answer r = RawHttp.request(null, method, url, h, ics == null ? null : ics.getBytes(StandardCharsets.UTF_8));
+        Answer a = new Answer(r.status, r.text(), new ArrayList<>());
+        a.etag = r.headers.get("etag");
+        return a;
+    }
+
     /**
      * One request. user and pass, when set, are Basic credentials (the
      * device's); cookie, when set, is the WebView's session; json is the

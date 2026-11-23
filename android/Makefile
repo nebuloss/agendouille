@@ -35,6 +35,7 @@ PURE   := src/io/github/nebuloss/agendouille/EnrollLink.java \
           src/io/github/nebuloss/agendouille/ServerAddress.java \
           src/io/github/nebuloss/agendouille/ICal.java \
           src/io/github/nebuloss/agendouille/EventMapper.java \
+          src/io/github/nebuloss/agendouille/EventWriter.java \
           src/io/github/nebuloss/agendouille/Dav.java \
           src/io/github/nebuloss/agendouille/BridgeCodec.java \
           src/io/github/nebuloss/agendouille/Versions.java

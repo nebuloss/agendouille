@@ -88,21 +88,23 @@ final class CalendarSync {
         final long id;
         final String url;
         final String token;
+        final boolean readOnly;
 
-        Synced(long id, String url, String token) {
+        Synced(long id, String url, String token, boolean readOnly) {
             this.id = id;
             this.url = url;
             this.token = token;
+            this.readOnly = readOnly;
         }
     }
 
     /** The calendars whose events the phone keeps (SYNC_EVENTS). */
     List<Synced> synced() throws RemoteException {
         List<Synced> out = new java.util.ArrayList<>();
-        try (Cursor c = provider.query(asSyncAdapter(Calendars.CONTENT_URI, account), new String[]{Calendars._ID, Calendars._SYNC_ID, Calendars.CAL_SYNC2},
+        try (Cursor c = provider.query(asSyncAdapter(Calendars.CONTENT_URI, account), new String[]{Calendars._ID, Calendars._SYNC_ID, Calendars.CAL_SYNC2, Calendars.CALENDAR_ACCESS_LEVEL},
                 Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=? AND " + Calendars.SYNC_EVENTS + "=1",
                 new String[]{account.name, account.type}, null)) {
-            while (c != null && c.moveToNext()) out.add(new Synced(c.getLong(0), c.getString(1), c.getString(2)));
+            while (c != null && c.moveToNext()) out.add(new Synced(c.getLong(0), c.getString(1), c.getString(2), c.getInt(3) < Calendars.CAL_ACCESS_CONTRIBUTOR));
         }
         return out;
     }

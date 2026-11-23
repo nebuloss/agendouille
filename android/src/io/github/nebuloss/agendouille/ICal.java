@@ -20,11 +20,24 @@ final class ICal {
         final String name;                  // upper case
         final Map<String, String> params;   // upper-case names, values unquoted
         final String value;                 // raw: escapes still in
+        String raw;                         // the unfolded line as read, written back as is
 
         Property(String name, Map<String, String> params, String value) {
             this.name = name;
             this.params = params;
             this.value = value;
+        }
+
+        /** The line, as read when it was, else built. */
+        String line() {
+            if (raw != null) return raw;
+            StringBuilder b = new StringBuilder(name);
+            for (Map.Entry<String, String> p : params.entrySet()) {
+                String v = p.getValue();
+                boolean quote = v.indexOf(':') >= 0 || v.indexOf(';') >= 0 || v.indexOf(',') >= 0;
+                b.append(';').append(p.getKey()).append('=').append(quote ? '"' + v + '"' : v);
+            }
+            return b.append(':').append(value).toString();
         }
 
         String param(String p) {
@@ -149,6 +162,46 @@ final class ICal {
             params.put(pname, v.toString());
         }
         if (i >= n || line.charAt(i) != ':') throw new IllegalArgumentException("no value: " + line);
-        return new Property(name, params, line.substring(i + 1));
+        Property p = new Property(name, params, line.substring(i + 1));
+        p.raw = line;
+        return p;
+    }
+
+    /** A TEXT value with its characters escaped (RFC 5545 3.3.11). */
+    static String escape(String text) {
+        return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n");
+    }
+
+    /** The component as iCalendar text: CRLF, lines folded at 75 octets. */
+    static String write(Component c) {
+        StringBuilder b = new StringBuilder();
+        write(c, b);
+        return b.toString();
+    }
+
+    private static void write(Component c, StringBuilder b) {
+        fold("BEGIN:" + c.name, b);
+        for (Property p : c.props) fold(p.line(), b);
+        for (Component k : c.children) write(k, b);
+        fold("END:" + c.name, b);
+    }
+
+    /** Folds a line at 75 octets without cutting a UTF-8 character. */
+    static void fold(String line, StringBuilder b) {
+        int octets = 0;
+        int limit = 75;
+        for (int i = 0; i < line.length(); ) {
+            int cp = line.codePointAt(i);
+            int len = cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+            if (octets + len > limit) {
+                b.append("\r\n ");
+                octets = 1;
+                limit = 75;
+            }
+            b.appendCodePoint(cp);
+            octets += len;
+            i += Character.charCount(cp);
+        }
+        b.append("\r\n");
     }
 }

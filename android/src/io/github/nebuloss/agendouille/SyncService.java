@@ -57,11 +57,17 @@ public final class SyncService extends Service {
                 List<Dav.Collection> remote = dav.calendars();
                 Map<String, Long> ids = cals.update(remote);
                 result.stats.numEntries += ids.size();
-                // The events of each calendar the person keeps on the phone.
-                EventSync events = new EventSync(account, provider, dav, java.time.ZoneId.systemDefault());
+                // The events of each calendar the person keeps on the phone:
+                // the phone's changes first, then the server's.
+                java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+                UploadSync up = new UploadSync(account, provider,
+                        (method, url, body, ifMatch, ifNoneMatch) -> Http.object(method, url, cred.username, cred.secret, body, ifMatch, ifNoneMatch, ua), zone);
+                EventSync events = new EventSync(account, provider, dav, zone);
                 for (CalendarSync.Synced c : cals.synced()) {
+                    if (!c.readOnly) result.stats.numUpdates += up.sync(c.id, c.url);
                     result.stats.numUpdates += events.sync(c.id, c.url, c.token);
                 }
+                result.stats.numSkippedEntries += up.conflicts;
                 SyncStatus.done(ctx, cals.events());
             } catch (Dav.Unauthorized e) {
                 result.stats.numAuthExceptions++;

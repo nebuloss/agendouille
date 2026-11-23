@@ -57,6 +57,54 @@ public final class LiveCheck {
         }
         System.out.println("objects " + objects + ", rows " + rows + ", exceptions " + exceptions + ", reminders " + reminders);
         if (objects == 0) throw new AssertionError("no objects at all");
+
+        // The phone's changes, as UploadSync sends them: a new event, a
+        // patch with If-Match, a stale ETag refused, then a delete.
+        Dav.Collection mine = null;
+        for (Dav.Collection c : cals) if (!c.readOnly) mine = c;
+        String token = dav.changes(mine.url, null).token;
+        java.util.Map<String, Object> v = new java.util.HashMap<>();
+        long start = java.time.ZonedDateTime.of(2026, 12, 3, 18, 30, 0, 0, ZoneId.of("Europe/Paris")).toInstant().toEpochMilli();
+        v.put("title", "Dîner chez Mamie");
+        v.put("dtstart", start);
+        v.put("dtend", start + 7200000L);
+        v.put("eventTimezone", "Europe/Paris");
+        v.put("allDay", 0);
+        String ics = EventWriter.write(null, v, java.util.Collections.singletonList(new int[]{30, 1}), java.util.Collections.emptyList(), ZoneId.of("Europe/Paris"), System.currentTimeMillis());
+        String url = java.net.URI.create(mine.url).resolve("live-" + System.nanoTime() + ".ics").toString();
+        RawHttp.Answer put = object(auth, "PUT", url, ics, null, "*");
+        System.out.println("PUT new: " + put.status + " etag " + put.headers.get("etag"));
+        if (put.status != 201) throw new AssertionError("PUT new: " + put.status + " " + put.text());
+        if (object(auth, "PUT", url, ics, null, "*").status != 412) throw new AssertionError("a second If-None-Match: * was accepted");
+        Dav.Changes after = dav.changes(mine.url, token);
+        if (after.members.size() != 1) throw new AssertionError("the new event is not in the changes: " + after.members.size());
+        String etag = after.members.get(0).etag;
+        String stored = dav.multiget(mine.url, java.util.Collections.singletonList(after.members.get(0).href)).get(0).data;
+        EventMapper.Row row = EventMapper.map(stored, url, etag, ZoneId.of("Europe/Paris")).get(0);
+        if (!"Dîner chez Mamie".equals(row.get("title")) || row.reminders.size() != 1) throw new AssertionError("stored: " + row.values);
+        row.values.put("title", "Dîner chez Mamie et Papi");
+        String patched = EventWriter.write(stored, row.values, row.reminders, java.util.Collections.emptyList(), ZoneId.of("Europe/Paris"), System.currentTimeMillis());
+        RawHttp.Answer upd = object(auth, "PUT", url, patched, etag, null);
+        System.out.println("PUT patch: " + upd.status);
+        if (upd.status / 100 != 2) throw new AssertionError("PUT patch: " + upd.status + " " + upd.text());
+        RawHttp.Answer stale = object(auth, "PUT", url, patched, etag, null);
+        System.out.println("PUT with the old ETag: " + stale.status);
+        if (stale.status != 412) throw new AssertionError("a stale ETag was accepted: " + stale.status);
+        String now = dav.multiget(mine.url, java.util.Collections.singletonList(after.members.get(0).href)).get(0).data;
+        if (!now.contains("SUMMARY:Dîner chez Mamie et Papi")) throw new AssertionError("not patched: " + now);
+        RawHttp.Answer del = object(auth, "DELETE", url, null, null, null);
+        System.out.println("DELETE: " + del.status);
+        if (del.status / 100 != 2) throw new AssertionError("DELETE: " + del.status);
         System.out.println("LIVE OK");
+    }
+
+    private static RawHttp.Answer object(String auth, String method, String url, String ics, String ifMatch, String ifNoneMatch) throws Exception {
+        Map<String, String> h = new LinkedHashMap<>();
+        h.put("Authorization", auth);
+        h.put("User-Agent", "agendouille-android/live-check");
+        if (ifMatch != null) h.put("If-Match", ifMatch);
+        if (ifNoneMatch != null) h.put("If-None-Match", ifNoneMatch);
+        if (ics != null) h.put("Content-Type", "text/calendar; charset=utf-8");
+        return RawHttp.request(null, method, url, h, ics == null ? null : ics.getBytes(StandardCharsets.UTF_8));
     }
 }
