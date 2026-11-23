@@ -16,6 +16,7 @@
 <header class="sticky top-0 z-10 flex h-16 items-center gap-3 bg-surface/95 px-4 backdrop-blur md:px-6">
   <img src="/static/shared/icon.svg" alt="" width="32" height="32" class="rounded-md3-s md:hidden">
   <h1 class="mr-auto truncate text-[22px] font-normal">{{.Title}}</h1>
+  <span data-lang-menu class="contents"></span>
   <a href="/me" class="grid size-9 place-items-center rounded-full bg-primary-container text-sm font-bold text-on-primary-container no-underline" title="{{.User.DisplayName}}">{{.Initial}}</a>
   <form method="post" action="/signout" class="contents">
     <button type="submit" class="state-layer grid size-10 shrink-0 place-items-center rounded-full text-on-surface-variant sm:inline-flex sm:h-9 sm:w-auto sm:gap-2 sm:px-3 sm:text-sm sm:font-medium sm:text-primary" title="{{t "app.signout"}}" aria-label="{{t "app.signout"}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4 M10 8l-4 4 4 4 M6 12h11"/></svg><span class="hidden sm:inline">{{t "app.signout"}}</span></button>

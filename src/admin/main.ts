@@ -8,7 +8,7 @@ import { ActivityPage, BackupsPage, GroupPage, GroupsPage, SettingsPage } from '
 import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UserPage, UsersPage } from '@/admin/pages/Users.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
-import { langButton, themeButton } from '@/shared/components/Ui.ts';
+import { langMenu, themeButton } from '@/shared/components/Ui.ts';
 
 const api = adminApi();
 
@@ -34,8 +34,9 @@ whenReady(document, () => {
   const trail = document.querySelector<HTMLElement>('.trail');
   if (trail !== null) trail.scrollLeft = trail.scrollWidth;
   // The theme, one button that cycles: system, light, dark.
+  for (const slot of Array.from(document.querySelectorAll('[data-lang-menu]'))) slot.replaceWith(langMenu(document));
   const themeSlot = document.getElementById('theme-slot');
-  if (themeSlot !== null) themeSlot.replaceWith(langButton(document), themeButton(document));
+  if (themeSlot !== null) themeSlot.replaceWith(langMenu(document), themeButton(document));
   // The bell, on every page of the shell; it counts again after a change.
   const slot = document.getElementById('bell-slot');
   if (slot !== null) {

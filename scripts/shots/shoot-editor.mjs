@@ -40,6 +40,14 @@ for (const scheme of ['light', 'dark']) {
   console.log(`${scheme}: after Annuler the editor is ${open ? 'STILL OPEN' : 'closed'}`);
   if (open) await page.keyboard.press('Escape');
 }
+// The language menu, open, and the theme choice on Moi, light and dark.
+for (const scheme of ['light', 'dark']) {
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
+  await page.goto(base + '/me', { waitUntil: 'networkidle2' });
+  await page.click('[aria-haspopup="menu"]');
+  await wait(300);
+  await page.screenshot({ path: `${out}/menu-${scheme}.png`, clip: { x: 600, y: 0, width: 680, height: 560 } });
+}
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
 await page.setViewport({ width: 390, height: 844, isMobile: true });
 await page.goto(base + '/', { waitUntil: 'networkidle2' });

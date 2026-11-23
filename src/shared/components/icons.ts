@@ -39,9 +39,13 @@ const PATHS = {
   warn: 'M12 4l9 16H3z M12 10v4 M12 17v.5',
   info: 'M12 21a9 9 0 100-18 9 9 0 000 18z M12 11v5 M12 8v.5',
   check: 'M5 12.5l4.5 4.5L19 7.5',
-  sun: 'M12 16a4 4 0 100-8 4 4 0 000 8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4',
-  moon: 'M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z',
-  contrast: 'M12 21a9 9 0 100-18 9 9 0 000 18z M12 3v18 M12 3a9 9 0 010 18z',
+  // Theme: a sun with a solid disc, a crescent, and a disc half day half
+  // night for "follow the system". Entries starting "F " are filled.
+  sun: 'F M12 16.25a4.25 4.25 0 100-8.5 4.25 4.25 0 000 8.5z|M12 2.5v1.75 M12 19.75v1.75 M5.28 5.28l1.24 1.24 M17.48 17.48l1.24 1.24 M2.5 12h1.75 M19.75 12h1.75 M5.28 18.72l1.24-1.24 M17.48 6.52l1.24-1.24',
+  moon: 'F M20.4 14.6A8.6 8.6 0 019.4 3.6a8.6 8.6 0 1011 11z|M17.2 3.4l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5z',
+  contrast: 'M12 21a9 9 0 100-18 9 9 0 000 18z|F M12 3a9 9 0 010 18z',
+  chevronDown: 'M7 10l5 5 5-5',
+  globe: 'M12 21a9 9 0 100-18 9 9 0 000 18z M3.5 9h17 M3.5 15h17 M12 3c-2.5 2.6-3.6 5.6-3.6 9s1.1 6.4 3.6 9 M12 3c2.5 2.6 3.6 5.6 3.6 9s-1.1 6.4-3.6 9',
   lock: 'M5 11h14v9H5z M8 11V8a4 4 0 018 0v3',
   search: 'M11 17a6 6 0 100-12 6 6 0 000 12z M20 20l-4.5-4.5',
   palette: 'M12 21a9 9 0 110-18c5 0 9 3.6 9 8 0 2.8-2.2 4-4 4h-2a2 2 0 00-1.5 3.3A2 2 0 0112 21z M7.5 11h.01 M10 7h.01 M14.5 7h.01',
@@ -57,8 +61,16 @@ export function icon(name: IconName, doc: Document = document): SVGSVGElement {
   svg.setAttribute('class', 'ic');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
-  const path = doc.createElementNS(NS, 'path');
-  path.setAttribute('d', PATHS[name]);
-  svg.append(path);
+  // Parts are separated by "|"; a part starting "F " is filled, not stroked.
+  for (const part of PATHS[name].split('|')) {
+    const path = doc.createElementNS(NS, 'path');
+    const filled = part.startsWith('F ');
+    path.setAttribute('d', filled ? part.slice(2) : part);
+    if (filled) {
+      path.setAttribute('fill', 'currentColor');
+      path.setAttribute('stroke', 'none');
+    }
+    svg.append(path);
+  }
   return svg;
 }

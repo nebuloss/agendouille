@@ -1,6 +1,7 @@
 import { currentTheme, nextTheme, setTheme, type Theme } from '@/shared/core/Theme.ts';
 import { LANGS, lang, setLang, type Lang } from '@/shared/i18n/i18n.ts';
 import { t } from '@/shared/components/Ui.msg.ts';
+import { flag } from '@/shared/components/flags.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { icon, type IconName } from '@/shared/components/icons.ts';
 import { ui, type ButtonVariant } from '@/shared/components/recipes.ts';
@@ -284,12 +285,48 @@ export function langChoice(doc: Document = document): HTMLElement {
   return select;
 }
 
-/** The language as a small button (the admin's header): the other one. */
-export function langButton(doc: Document = document): HTMLElement {
+/**
+ * The language as a small dropdown (both headers, the sign-in pages): the
+ * current flag and code, then a list of the languages, each with its flag
+ * and its own name. Choosing one reloads the page in it.
+ */
+export function langMenu(doc: Document = document): HTMLElement {
   const current = lang(doc);
-  const other: Lang = current === 'fr' ? 'en' : 'fr';
-  const b = h('button', { type: 'button', lang: other, class: 'state-layer inline-flex h-8 items-center rounded-md3-full px-2.5 text-[13px] font-semibold text-on-surface-variant',
-    title: LANGS[other], 'aria-label': LANGS[other] }, other.toUpperCase());
-  b.addEventListener('click', () => setLang(other, doc));
-  return b;
+  const wrap = h('div', { class: 'relative' });
+  const button = h('button', { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: t('language'), 'aria-label': `${t('language')} : ${LANGS[current]}`,
+    class: 'state-layer inline-flex h-9 items-center gap-1.5 rounded-md3-full border border-outline-variant px-2.5 text-[13px] font-semibold text-on-surface-variant' },
+  flag(current, 13, doc), current.toUpperCase(), icon('chevronDown'));
+  button.querySelector('.ic')?.classList.add('!size-4');
+  const menu = h('div', { role: 'menu', hidden: true,
+    class: 'absolute right-0 z-50 mt-1.5 flex min-w-44 flex-col rounded-md3-l bg-surface-high p-1.5 text-on-surface elevation-2' },
+  ...(Object.keys(LANGS) as Lang[]).map((l) => {
+    const item = h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(l === current), lang: l,
+      class: 'state-layer flex items-center gap-3 rounded-md3-m px-3 py-2 text-left text-sm aria-checked:font-semibold' },
+    flag(l, 15, doc), h('span', { class: 'flex-1' }, LANGS[l]), l === current ? icon('check') : null);
+    item.addEventListener('click', () => {
+      close();
+      if (l !== current) setLang(l, doc);
+    });
+    return item;
+  }));
+  const close = (): void => {
+    menu.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+  };
+  button.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    button.setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) menu.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+  });
+  doc.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target as Node)) close();
+  });
+  wrap.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.hidden) {
+      close();
+      button.focus();
+    }
+  });
+  wrap.append(button, menu);
+  return wrap;
 }
