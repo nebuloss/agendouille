@@ -3,6 +3,21 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-23: our own server, not an existing one
+
+Asked whether existing software already does this: DAVx5 covers Android
+(and stays the client, PLAN 6). For the server, Radicale, Baïkal, Davis,
+Nextcloud, SOGo, RustiCal and EteSync were weighed. The user keeps a server
+of our own: "i hate php and python for server so i would like to keep
+server side implementation to be free to manage properly users and
+calendar + have an ui view", and "it would allow to have a modern stack"
+(Go 1.26, TypeScript, one static binary). So no PHP or Python server, members and the
+calendar are managed in agendouille itself (the web UI's Members and
+Calendar settings pages, and the CLI), and the web UI has a real calendar
+view (PLAN 9.3). RustiCal (Rust, SQLite, WebDAV-Push) is the closest
+existing server; it has no calendar view and says it is not
+production-ready, and it is worth reading when writing `internal/dav`.
+
 ## 2026-11-23: the starting brief
 
 The user's brief: a shared calendar for the family; every member reads and

@@ -183,7 +183,7 @@ func ContextPrincipal(ctx context.Context) *Principal
 | GET, POST | `/signin` | none; rate limited | pages |
 | POST | `/signout` | session, same-origin | pages |
 | GET, POST | `/invite/{token}` | the token | pages |
-| GET | `/`, `/devices`, `/members`, `/me` | session (`/members`: admin) | pages |
+| GET | `/`, `/devices`, `/members`, `/settings`, `/me` | session (`/members`, `/settings`: admin) | pages |
 | GET | `/static/...` | none | web assets |
 | GET | `/api/me` | session | api |
 | PATCH | `/api/me` | session, same-origin | api |
@@ -194,6 +194,10 @@ func ContextPrincipal(ctx context.Context) *Principal
 | POST | `/api/events` | session, same-origin | api |
 | PUT | `/api/events/{name}` | session, same-origin, `If-Match` required | api |
 | DELETE | `/api/events/{name}` | session, same-origin, `If-Match` required | api |
+| PATCH | `/api/calendar` | admin, same-origin; `name`, `color`, `timezone` | api |
+| POST | `/api/import` | admin, same-origin; `text/calendar` body; answers counts | api |
+| GET | `/api/export` | session; the whole calendar as `.ics` | api |
+| GET | `/api/backup` | admin; a `VACUUM INTO` snapshot | api |
 | GET | `/api/members` | session | api |
 | POST | `/api/members` | admin, same-origin | api |
 | PATCH, DELETE | `/api/members/{name}` | admin, same-origin | api |

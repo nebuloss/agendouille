@@ -70,7 +70,10 @@ exists because the user wants:
 - a single Go binary with the web UI embedded, deployed like cafard;
 - a family-first model (one calendar, members, devices with QR pairing)
   instead of a general groupware server;
-- a web UI that is good on a phone, which Radicale and Baïkal do not have.
+- a web UI that is good on a phone, which Radicale and Baïkal do not have;
+- no PHP or Python on the server, and members and the calendar managed in
+  agendouille itself rather than through a server's generic admin pages
+  (DECISIONS 2026-11-23, "our own server").
 
 ### Non-goals
 
@@ -457,7 +460,8 @@ notifications ("Papa added Judo"). If it is built:
 | `/invite/<token>` | Choose a password (form) |
 | `/` | The calendar: agenda (phone default), week, month |
 | `/devices` | My devices and subscription links; add one (QR, profile, manual settings); revoke |
-| `/members` | Admin: members, invitations, disable, remove |
+| `/members` | Admin: members, invitations, disable, remove, make admin |
+| `/settings` | Admin: the calendar's name, colour and time zone; import an `.ics`; download an export or a backup |
 | `/me` | Display name, colour, password |
 
 ### 9.3 The calendar views (Default)
