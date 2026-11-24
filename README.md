@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="internal/web/assets/static/shared/icon.svg" alt="" width="112" height="112">
+</p>
+
 # agendouille
 
 > *agendouille*: an *agenda* with the *-ouille* of *andouille*. The

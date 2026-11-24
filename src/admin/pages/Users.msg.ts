@@ -153,7 +153,7 @@ export const t = messages({
     expiresOn: 'expire le {date}',
     cancelLink: 'Annuler le lien',
     linkCancelled: 'Lien annulé.',
-    noLinks: 'Aucun lien pour le moment. Créez-en un pour connecter un appareil.',
+    noLinks: 'Aucun lien en attente. Créez-en un pour connecter un appareil.',
 
     // Deleting a user.
     deleteCalendar: 'Supprimer ce calendrier',
@@ -315,7 +315,7 @@ export const t = messages({
     expiresOn: 'expires on {date}',
     cancelLink: 'Cancel link',
     linkCancelled: 'Link cancelled.',
-    noLinks: 'No links yet. Create one to sign a device in.',
+    noLinks: 'No pending links. Create one to sign a device in.',
 
     deleteCalendar: 'Delete this calendar',
     giveTo: 'Give to {name}',

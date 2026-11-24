@@ -202,7 +202,6 @@ export class UserPage extends AdminPage {
         // device in, the devices that sync, the browsers signed in.
         return [
           this.signin(u, d.enrollments),
-          this.policyCard(u, d),
           card(t('syncedDevices', { count: d.devices.length }), [action(t('addDevice'), () => this.addDevice(u), 'tonal', 'plus', 'sm')],
             h('p', { class: 'text-sm text-on-surface-variant' }, t('devicesHelp')),
             entries(d.devices.map((x) => ({
@@ -263,6 +262,7 @@ export class UserPage extends AdminPage {
         tileLink(String(d.calendars_shared.length), t('sharedTile', { count: d.calendars_shared.length }), `${base}/calendars`),
         tileLink(String(d.sessions.length), t('browsersTile', { count: d.sessions.length }), `${base}/devices`)),
       this.profile(u),
+      this.policyCard(u, d),
       section(t('account'),
         h('div', { class: 'flex flex-wrap items-center gap-2' },
           u.disabled
@@ -366,7 +366,9 @@ export class UserPage extends AdminPage {
       action(t('makeBrowserLink'), () => make('browser'), 'tonal', 'laptop'),
     ],
     h('p', { class: 'text-sm text-on-surface-variant' }, t('signinHelp')),
-    entries(enrollments.map((e) => {
+    // Only the links still waiting: a used one is a device or a browser
+    // below, an expired one is of no use.
+    entries(enrollments.filter((e) => (e.state ?? (e.used_at !== undefined ? 'used' : 'pending')) === 'pending').map((e) => {
       const state = e.state ?? (e.used_at !== undefined ? 'used' : 'pending');
       const [label, cls] = STATE[state] ?? STATE['pending']!;
       return {

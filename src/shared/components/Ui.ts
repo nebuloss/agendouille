@@ -258,7 +258,7 @@ export function themeToggle(doc: Document = document, size: 'sm' | 'md' = 'md'):
     group.replaceChildren(...options.map(([value, label, ic], i) => {
       const on = now === value;
       const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), 'aria-label': label, title: label,
-        class: `state-layer grid ${size === 'md' ? 'h-10 min-w-10' : 'h-8 min-w-8'} place-items-center px-3 ${i > 0 ? 'border-l border-outline' : ''} ${on ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'} [&_.ic]:size-4` },
+        class: `state-layer grid ${size === 'md' ? 'h-10 min-w-10' : 'h-8 min-w-8'} place-items-center px-2 sm:px-3 ${i > 0 ? 'border-l border-outline' : ''} ${on ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'} [&_.ic]:size-4` },
       icon(ic));
       b.addEventListener('click', () => {
         setTheme(value, doc);
@@ -292,7 +292,7 @@ export function langMenu(doc: Document = document): HTMLElement {
   const wrap = h('div', { class: 'relative' });
   const button = h('button', { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: t('language'), 'aria-label': `${t('language')} : ${LANGS[current]}`,
     class: 'state-layer inline-flex h-9 items-center gap-1.5 rounded-md3-full border border-outline-variant px-2.5 text-[13px] font-semibold text-on-surface-variant' },
-  flag(current, 13, doc), current.toUpperCase(), icon('chevronDown'));
+  flag(current, 13, doc), h('span', { class: 'max-sm:hidden' }, current.toUpperCase()), icon('chevronDown'));
   button.querySelector('.ic')?.classList.add('!size-4');
   const menu = h('div', { role: 'menu', hidden: true,
     class: 'absolute right-0 z-50 mt-1.5 flex min-w-44 flex-col rounded-md3-l bg-surface-high p-1.5 text-on-surface elevation-2' },

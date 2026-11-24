@@ -40,6 +40,13 @@ for (const scheme of ['light', 'dark']) {
   console.log(`${scheme}: after Annuler the editor is ${open ? 'STILL OPEN' : 'closed'}`);
   if (open) await page.keyboard.press('Escape');
 }
+// The language menu open over the calendar (the event button stays under it).
+await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
+await page.goto(base + '/', { waitUntil: 'networkidle2' });
+await page.click('[aria-haspopup="menu"]');
+await wait(300);
+await page.screenshot({ path: `${out}/menu-over-fab.png`, clip: { x: 640, y: 0, width: 640, height: 260 } });
+await page.keyboard.press('Escape');
 // The language menu, open, and the theme choice on Moi, light and dark.
 for (const scheme of ['light', 'dark']) {
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);

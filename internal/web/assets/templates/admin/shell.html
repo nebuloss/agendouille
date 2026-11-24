@@ -9,7 +9,7 @@
     </a>
     <span id="theme-slot" class="contents"></span>
     <span id="bell-slot" class="contents"></span>
-    <form method="post" action="/signout"><button class="state-layer inline-flex h-8 items-center rounded-md3-full px-3 text-[13px] font-medium whitespace-nowrap text-primary" type="submit">{{t "admin.shell.signout"}}</button></form>
+    <form method="post" action="/signout" class="shrink-0"><button class="state-layer inline-flex h-8 items-center gap-1.5 rounded-md3-full px-2 text-[13px] font-medium whitespace-nowrap text-primary sm:px-3" type="submit" title="{{t "admin.shell.signout"}}" aria-label="{{t "admin.shell.signout"}}"><svg class="ic sm:hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4 M10 8l-4 4 4 4 M6 12h11"/></svg><span class="hidden sm:inline">{{t "admin.shell.signout"}}</span></button></form>
   </div>
   <nav class="trail mx-auto mt-2 flex max-w-[110rem] min-w-0 items-center gap-0.5 overflow-x-auto rounded-md3-full bg-primary-container p-1 text-on-primary-container [scrollbar-width:none]" aria-label="{{t "admin.shell.trail"}}">
     {{range $i, $c := .Nav.Trail}}
@@ -20,14 +20,15 @@
   </nav>
 </header>
 <div class="mx-auto grid w-full max-w-[110rem] flex-1 grid-cols-[auto_minmax(0,1fr)] gap-2 px-2 pb-10 md:gap-4 md:px-4">
-  <!-- The rail: a column beside the page at every width, folded to its
-       icons with the first button (folded by default on a phone; the
-       choice is kept per browser, src/admin/main.ts). -->
+  <!-- The rail: a column beside the page at every width. On a phone it is
+       folded to its icons, and the menu button opens it over the page
+       (src/admin/main.ts); on a larger screen it is always open. -->
   <div class="relative max-md:w-[3.25rem]">
-  <nav class="rail group/rail sticky top-[7.5rem] z-20 flex w-[13.5rem] flex-col gap-0.5 self-start rounded-md3-xl bg-surface-container p-1.5 data-[folded=true]:w-auto max-md:data-[folded=auto]:w-auto max-md:data-[folded=false]:absolute max-md:data-[folded=false]:top-0 max-md:data-[folded=false]:w-[15rem] max-md:data-[folded=false]:elevation-2 md:p-2" data-folded="auto" aria-label="{{if .Nav.Back}}{{t "admin.shell.pages"}}{{else}}{{t "admin.shell.sections"}}{{end}}">
-    <button type="button" class="rail-toggle state-layer flex min-h-10 items-center gap-3 rounded-md3-full px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant" aria-expanded="true" title="{{t "admin.shell.fold"}}" data-fold="{{t "admin.shell.fold"}}" data-unfold="{{t "admin.shell.unfold"}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16 M4 12h16 M4 17h16"/></svg><span class="truncate group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{t "admin.shell.fold"}}</span></button>
-    {{with .Nav.Back}}<a href="{{.Href}}" class="state-layer flex min-h-10 shrink-0 items-center gap-3 rounded-md3-full bg-surface-lowest px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant no-underline mb-1" title="{{.Label}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span class="truncate group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{.Label}}</span></a>{{end}}
-    {{range .Nav.Items}}<a href="{{.Href}}" class="state-layer flex min-h-10 shrink-0 items-center gap-3 rounded-md3-full px-3 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" title="{{.Label}}" {{if .Current}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span class="truncate group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{.Label}}</span></a>{{end}}
+  <nav class="rail group/rail sticky top-[7.5rem] z-20 flex w-[13.5rem] flex-col gap-0.5 self-start rounded-md3-xl bg-surface-container p-1.5 max-md:data-[folded=true]:w-auto max-md:data-[folded=auto]:w-auto max-md:data-[folded=false]:absolute max-md:data-[folded=false]:top-0 max-md:data-[folded=false]:w-[15rem] max-md:data-[folded=false]:elevation-2 md:p-2" data-folded="auto" aria-label="{{if .Nav.Back}}{{t "admin.shell.pages"}}{{else}}{{t "admin.shell.sections"}}{{end}}">
+    <button type="button" class="rail-toggle state-layer flex min-h-10 items-center gap-3 rounded-md3-full px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant md:hidden" aria-expanded="true" title="{{t "admin.shell.fold"}}" data-fold="{{t "admin.shell.fold"}}" data-unfold="{{t "admin.shell.unfold"}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16 M4 12h16 M4 17h16"/></svg><span class="truncate max-md:group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{t "admin.shell.fold"}}</span></button>
+    <hr class="mx-2 my-1 border-0 border-t border-outline-variant md:hidden">
+    {{with .Nav.Back}}<a href="{{.Href}}" class="state-layer flex min-h-10 shrink-0 items-center gap-3 rounded-md3-full bg-surface-lowest px-3 text-sm font-medium whitespace-nowrap text-on-surface-variant no-underline mb-1" title="{{.Label}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span class="truncate max-md:group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{.Label}}</span></a>{{end}}
+    {{range .Nav.Items}}<a href="{{.Href}}" class="state-layer flex min-h-10 shrink-0 items-center gap-3 rounded-md3-full px-3 text-sm font-semibold whitespace-nowrap text-on-surface no-underline aria-[current=page]:bg-secondary-container aria-[current=page]:text-on-secondary-container" title="{{.Label}}" {{if .Current}}aria-current="page"{{end}}><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{.Icon}}"/></svg><span class="truncate max-md:group-data-[folded=true]/rail:sr-only max-md:group-data-[folded=auto]/rail:sr-only">{{.Label}}</span></a>{{end}}
   </nav>
   </div>
   <section class="flex min-w-0 flex-col gap-4" id="admin-content" data-name="{{.Name}}" data-sub="{{.Sub}}">

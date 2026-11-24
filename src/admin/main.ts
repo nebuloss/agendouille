@@ -32,8 +32,7 @@ export const pages = new Pages({
 whenReady(document, () => {
   document.documentElement.dataset['bundle'] = 'admin';
   pages.mount(document);
-  // The rail folds to its icons (folded by default on a phone); the choice
-  // is this browser's.
+  // On a phone the rail is folded to its icons; its menu button opens it.
   const rail = document.querySelector<HTMLElement>('.rail');
   if (rail !== null) foldable(rail);
   // On a phone the trail can be wider than the screen: show its end.
@@ -52,46 +51,25 @@ whenReady(document, () => {
   }
 });
 
-/** The rail's fold button: folded shows the icons only, their names as tooltips. */
+/** The rail's menu button, on a phone: open over the page, folded again on a tap beside it. */
 function foldable(rail: HTMLElement): void {
   const button = rail.querySelector<HTMLButtonElement>('.rail-toggle');
   if (button === null) return;
-  const key = 'agd_rail';
-  let stored: string | null = null;
-  try {
-    stored = window.localStorage.getItem(key);
-  } catch {
-    stored = null;
-  }
-  if (stored === 'folded' || stored === 'open') rail.dataset['folded'] = String(stored === 'folded');
-  const folded = (): boolean => rail.dataset['folded'] === 'true' || (rail.dataset['folded'] === 'auto' && window.matchMedia('(max-width: 47.99rem)').matches);
+  const open = (): boolean => rail.dataset['folded'] === 'false';
   const draw = (): void => {
-    const f = folded();
-    const label = f ? button.dataset['unfold'] ?? '' : button.dataset['fold'] ?? '';
-    button.setAttribute('aria-expanded', String(!f));
+    const label = open() ? button.dataset['fold'] ?? '' : button.dataset['unfold'] ?? '';
+    button.setAttribute('aria-expanded', String(open()));
     button.title = label;
     const span = button.querySelector('span');
     if (span !== null) span.textContent = label;
   };
-  // On a phone the open rail covers the page: it does not stay open from one
-  // page to the next, and a tap beside it folds it.
-  const phone = (): boolean => window.matchMedia('(max-width: 47.99rem)').matches;
-  if (phone() && stored === 'open') rail.dataset['folded'] = 'auto';
   button.addEventListener('click', () => {
-    const next = !folded();
-    rail.dataset['folded'] = String(next);
-    if (!phone()) {
-      try {
-        window.localStorage.setItem(key, next ? 'folded' : 'open');
-      } catch {
-        // a browser that keeps nothing: the choice lasts this page
-      }
-    }
+    rail.dataset['folded'] = open() ? 'auto' : 'false';
     draw();
   });
   document.addEventListener('click', (e) => {
-    if (phone() && !folded() && !rail.contains(e.target as Node)) {
-      rail.dataset['folded'] = 'true';
+    if (open() && !rail.contains(e.target as Node)) {
+      rail.dataset['folded'] = 'auto';
       draw();
     }
   });
