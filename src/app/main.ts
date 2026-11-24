@@ -6,7 +6,7 @@ import { CalendarPage } from '@/app/pages/CalendarPage.ts';
 import { CalendarsPage, DevicesPage, MePage } from '@/app/pages/Manage.ts';
 import { SigninPage } from '@/app/pages/SigninPage.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
-import { langMenu } from '@/shared/components/Ui.ts';
+import { langMenu, themeToggle } from '@/shared/components/Ui.ts';
 import { ownValidation } from '@/shared/components/Validation.ts';
 
 // Field errors in our words and design, not the browser's bubbles.
@@ -27,4 +27,5 @@ whenReady(document, () => {
   pages.mount(document);
   // The language menu, wherever the page has room for it.
   for (const slot of Array.from(document.querySelectorAll('[data-lang-menu]'))) slot.replaceWith(langMenu(document));
+  for (const slot of Array.from(document.querySelectorAll('[data-theme-toggle]'))) slot.replaceWith(themeToggle(document, 'sm'));
 });

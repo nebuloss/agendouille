@@ -184,7 +184,7 @@ install'`, and copy `package-lock.json` back with `scp`.
   generated). `theme.css` is claudication's, copied: change it there.
 - **Screenshots before saying a page works:** `scripts/remote.sh 'bash
   scripts/shots/run.sh'`, then look at them. Happy-dom tests do not catch
-  layout. The app pages hold `/api/live` open: wait for `networkidle2`,
+  layout. The app pages hold `/api/live` open, the admin pages `/api/admin/events`: wait for `networkidle2`,
   never `networkidle0`.
 - **The web app sends and gets naive local times in the family zone.**
   Never `new Date("2026-11-25T14:00")` in the browser (that is the

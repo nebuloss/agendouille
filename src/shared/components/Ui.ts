@@ -1,4 +1,4 @@
-import { currentTheme, nextTheme, setTheme, type Theme } from '@/shared/core/Theme.ts';
+import { currentTheme, setTheme, type Theme } from '@/shared/core/Theme.ts';
 import { LANGS, lang, setLang, type Lang } from '@/shared/i18n/i18n.ts';
 import { t } from '@/shared/components/Ui.msg.ts';
 import { flag } from '@/shared/components/flags.ts';
@@ -208,20 +208,31 @@ export function card(title: string, aside: Child[], ...children: Child[]): HTMLE
  * on the screen for whoever looks over a shoulder.
  */
 export function secretField(value: string, label: string): HTMLElement {
-  const text = h('code', { class: 'min-w-0 flex-1 font-mono text-[13px] break-all select-all', 'aria-label': label }, '•'.repeat(16));
+  const masked = '•'.repeat(12);
+  const text = h('code', { class: 'min-w-0 flex-1 truncate font-mono text-[13px] select-all', 'aria-label': label }, masked);
   let shown = false;
-  const toggle = h('button', { type: 'button', class: ui.btn('text', 'sm'), 'aria-pressed': 'false' }, icon('show'), t('show'));
+  const small = 'state-layer grid size-9 shrink-0 place-items-center rounded-full text-on-surface-variant [&_.ic]:size-[18px]';
+  const toggle = h('button', { type: 'button', class: small, 'aria-pressed': 'false', title: t('show'), 'aria-label': t('show') }, icon('show'));
   toggle.addEventListener('click', () => {
     shown = !shown;
-    text.textContent = shown ? value : '•'.repeat(16);
+    text.textContent = shown ? value : masked;
+    // Shown, the value wraps rather than hides its end.
+    text.classList.toggle('truncate', !shown);
+    text.classList.toggle('break-all', shown);
     toggle.setAttribute('aria-pressed', String(shown));
-    toggle.replaceChildren(icon(shown ? 'hide' : 'show'), shown ? t('hide') : t('show'));
+    toggle.title = shown ? t('hide') : t('show');
+    toggle.setAttribute('aria-label', toggle.title);
+    toggle.replaceChildren(icon(shown ? 'hide' : 'show'));
   });
-  const copy = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('link'), t('copy'));
+  const copy = h('button', { type: 'button', class: small, title: t('copy'), 'aria-label': t('copy') }, icon('copy'));
   copy.addEventListener('click', () => {
     const done = (ok: boolean): void => {
-      copy.replaceChildren(icon(ok ? 'check' : 'warn'), ok ? t('copied') : t('copyFailed'));
-      setTimeout(() => copy.replaceChildren(icon('link'), t('copy')), 2000);
+      copy.replaceChildren(icon(ok ? 'check' : 'warn'));
+      copy.title = ok ? t('copied') : t('copyFailed');
+      setTimeout(() => {
+        copy.replaceChildren(icon('copy'));
+        copy.title = t('copy');
+      }, 2000);
     };
     const clip = (globalThis.navigator as Navigator | undefined)?.clipboard;
     if (clip === undefined) {
@@ -230,21 +241,25 @@ export function secretField(value: string, label: string): HTMLElement {
     }
     clip.writeText(value).then(() => done(true), () => done(false));
   });
-  return h('div', { class: 'flex flex-wrap items-center gap-2 rounded-md3-s bg-surface-lowest px-3 py-2' }, text, toggle, copy);
+  return h('div', { class: 'flex min-w-0 items-center gap-1 rounded-md3-s bg-surface-lowest py-1 pr-1 pl-3' }, text, toggle, copy);
 }
 
 /**
- * Appearance: follow the system, light or dark (src/shared/core/Theme.ts).
- * Three segments; the choice applies at once and is remembered.
+ * The theme, as claudication's toggle (web/src/ui/features/theme-toggle.tsx):
+ * three icon segments, light, follow the system, dark, each named in its
+ * tooltip. Three states rather than a switch: "follow the system" is a
+ * standing instruction that a two-way switch cannot say.
  */
-export function themeChoice(doc: Document = document): HTMLElement {
-  const choices: [Theme, string, IconName][] = [['auto', t('themeAuto'), 'contrast'], ['light', t('themeLight'), 'sun'], ['dark', t('themeDark'), 'moon']];
-  const group = h('div', { class: ui.seg, role: 'radiogroup', 'aria-label': t('appearance') });
+export function themeToggle(doc: Document = document, size: 'sm' | 'md' = 'md'): HTMLElement {
+  const options: [Theme, string, IconName][] = [['light', t('themeLight'), 'themeLight'], ['auto', t('themeFollow'), 'themeAuto'], ['dark', t('themeDark'), 'themeDark']];
+  const group = h('div', { role: 'radiogroup', 'aria-label': t('appearance'), class: 'inline-flex shrink-0 overflow-hidden rounded-md3-full border border-outline' });
   const draw = (): void => {
     const now = currentTheme(doc);
-    group.replaceChildren(...choices.map(([value, label, ic]) => {
-      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(now === value),
-        class: 'state-layer inline-flex items-center gap-1.5 px-3.5 py-2 text-sm aria-checked:bg-secondary-container aria-checked:text-on-secondary-container' }, icon(ic), label);
+    group.replaceChildren(...options.map(([value, label, ic], i) => {
+      const on = now === value;
+      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), 'aria-label': label, title: label,
+        class: `state-layer grid ${size === 'md' ? 'h-10 min-w-10' : 'h-8 min-w-8'} place-items-center px-3 ${i > 0 ? 'border-l border-outline' : ''} ${on ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'} [&_.ic]:size-4` },
+      icon(ic));
       b.addEventListener('click', () => {
         setTheme(value, doc);
         draw();
@@ -256,24 +271,6 @@ export function themeChoice(doc: Document = document): HTMLElement {
   return group;
 }
 
-/** The theme as one round button that cycles (the admin's header). */
-export function themeButton(doc: Document = document): HTMLElement {
-  const LABEL: Record<Theme, string> = { auto: t('themeIsAuto'), light: t('themeIsLight'), dark: t('themeIsDark') };
-  const ICON: Record<Theme, IconName> = { auto: 'contrast', light: 'sun', dark: 'moon' };
-  const b = h('button', { type: 'button', class: ui.iconBtn });
-  const draw = (): void => {
-    const t = currentTheme(doc);
-    b.replaceChildren(icon(ICON[t]));
-    b.title = LABEL[t];
-    b.setAttribute('aria-label', LABEL[t]);
-  };
-  b.addEventListener('click', () => {
-    setTheme(nextTheme(currentTheme(doc)), doc);
-    draw();
-  });
-  draw();
-  return b;
-}
 
 /** The language, as a select; choosing one reloads the page in it. */
 export function langChoice(doc: Document = document): HTMLElement {

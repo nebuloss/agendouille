@@ -80,7 +80,7 @@ export const ui = {
   },
 
   /** Term and value pairs. */
-  kv: 'grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5 text-sm [&_dd]:m-0 [&_dd]:break-all [&_dt]:text-on-surface-variant',
+  kv: 'grid grid-cols-1 items-baseline gap-x-4 gap-y-1.5 sm:grid-cols-[auto_minmax(0,1fr)] [&>dt]:max-sm:mt-1.5 text-sm [&_dd]:m-0 [&_dd]:break-all [&_dt]:text-on-surface-variant',
   link: 'font-semibold text-primary no-underline hover:underline',
   dim: 'text-on-surface-variant',
   empty: 'p-5 text-center text-on-surface-variant',

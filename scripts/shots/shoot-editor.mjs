@@ -50,6 +50,18 @@ for (const scheme of ['light', 'dark']) {
 }
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
 await page.setViewport({ width: 390, height: 844, isMobile: true });
+// On a phone: a DAVx5 device added, its password in the dialog.
+await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
+await (await page.$('xpath/.//button[contains(., "DAVx5")]')).click();
+await wait(300);
+await (await page.$('xpath/.//dialog//button[@value="ok"]')).click();
+await wait(700);
+await page.screenshot({ path: `${out}/phone-device-added.png` });
+await page.evaluate(() => { for (const b of document.querySelectorAll('dialog[open] div')) b.scrollTop = b.scrollHeight; });
+await wait(200);
+await page.screenshot({ path: `${out}/phone-device-added-password.png` });
+await page.keyboard.press('Escape');
+await page.screenshot({ path: `${out}/phone-header.png`, clip: { x: 0, y: 0, width: 390, height: 80 } });
 await page.goto(base + '/', { waitUntil: 'networkidle2' });
 await page.click('button[class*="bg-primary-container"]');
 await wait(500);

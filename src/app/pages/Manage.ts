@@ -5,7 +5,7 @@ import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
 import {
-  action, card, check, confirmDialog, dialog, field, langChoice, secretField, section, styleControl, swatch, table, themeChoice,
+  action, card, check, confirmDialog, dialog, field, langChoice, secretField, section, styleControl, swatch, table, themeToggle,
 } from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
@@ -417,7 +417,7 @@ export class MePage extends AppPage {
         h('div', { class: 'flex justify-end' }, action(t('save'), () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), t('saved')), 'filled'))),
       section(t('appearance'),
         h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')),
-        h('div', {}, themeChoice(this.doc)),
+        h('div', {}, themeToggle(this.doc)),
         field(t('language'), language)),
       section(t('myGroups'),
         me.groups.length === 0 ? h('p', { class: ui.empty }, t('noGroup'))

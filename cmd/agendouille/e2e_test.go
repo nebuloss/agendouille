@@ -278,7 +278,7 @@ func TestM1(t *testing.T) {
 	if a := x.do("GET", link, nil, nil); !strings.Contains(a.body, `action="/enroll/`) {
 		t.Errorf("the enrollment page has no button:\n%s", a.body)
 	}
-	if a := x.do("GET", x.public+"/", nil, cookie(auth.AppCookie, leaPhone)); a.status != 200 || !strings.Contains(a.body, "Léa") {
+	if a := x.do("GET", x.public+"/", nil, cookie(auth.AppCookie, leaPhone)); a.status != 200 || !strings.Contains(a.body, `data-user="lea"`) {
 		t.Errorf("home signed in: %d", a.status)
 	}
 

@@ -169,7 +169,7 @@ describe('secretField', () => {
   it('masks a secret until asked, then shows it', () => {
     const f = secretField('agd_abcd-efgh-ijkl', 'Mot de passe');
     expect(f.textContent).not.toContain('agd_');
-    const show = [...f.querySelectorAll('button')].find((b) => b.textContent === 'Afficher')!;
+    const show = [...f.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === 'Afficher')!;
     show.click();
     expect(f.textContent).toContain('agd_abcd-efgh-ijkl');
     show.click();

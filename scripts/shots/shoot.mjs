@@ -15,23 +15,23 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${label} console: ${m.text()}`); });
   page.on('pageerror', (e) => errors.push(`${label} page: ${e.message}`));
   await page.setViewport(viewport);
-  await page.goto(base + '/signin', { waitUntil: 'networkidle0' });
+  await page.goto(base + '/signin', { waitUntil: 'networkidle2' });
   await page.type('input[name=password]', password);
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type=submit]')]);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
   for (const path of ['/', '/users', '/calendars', '/users/lea', '/users/lea/devices', '/users/lea/groups', '/users/lea/calendars', '/users/lea/signin', '/groups', '/groups/famille', '/groups/famille/members', '/users/lea/activity', '/calendars/maman~ecole', '/calendars/maman~ecole/shares', '/activity', '/settings', '/backups']) {
-    await page.goto(base + path, { waitUntil: 'networkidle0' });
+    await page.goto(base + path, { waitUntil: 'networkidle2' });
     await new Promise((r) => setTimeout(r, 300));
     const name = path.replaceAll('/', '_').replace(/^_/, '') || 'overview';
     await page.screenshot({ path: `${out}/${label}-${name}.png`, fullPage: label === 'desktop' });
   }
   // The notification centre, open.
-  await page.goto(base + '/', { waitUntil: 'networkidle0' });
+  await page.goto(base + '/', { waitUntil: 'networkidle2' });
   await page.click('#bell-slot button');
   await new Promise((r) => setTimeout(r, 400));
   await page.screenshot({ path: `${out}/${label}-notices.png` });
   await page.keyboard.press('Escape');
   // Creating a user is a modal.
-  await page.goto(base + '/users', { waitUntil: 'networkidle0' });
+  await page.goto(base + '/users', { waitUntil: 'networkidle2' });
   const add = await page.$('xpath/.//button[contains(., "Ajouter un utilisateur")]');
   if (add) {
     await add.click();
@@ -40,7 +40,8 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
     await page.keyboard.press('Escape');
   } else errors.push(`${label}: no "Ajouter un utilisateur" button`);
   if (label === 'desktop') {
-    await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle0' });
+    await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle2' });
+    await new Promise((r) => setTimeout(r, 1200)); // a live reload from the step before lands first
     for (const [label2, file] of [['Créer un QR code', 'enrollment-dialog'], ['Créer un lien pour navigateur', 'browser-link-dialog']]) {
       const [button] = await page.$$(`xpath/.//button[contains(., "${label2}")]`);
       if (!button) {
@@ -51,7 +52,7 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
       await new Promise((r) => setTimeout(r, 500));
       await page.screenshot({ path: `${out}/desktop-${file}.png` });
       await page.keyboard.press('Escape');
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 1200)); // the new link's notice reloads the page
     }
     await page.screenshot({ path: `${out}/desktop-signin-links.png` });
     // The picker: a calendar's "add members", with a search typed.
