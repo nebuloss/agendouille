@@ -63,7 +63,8 @@
               "target": "g:famille",
               "access": "readwrite"
             }
-          ]
+          ],
+          "shown": true
         },
         {
           "ref": "lea~perso",
@@ -73,7 +74,8 @@
           "access": "owner",
           "hidden": false,
           "description": "",
-          "shares": []
+          "shares": [],
+          "shown": false
         },
         {
           "ref": "maman~ecole",
@@ -82,7 +84,8 @@
           "owner": "maman",
           "access": "read",
           "hidden": false,
-          "description": ""
+          "description": "",
+          "shown": true
         }
       ]
     },

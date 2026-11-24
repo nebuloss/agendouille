@@ -518,13 +518,27 @@ func (h *handlers) appSession(w http.ResponseWriter, r *http.Request, p *auth.Pr
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *handlers) appConfig(w http.ResponseWriter, _ *http.Request, _ *auth.Principal) {
+func (h *handlers) appConfig(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	apkSHA, apkVersion := "", ""
 	if a := assets.AndroidApp(); a != nil {
 		apkSHA, apkVersion = a.SHA256, a.Version
 	}
+	// The calendars the person turned off (« affiché », the web app's and
+	// the app's switch, one per user): the app keeps them off the phone.
+	notShown := []string{}
+	infos, err := h.d.Calendar.Home(r.Context(), h.actor(p), false)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	for _, i := range infos {
+		if !i.View.Shown {
+			notShown = append(notShown, i.Ref.String())
+		}
+	}
 	webx.JSON(w, http.StatusOK, map[string]any{"server_version": h.d.Version, "min_app_version": "0.0.0",
-		"apk_sha256": apkSHA, "apk_version": apkVersion, "bridge": 1, "sync_interval_s": h.d.Settings.Get().AppSyncIntervalMinutes * 60})
+		"apk_sha256": apkSHA, "apk_version": apkVersion, "bridge": 1, "sync_interval_s": h.d.Settings.Get().AppSyncIntervalMinutes * 60,
+		"not_shown": notShown})
 }
 
 // initial is the letter on a user's avatar: the first of the display name,

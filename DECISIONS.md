@@ -1158,3 +1158,12 @@ computer the QR code. The app's update source is a switch in Réglages,
 « Versions de développement » (the server's build, or GitHub's releases),
 defaulting to what the app is, and the version code decides before Android
 would refuse an older APK.
+
+## 2026-11-24: one « affiché » switch per person, the web's and the phones'
+
+The app's per-calendar switch was the phone's own (SYNC_EVENTS); the web
+agenda had its own choice, `shown`. They are one now: the app's switch
+sets `shown`, `/api/app/config` lists the calendars turned off
+(`not_shown`), and each sync of the app brings the phone in line. DAVx5 and
+other CalDAV clients are not affected: they keep their own per-calendar
+choice, and `hidden` (« Masquer ») still takes a calendar off every device.

@@ -41,7 +41,10 @@ which opens a session for the person.
   device on the server). While a permission is missing (battery
   optimisation included), a small « N autorisations à accorder » link opens
   Réglages' Autorisations.
-- **Calendriers**: mine and those shared with me. A calendar's page:
+- **Calendriers**: mine and those shared with me, each with its
+  « Affiché » switch. The switch is the person's, kept on the server: the
+  web agenda follows it, and so does every phone with the app at its next
+  sync (a calendar turned off leaves the phone's agenda). A calendar's page:
   « Synchroniser sur ce téléphone », its shares (each one's access in
   place; « Partager avec d'autres » picks groups and people), « Modifier »,
   « Transférer », « Supprimer »; for one shared with me, « Personnaliser »

@@ -326,3 +326,34 @@ func fmtID(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
+
+// A calendar turned off (« affiché », one switch per person) is in the
+// app's configuration, which the phone follows at each sync.
+func TestShownReachesTheApp(t *testing.T) {
+	x := startServer(t)
+	x.publicOn()
+	x.svc.dir.AddUser(context.Background(), "cli", "lea", "Léa", "", nil)
+	L := x.browser("lea")
+	c, _ := L.json("POST", "/api/calendars", map[string]any{"name": "Perso"}, 201)
+	ref := c["ref"].(string)
+	d, _ := L.json("POST", "/api/devices", map[string]any{"kind": "thunderbird", "label": "Téléphone"}, 201)
+	secret, _ := d["secret"].(string)
+	config := func() string {
+		a := x.do("GET", x.public+"/api/app/config", nil, func(r *http.Request) { r.SetBasicAuth("lea", secret) })
+		if a.status != 200 {
+			t.Fatalf("the app's configuration: %d %s", a.status, a.body)
+		}
+		return a.body
+	}
+	if b := config(); !strings.Contains(b, `"not_shown":[]`) {
+		t.Errorf("nothing turned off yet: %s", b)
+	}
+	L.json("PATCH", "/api/calendars/"+ref, map[string]any{"shown": false}, 200)
+	if b := config(); !strings.Contains(b, `"not_shown":["`+ref+`"]`) {
+		t.Errorf("turned off on the web, the app is not told: %s", b)
+	}
+	L.json("PATCH", "/api/calendars/"+ref, map[string]any{"shown": true}, 200)
+	if b := config(); !strings.Contains(b, `"not_shown":[]`) {
+		t.Errorf("back on: %s", b)
+	}
+}

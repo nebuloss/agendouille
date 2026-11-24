@@ -83,6 +83,33 @@ final class CalendarSync {
         return out;
     }
 
+    /**
+     * The person's switch (« affiché », kept on the server for the web app
+     * too): a calendar turned off stops syncing and leaves the phone's
+     * agenda; on again, it comes back. notShown holds the server's refs.
+     */
+    void applyShown(java.util.Set<String> notShown) throws RemoteException {
+        Uri uri = asSyncAdapter(Calendars.CONTENT_URI, account);
+        try (Cursor c = provider.query(uri, new String[]{Calendars._ID, Calendars._SYNC_ID, Calendars.SYNC_EVENTS},
+                Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=?", new String[]{account.name, account.type}, null)) {
+            while (c != null && c.moveToNext()) {
+                int want = notShown.contains(ref(c.getString(1))) ? 0 : 1;
+                if (c.getInt(2) == want) continue;
+                ContentValues v = new ContentValues();
+                v.put(Calendars.SYNC_EVENTS, want);
+                v.put(Calendars.VISIBLE, want);
+                provider.update(android.content.ContentUris.withAppendedId(uri, c.getLong(0)), v, null, null);
+            }
+        }
+    }
+
+    /** ".../dav/calendars/<user>/<owner~slug>/" -> "owner~slug", the API's ref. */
+    static String ref(String url) {
+        if (url == null) return "";
+        String u = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        return Uri.decode(u.substring(u.lastIndexOf('/') + 1));
+    }
+
     /** A calendar the person syncs: its id, URL and last sync token. */
     static final class Synced {
         final long id;

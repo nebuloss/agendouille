@@ -272,7 +272,7 @@ no same-origin):
 | GET | `/app/agendouille.apk` | none: the embedded app (404 in a build without it) |
 | GET | `/.well-known/assetlinks.json` | none: the app's package and signing certificate, for App Links (404 without the app) |
 | GET | `/davx5/{token}` | the token: a new DAVx5 device's page, ten minutes (410 after) |
-| GET | `/api/app/config` | Basic -> `{"server_version", "min_app_version", "apk_sha256", "apk_version", "bridge": 1, "sync_interval_s"}` |
+| GET | `/api/app/config` | Basic -> `{"server_version", "min_app_version", "apk_sha256", "apk_version", "bridge": 1, "sync_interval_s", "not_shown": [ref]}` (the calendars the person turned off, which the app keeps off the phone) |
 
 ### 2.3 Surface `admin`
 

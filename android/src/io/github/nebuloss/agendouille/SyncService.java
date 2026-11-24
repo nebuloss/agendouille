@@ -57,6 +57,9 @@ public final class SyncService extends Service {
                 List<Dav.Collection> remote = dav.calendars();
                 Map<String, Long> ids = cals.update(remote);
                 result.stats.numEntries += ids.size();
+                // Which of them the person turned off, on the web or in the app.
+                java.util.Set<String> off = notShown(cred, ua);
+                if (off != null) cals.applyShown(off);
                 // The events of each calendar the person keeps on the phone:
                 // the phone's changes first, then the server's.
                 java.time.ZoneId zone = java.time.ZoneId.systemDefault();
@@ -80,6 +83,21 @@ public final class SyncService extends Service {
                 Log.e("agendouille", "sync", e);
                 result.databaseError = true;
                 SyncStatus.failed(ctx, String.valueOf(e.getMessage()));
+            }
+        }
+
+        /** The refs the server says are turned off; null when it cannot tell (offline, an older server). */
+        private static java.util.Set<String> notShown(Credentials cred, String ua) {
+            try {
+                Http.Answer a = Http.call("GET", cred.server + "/api/app/config", cred.username, cred.secret, null, null, ua);
+                if (a.status != 200) return null;
+                org.json.JSONArray arr = new org.json.JSONObject(a.body).optJSONArray("not_shown");
+                if (arr == null) return null;
+                java.util.Set<String> out = new java.util.HashSet<>();
+                for (int i = 0; i < arr.length(); i++) out.add(arr.getString(i));
+                return out;
+            } catch (Exception e) {
+                return null;
             }
         }
 

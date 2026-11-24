@@ -57,7 +57,8 @@ class PhoneCalendars extends CalendarsPage {
   protected override readonly files = false;
   private selected: string | null = null;
 
-  constructor(doc: Document, api: Api, private readonly phone: () => AppState | null, private readonly toggle: (c: CalendarState, on: boolean) => void) {
+  constructor(doc: Document, api: Api, private readonly phone: () => AppState | null, private readonly toggle: (c: CalendarState, on: boolean) => void,
+    private readonly align: (c: CalendarState, on: boolean) => void = () => undefined) {
     super(doc, api);
   }
 
@@ -81,14 +82,20 @@ class PhoneCalendars extends CalendarsPage {
   private list(all: Calendar[], me: string): Child[] {
     const row = (c: Calendar): HTMLElement => {
       const shares = c.shares ?? [];
-      const b = h('button', { type: 'button', class: ROW },
+      const phone = this.phone()?.calendars.find((x) => x.ref === c.ref);
+      if (phone !== undefined && phone.sync !== c.shown) this.align(phone, c.shown);
+      const b = h('button', { type: 'button', class: 'state-layer flex min-h-14 min-w-0 flex-1 items-center gap-4 py-2 pr-2 pl-4 text-left' },
         swatch(c.color, 'md'),
         h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1' },
           h('span', { class: 'truncate text-base font-medium' }, c.name),
           h('span', { class: 'flex flex-wrap items-center gap-1.5' }, ...calendarChips(c, me, shares.length))),
-        h('span', { class: 'text-on-surface-variant' }, icon('right')));
+        phone === undefined ? h('span', { class: 'text-on-surface-variant' }, icon('right')) : null);
       b.addEventListener('click', () => this.open(c.ref));
-      return b;
+      // On the phone: synced here or not, in one tap.
+      if (phone === undefined) return b;
+      return h('div', { class: 'flex items-center' }, b,
+        h('span', { class: 'flex shrink-0 items-center pr-4' },
+          switchButton(this.doc, t('syncThis', { name: c.name }), c.shown, (on) => this.toggle(phone, on))));
     };
     const create = h('button', { type: 'button', class: ui.btn('filled', 'sm') }, icon('plus'), t('newCalendar'));
     create.addEventListener('click', () => void this.create());
@@ -119,8 +126,7 @@ class PhoneCalendars extends CalendarsPage {
     if (phone === undefined) {
       sync = h('p', { class: 'px-4 py-3 text-sm text-on-surface-variant' }, t('notOnPhoneYet'));
     } else {
-      const box = h('input', { type: 'checkbox', checked: phone.sync, 'aria-label': t('syncThis', { name: c.name }) });
-      box.addEventListener('change', () => this.toggle(phone, box.checked));
+      const box = switchButton(this.doc, t('syncThis', { name: c.name }), c.shown, (on) => this.toggle(phone, on));
       sync = h('label', { class: ROW },
         h('span', { class: 'flex min-w-0 flex-1 flex-col' },
           h('span', { class: 'text-base' }, t('syncOnPhone')),
@@ -353,15 +359,14 @@ export class App {
       append(this.root, ...this.phoneCalendars(s));
       return;
     }
-    this.mount(s, (doc) => new PhoneCalendars(doc, this.api, () => this.state,
-      (c, on) => void this.act('calendar.toggle', { id: c.id, enabled: on }, on ? t('syncOn', { name: c.name }) : t('syncOff', { name: c.name }))));
+    this.mount(s, (doc) => new PhoneCalendars(doc, this.api, () => this.state, (c, on) => void this.setShown(c, on),
+      (c, on) => void this.bridge.call('calendar.toggle', { id: c.id, enabled: on }).catch(() => undefined)));
   }
 
   /** Signed in with a device's password: the calendars on the phone, to sync or not, and how to manage them. */
   private phoneCalendars(s: AppState): Child[] {
     const rows = s.calendars.map((c) => {
-      const box = h('input', { type: 'checkbox', checked: c.sync, 'aria-label': t('syncThis', { name: c.name }) });
-      box.addEventListener('change', () => void this.act('calendar.toggle', { id: c.id, enabled: box.checked }));
+      const box = switchButton(this.doc, t('syncThis', { name: c.name }), c.sync, (on) => void this.act('calendar.toggle', { id: c.id, enabled: on }));
       return h('label', { class: 'flex min-h-14 items-center gap-3 px-4 py-2' },
         swatch(c.color, 'md'),
         h('span', { class: 'flex min-w-0 flex-1 flex-col' },
@@ -605,6 +610,20 @@ export class App {
   }
 
   /** A call that answers with the new state, its error in a toast. */
+  /**
+   * The switch of a calendar: the person's (« affiché », on the server, the
+   * web app's too), then this phone at once; other phones at their next sync.
+   */
+  private async setShown(c: CalendarState, on: boolean): Promise<void> {
+    try {
+      await this.api.patch(`/calendars/${seg(c.ref)}`, { shown: on });
+    } catch (e) {
+      this.toasts.error(new Error(reason(e)));
+      return;
+    }
+    await this.act('calendar.toggle', { id: c.id, enabled: on }, on ? t('syncOn', { name: c.name }) : t('syncOff', { name: c.name }));
+  }
+
   private async act(name: string, args?: Record<string, unknown>, done?: string): Promise<boolean> {
     try {
       this.show(parseState(await this.bridge.call(name, args)));
