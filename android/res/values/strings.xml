@@ -3,6 +3,8 @@
      in values-fr. The style guide is docs/i18n.md. -->
 <resources>
   <string name="app_name">agendouille</string>
+  <!-- Under the icon: "agendouille" is cut in a launcher's grid; the andouille of Guémené fits. -->
+  <string name="launcher_name" translatable="false">Guémené</string>
   <string name="bad_link">This is not an agendouille sign-in link. Check the address and try again.</string>
   <string name="enroll_failed">This phone could not be signed in: %1$s</string>
   <string name="enroll_used">This sign-in link has already been used. Ask your administrator for a new one.</string>

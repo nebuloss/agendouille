@@ -3,6 +3,14 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the Android app is « Guémené » under its icon
+
+"agendouille" (11 letters) is cut in a launcher's grid (a Xiaomi's drawer
+showed it). The user chose « Guémené », the andouille's town: 7 letters.
+Only the launcher activity's label changes (`launcher_name`); the app's
+label, in Android's settings and on the account, stays "agendouille", as
+do the screens, the server and the web app.
+
 ## 2026-11-24: the Android app needs no Google Play services
 
 The user: "we must support devices without play services too". The app
