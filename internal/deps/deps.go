@@ -14,6 +14,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
 	"github.com/nebuloss/agendouille/internal/live"
+	"github.com/nebuloss/agendouille/internal/push"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/store"
 )
@@ -29,6 +30,8 @@ type Deps struct {
 	Calendar  *calendar.Service
 	Backup    *backup.Service
 	Hub       *hub.Hub
+	// Push sends WebDAV-Push messages (M9).
+	Push *push.Service
 	// Live tells the admin UI what changed (internal/live).
 	Live    *live.Hub
 	Clock   func() time.Time

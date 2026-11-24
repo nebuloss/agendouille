@@ -14,6 +14,11 @@ type Event struct {
 	Name       string // "" for a change of the calendar itself
 	Action     string
 	By         string
+	// DeviceID is the device that made the change (0: none, the web app);
+	// push does not tell it of its own change.
+	DeviceID int64
+	// DontNotify is the request's Push-Dont-Notify: registration URLs, or "*".
+	DontNotify []string
 }
 
 // Listener receives events on C. Lost reports whether some were dropped

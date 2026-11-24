@@ -72,6 +72,9 @@ type Actor struct {
 	DeviceID int64
 	Cap      string // "readwrite" or "read"
 	Via      string // caldav, web, app, import, cli, admin
+	// DontNotify is a CalDAV request's Push-Dont-Notify (WebDAV-Push): the
+	// registrations its change must not be pushed to, or "*".
+	DontNotify []string
 }
 
 // Operator is the CLI's actor.
@@ -336,9 +339,10 @@ func (s *Service) change(ctx context.Context, tx *sql.Tx, a Actor, calID int64, 
 	return seq, err
 }
 
-func (s *Service) publish(i Info, seq int64, name, action, by string) {
+func (s *Service) publish(i Info, seq int64, name, action string, a Actor) {
 	if s.hub != nil {
-		s.hub.Publish(hub.Event{Seq: seq, CalendarID: i.ID, Calendar: i.Ref.String(), Name: name, Action: action, By: by})
+		s.hub.Publish(hub.Event{Seq: seq, CalendarID: i.ID, Calendar: i.Ref.String(), Name: name, Action: action, By: a.Name,
+			DeviceID: a.DeviceID, DontNotify: a.DontNotify})
 	}
 }
 
@@ -413,7 +417,7 @@ func (s *Service) Create(ctx context.Context, a Actor, owner, slug string, p Pro
 	}
 	i, err := s.lookup(ctx, a, Ref{owner, slug})
 	if err == nil {
-		s.publish(i, i.Seq, "", "calendar_created", a.Name)
+		s.publish(i, i.Seq, "", "calendar_created", a)
 	}
 	return i, err
 }
@@ -479,7 +483,7 @@ func (s *Service) Update(ctx context.Context, a Actor, r Ref, p Props) (Info, er
 	if err != nil {
 		return Info{}, err
 	}
-	s.publish(i, seq, "", "calendar_changed", a.Name)
+	s.publish(i, seq, "", "calendar_changed", a)
 	return s.lookup(ctx, a, r)
 }
 
@@ -516,7 +520,7 @@ func (s *Service) DeleteCalendar(ctx context.Context, a Actor, r Ref) error {
 		return err
 	})
 	if err == nil {
-		s.publish(i, seq, "", "calendar_deleted", a.Name)
+		s.publish(i, seq, "", "calendar_deleted", a)
 	}
 	return err
 }
@@ -578,7 +582,7 @@ func (s *Service) Transfer(ctx context.Context, a Actor, r Ref, to string, keep 
 	if err != nil {
 		return Info{}, err
 	}
-	s.publish(i, seq, "", "calendar_changed", a.Name)
+	s.publish(i, seq, "", "calendar_changed", a)
 	return s.lookup(ctx, Operator(a.Via), Ref{to, i.Ref.Slug})
 }
 
@@ -850,7 +854,7 @@ func (s *Service) Put(ctx context.Context, a Actor, r Ref, name string, data []b
 	if created {
 		action = "created"
 	}
-	s.publish(i, seq, name, action, a.Name)
+	s.publish(i, seq, name, action, a)
 	return Object{Name: name, UID: idx.UID, ETag: etag, Data: data, Summary: idx.Summary, CreatedBy: author, ModifiedBy: author,
 		CreatedAt: now, ModifiedAt: now}, created, nil
 }
@@ -886,7 +890,7 @@ func (s *Service) Delete(ctx context.Context, a Actor, r Ref, name string, p Pre
 		return err
 	})
 	if err == nil {
-		s.publish(i, seq, name, "deleted", a.Name)
+		s.publish(i, seq, name, "deleted", a)
 	}
 	return err
 }

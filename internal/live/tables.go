@@ -5,25 +5,27 @@ package live
 // table of the schema is here; TestEveryTableHasATopic fails on one that is
 // not. An empty list says on purpose that no screen shows it.
 var Tables = map[string][]Topic{
-	"users":             {People},
-	"groups":            {People},
-	"group_members":     {People},
-	"devices":           {Devices},
-	"enrollments":       {Devices},
-	"approvals":         {Devices},
-	"sessions":          {Devices},
-	"links":             {Devices},
-	"link_calendars":    {Devices},
-	"calendars":         {Calendars},
-	"calendar_views":    {Calendars},
-	"shares":            {Calendars},
-	"objects":           {Calendars},
-	"changes":           {Calendars, Activity},
-	"audit":             {Activity},
-	"settings":          {Settings},
-	"notice_reads":      {Notices},
-	"admin":             {}, // the admin password: no screen shows it
-	"schema_migrations": {},
+	"users":              {People},
+	"groups":             {People},
+	"group_members":      {People},
+	"devices":            {Devices},
+	"enrollments":        {Devices},
+	"approvals":          {Devices},
+	"sessions":           {Devices},
+	"links":              {Devices},
+	"link_calendars":     {Devices},
+	"calendars":          {Calendars},
+	"calendar_views":     {Calendars},
+	"shares":             {Calendars},
+	"objects":            {Calendars},
+	"changes":            {Calendars, Activity},
+	"audit":              {Activity},
+	"settings":           {Settings},
+	"notice_reads":       {Notices},
+	"admin":              {}, // the admin password: no screen shows it
+	"push_subscriptions": {}, // a device's push registrations: no screen shows them
+	"push_keys":          {}, // the server's VAPID key
+	"schema_migrations":  {},
 }
 
 // ForTables are the topics writes to tables change, each once.

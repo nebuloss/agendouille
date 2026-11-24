@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
 	"github.com/nebuloss/agendouille/internal/live"
+	"github.com/nebuloss/agendouille/internal/push"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/sharing"
 	"github.com/nebuloss/agendouille/internal/store"
@@ -81,6 +83,7 @@ type services struct {
 	auth     *auth.Service
 	calendar *calendar.Service
 	hub      *hub.Hub
+	push     *push.Service
 }
 
 func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
@@ -100,7 +103,8 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 	h := hub.New()
 	cal := calendar.New(st.DB(), time.Now, set, dir, sharing.New(st.DB(), dir), h)
 	a := auth.New(st.DB(), time.Now, set, dir)
-	return &services{store: st, settings: set, dir: dir, auth: a, calendar: cal, hub: h}, nil
+	ps := push.New(st.DB(), cal.Sharing(), time.Now, func() string { return strings.TrimRight(set.Get().PublicURL, "/") }, slog.Default())
+	return &services{store: st, settings: set, dir: dir, auth: a, calendar: cal, hub: h, push: ps}, nil
 }
 
 // muxes builds each listener's routes once: the public one holds the dav
@@ -173,7 +177,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	svc.settings.Subscribe(func(settings.Change) { lv.Changed(live.Settings) })
 	bk.OnChange(func() { lv.Changed(live.Backups) })
 	d := &deps.Deps{Config: cfg, Settings: svc.settings, Log: log, Store: svc.store, Directory: svc.dir, Auth: svc.auth,
-		Calendar: svc.calendar, Backup: bk, Hub: svc.hub, Live: lv, Clock: time.Now, Version: version,
+		Calendar: svc.calendar, Backup: bk, Hub: svc.hub, Push: svc.push, Live: lv, Clock: time.Now, Version: version,
 		Restart: func(reason string) {
 			select {
 			case restart <- reason:
@@ -229,6 +233,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	go watchConfig(watchCtx, cfg, svc.settings, log)
 	go prune(watchCtx, svc.calendar, log)
 	go bk.Run(watchCtx)
+	go svc.push.Run(watchCtx, svc.hub)
 	go lv.Run(watchCtx.Done())
 
 	if ready != nil {

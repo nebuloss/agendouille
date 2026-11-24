@@ -42,6 +42,10 @@ var (
 	pColor            = xml.Name{Space: nsApple, Local: "calendar-color"}
 	pOrder            = xml.Name{Space: nsApple, Local: "calendar-order"}
 	pPrincipalColSet  = dn("principal-collection-set")
+	// WebDAV-Push: asked by name only, never part of allprop.
+	pPushTransports = xml.Name{Space: nsPush, Local: "transports"}
+	pPushTopic      = xml.Name{Space: nsPush, Local: "topic"}
+	pPushTriggers   = xml.Name{Space: nsPush, Local: "supported-triggers"}
 )
 
 // resource is one thing a multistatus reports on.
@@ -107,6 +111,7 @@ func (c *call) props(res resource, withData bool) (map[xml.Name]string, []xml.Na
 		put(pCTag, strconv.FormatInt(i.Seq, 10))
 		put(pSyncToken, esc(calendar.Token(c.s.d.PublicURL(), *i)))
 		put(pContentType, "text/calendar; charset=utf-8; component=vcalendar")
+		c.pushProps(out, i.ID)
 	case kObject:
 		o := res.obj
 		put(pResourceType, "")
@@ -119,6 +124,30 @@ func (c *call) props(res resource, withData bool) (map[xml.Name]string, []xml.Na
 		}
 	}
 	return out, order
+}
+
+// pushProps adds a calendar's WebDAV-Push properties: where messages go
+// (Web Push, with the server's VAPID key), its topic, and the triggers: a
+// member changed (depth 1), the calendar's own properties (depth 0).
+func (c *call) pushProps(out map[xml.Name]string, calendarID int64) {
+	ps := c.s.d.Push
+	if ps == nil {
+		return
+	}
+	ctx := c.r.Context()
+	key, err := ps.PublicKey(ctx)
+	if err != nil {
+		c.s.d.Log.Warn("push: the VAPID key", "err", err)
+		return
+	}
+	topic, err := ps.Topic(ctx, calendarID)
+	if err != nil {
+		c.s.d.Log.Warn("push: a topic", "err", err)
+		return
+	}
+	out[pPushTransports] = `<p:web-push><p:vapid-public-key type="p256ecdsa">` + esc(key) + `</p:vapid-public-key></p:web-push>`
+	out[pPushTopic] = esc(topic)
+	out[pPushTriggers] = `<p:content-update><d:depth>1</d:depth></p:content-update><p:property-update><d:depth>0</d:depth></p:property-update>`
 }
 
 // propRequest is what a PROPFIND or REPORT asks for.

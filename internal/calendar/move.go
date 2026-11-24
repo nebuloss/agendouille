@@ -79,7 +79,7 @@ func (s *Service) Move(ctx context.Context, a Actor, from Ref, name string, to R
 	if err != nil {
 		return Object{}, err
 	}
-	s.publish(src, seqFrom, name, "deleted", a.Name)
-	s.publish(dst, seqTo, name, "created", a.Name)
+	s.publish(src, seqFrom, name, "deleted", a)
+	s.publish(dst, seqTo, name, "created", a)
 	return o, nil
 }

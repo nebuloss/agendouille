@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	davHeader = "1, 3, calendar-access, extended-mkcol"
-	allow     = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, REPORT, MKCALENDAR, MKCOL"
+	davHeader = "1, 3, calendar-access, extended-mkcol, webdav-push"
+	allow     = "OPTIONS, GET, HEAD, POST, PUT, DELETE, PROPFIND, PROPPATCH, REPORT, MKCALENDAR, MKCOL"
 )
 
 type server struct{ d *deps.Deps }
@@ -94,6 +94,7 @@ const (
 	kHome
 	kCalendar
 	kObject
+	kPush // a WebDAV-Push registration, /dav/push/<id>
 	kNone
 )
 
@@ -114,6 +115,8 @@ func route(p string) target {
 		return target{kind: kRoot}
 	}
 	switch {
+	case len(parts) == 2 && parts[0] == "push" && !trailing:
+		return target{kind: kPush, name: parts[1]}
 	case len(parts) == 2 && parts[0] == "principals":
 		return target{kind: kPrincipal, user: parts[1]}
 	case len(parts) == 2 && parts[0] == "calendars":
@@ -168,11 +171,12 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := route(r.URL.Path)
-	if t.kind == kNone || (t.kind != kRoot && t.user != p.User.Name) {
+	if t.kind == kNone || (t.kind != kRoot && t.kind != kPush && t.user != p.User.Name) {
 		http.NotFound(w, r)
 		return
 	}
-	a := calendar.Actor{UserID: p.User.ID, Name: p.User.Name, DeviceID: p.DeviceID, Cap: p.DeviceCap, Via: "caldav"}
+	a := calendar.Actor{UserID: p.User.ID, Name: p.User.Name, DeviceID: p.DeviceID, Cap: p.DeviceCap, Via: "caldav",
+		DontNotify: dontNotify(r.Header.Values("Push-Dont-Notify"))}
 	c := &call{s: s, w: w, r: r, p: p, a: a, t: t}
 	switch r.Method {
 	case "PROPFIND":
@@ -183,7 +187,13 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 		c.get()
 	case http.MethodPut:
 		c.put()
+	case http.MethodPost:
+		c.pushRegister()
 	case http.MethodDelete:
+		if t.kind == kPush {
+			c.pushUnregister()
+			return
+		}
 		c.delete()
 	case "MKCALENDAR", "MKCOL":
 		c.mkcalendar()

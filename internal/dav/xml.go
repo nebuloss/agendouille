@@ -13,9 +13,10 @@ const (
 	nsCalDAV = "urn:ietf:params:xml:ns:caldav"
 	nsCS     = "http://calendarserver.org/ns/"
 	nsApple  = "http://apple.com/ns/ical/"
+	nsPush   = "https://bitfire.at/webdav-push" // WebDAV-Push (M9)
 )
 
-var prefixes = map[string]string{nsDAV: "d", nsCalDAV: "c", nsCS: "cs", nsApple: "a"}
+var prefixes = map[string]string{nsDAV: "d", nsCalDAV: "c", nsCS: "cs", nsApple: "a", nsPush: "p"}
 
 // maxBody caps XML request bodies (PLAN.md 10).
 const maxBody = 1 << 20
@@ -123,7 +124,7 @@ type writer struct{ b strings.Builder }
 func newMultistatus() *writer {
 	w := &writer{}
 	w.b.WriteString(`<?xml version="1.0" encoding="utf-8"?>` + "\n")
-	w.b.WriteString(`<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:a="http://apple.com/ns/ical/">`)
+	w.b.WriteString(`<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:a="http://apple.com/ns/ical/" xmlns:p="https://bitfire.at/webdav-push">`)
 	return w
 }
 
@@ -220,5 +221,5 @@ func davError(space, local, inner string) string {
 		body = open(el) + inner + closeTag(el)
 	}
 	return `<?xml version="1.0" encoding="utf-8"?>` + "\n" +
-		`<d:error xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">` + body + `</d:error>`
+		`<d:error xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:p="https://bitfire.at/webdav-push">` + body + `</d:error>`
 }
