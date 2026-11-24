@@ -22,17 +22,37 @@ A self-hosted calendar server for a family, at home, with nothing outside.
 Sync is standard CalDAV for everyone; sharing and sign-in go through an
 additional API. One Go binary, SQLite, behind a reverse proxy in the DMZ.
 
-**Status: M4.** CalDAV works, read and write, with calendars owned by
+**Status: M6.** CalDAV works, read and write, with calendars owned by
 users and shared with users or groups. The admin UI manages users,
 groups, sign-in QR codes, calendars (their metadata only), settings and
-backups at `http://127.0.0.1:8792/`. The family web app shows the
-calendars by agenda, week and month, edits events (one, this and
-following, or all of a series), creates and shares calendars, and sets
-up phones (DAVx5 by QR, iPhone by profile, Thunderbird by hand) and
-read-only `.ics` links. `deploy/install.sh` installs and upgrades it on
-Debian or Alpine (see `deploy/README.md`). See `PLAN.md` for the design,
-`CONTRACTS.md` for the interfaces and `DECISIONS.md` for what was decided
-and why.
+backups. The family web app shows the calendars by agenda, week and
+month, edits events, creates and shares calendars, and sets up phones
+(the agendouille app or DAVx5 by QR code, iPhone by profile, Thunderbird
+by hand) and read-only `.ics` links. The Android app syncs, manages
+calendars and signs browsers in. Releases are built, signed and published
+by GitHub Actions. See `PLAN.md` for the design, `CONTRACTS.md` for the
+interfaces and `DECISIONS.md` for what was decided and why.
+
+## Install
+
+As root, on Debian, Ubuntu or Alpine (the same command installs and
+upgrades):
+
+    curl -fsSL https://raw.githubusercontent.com/nebuloss/agendouille/main/deploy/install.sh | sh
+
+It downloads the latest release for this machine, checks it against the
+release's `SHA256SUMS`, installs the service, starts it, and prints the
+admin password once. The admin UI is then at **http://127.0.0.1:8792/**;
+`deploy/README.md` puts the family's side behind a proxy, with its address
+(`AGENDOUILLE_INSTALL_PUBLIC_URL=https://agenda.example.org` on the first
+install turns it on).
+
+The Android app comes with every release: the server offers it on its
+sign-in page, and the app updates itself from GitHub's releases.
+
+To install a release on a server from here: `PVE=root@pve CT=<id>
+scripts/deploy.sh v0.7.0` (a Proxmox container) or `TARGET=root@host
+scripts/deploy.sh` (the latest).
 
 ## Build
 

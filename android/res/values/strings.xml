@@ -26,4 +26,9 @@
   <string name="manual_not_caldav">This server does not answer as an agendouille server (HTTP %1$d). Check the address.</string>
   <string name="crash_no_server">The report can be sent once this phone is signed in to a server. Copy it meanwhile.</string>
   <string name="manage_signed_out">This phone is not signed in.</string>
+  <string name="update_body_github">Version %1$s of agendouille is out (this phone has %2$s). It is downloaded from GitHub, checked, then Android asks you to confirm.</string>
+  <string name="update_install_now">Update</string>
+  <string name="update_downloading">Downloading the update…</string>
+  <string name="update_failed">The update failed: %1$s</string>
+  <string name="update_other_key">this app was installed from another build (signed with another key). Uninstall it once, then install the app from the GitHub release.</string>
 </resources>

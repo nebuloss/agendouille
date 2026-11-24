@@ -15,6 +15,22 @@ public final class Versions {
         return !strip(ours).equals(strip(servers));
     }
 
+    /** A release's version ("0.7.0", "v0.7.0"), not a dev build ("dev-1a2b3c4"). */
+    public static boolean isRelease(String v) {
+        return v != null && strip(v).matches("[0-9]+\\.[0-9]+\\.[0-9]+");
+    }
+
+    /** True when theirs is a release later than ours (GitHub's latest against this app). */
+    public static boolean newer(String ours, String theirs) {
+        if (!isRelease(ours) || !isRelease(theirs)) return false;
+        String[] a = strip(ours).split("\\."), b = strip(theirs).split("\\.");
+        for (int i = 0; i < 3; i++) {
+            long x = Long.parseLong(a[i]), y = Long.parseLong(b[i]);
+            if (x != y) return y > x;
+        }
+        return false;
+    }
+
     // "v0.6.0" and "0.6.0" are the same version; "-dirty" builds are their commit.
     private static String strip(String v) {
         v = v.trim();

@@ -22,4 +22,9 @@
   <string name="manual_not_caldav">Ce serveur ne répond pas comme un serveur agendouille (HTTP %1$d). Vérifiez l’adresse.</string>
   <string name="crash_no_server">Le rapport pourra être envoyé une fois ce téléphone connecté à un serveur. Copiez-le en attendant.</string>
   <string name="manage_signed_out">Ce téléphone n’est pas connecté.</string>
+  <string name="update_body_github">La version %1$s d’agendouille est sortie (ce téléphone a la %2$s). Elle est téléchargée depuis GitHub, vérifiée, puis Android vous demande de confirmer.</string>
+  <string name="update_install_now">Mettre à jour</string>
+  <string name="update_downloading">Téléchargement de la mise à jour…</string>
+  <string name="update_failed">La mise à jour a échoué : %1$s</string>
+  <string name="update_other_key">cette application a été installée depuis une autre version (signée avec une autre clé). Désinstallez-la une fois, puis installez l’application de la version GitHub.</string>
 </resources>

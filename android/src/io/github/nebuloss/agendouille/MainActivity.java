@@ -132,6 +132,10 @@ public final class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (Updater.ACTION_STATUS.equals(intent.getAction())) {
+            installStatus(intent);
+            return;
+        }
         String link = linkOf(intent);
         if (link != null) enrollFromIntent(link);
     }
@@ -612,8 +616,14 @@ public final class MainActivity extends Activity {
         });
     }
 
-    /** At start and on return: whether the device still exists, and an update. */
+    /**
+     * At start and on return: whether the device still exists, and an
+     * update. A release updates from GitHub (Updater); a dev build, from the
+     * server that embeds it.
+     */
     private void checkConfig() {
+        boolean release = Versions.isRelease(version());
+        if (release) checkGitHub();
         Credentials c = Credentials.load(this);
         if (c == null) return;
         io.execute(() -> {
@@ -626,7 +636,7 @@ public final class MainActivity extends Activity {
                 if (a.status != 200) return;
                 JSONObject o = new JSONObject(a.body);
                 String theirs = o.optString("apk_version");
-                if (Versions.updateAvailable(version(), theirs, !o.optString("apk_sha256").isEmpty())) ui.post(() -> offerUpdate(c.server, theirs));
+                if (!release && Versions.updateAvailable(version(), theirs, !o.optString("apk_sha256").isEmpty())) ui.post(() -> offerUpdate(c.server, theirs));
             } catch (Exception ignored) {
                 // Offline: the next start will tell.
             }
@@ -642,5 +652,60 @@ public final class MainActivity extends Activity {
                 .setPositiveButton(R.string.update_install, (d, w) -> openOutside(Uri.parse(server + "/app/agendouille.apk")))
                 .setNegativeButton(R.string.update_later, (d, w) -> p.edit().putString("update_dismissed", theirs).apply())
                 .show();
+    }
+
+    /** GitHub's latest release, at most every six hours. */
+    private void checkGitHub() {
+        SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
+        if (System.currentTimeMillis() - p.getLong("github_checked", 0) < 6 * 3600_000L) return;
+        io.execute(() -> {
+            try {
+                Updater.Release r = Updater.latest(userAgent());
+                p.edit().putLong("github_checked", System.currentTimeMillis()).apply();
+                if (r != null && Versions.newer(version(), r.version)) ui.post(() -> offerGitHubUpdate(r));
+            } catch (Exception ignored) {
+                // Offline, or GitHub unreachable: the next start will tell.
+            }
+        });
+    }
+
+    private void offerGitHubUpdate(Updater.Release r) {
+        SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
+        if (r.version.equals(p.getString("update_dismissed", ""))) return;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.update_title)
+                .setMessage(getString(R.string.update_body_github, r.version, version()))
+                .setPositiveButton(R.string.update_install_now, (d, w) -> installUpdate(r))
+                .setNegativeButton(R.string.update_later, (d, w) -> p.edit().putString("update_dismissed", r.version).apply())
+                .show();
+    }
+
+    /** Downloads, checks against SHA256SUMS, and hands it to Android, which asks. */
+    private void installUpdate(Updater.Release r) {
+        android.widget.Toast.makeText(this, R.string.update_downloading, android.widget.Toast.LENGTH_LONG).show();
+        io.execute(() -> {
+            try {
+                Updater.install(this, Updater.download(this, r, userAgent()));
+            } catch (Exception e) {
+                ui.post(() -> updateFailed(String.valueOf(e.getMessage())));
+            }
+        });
+    }
+
+    /** PackageInstaller's answer: its confirmation to show, or how it ended. */
+    private void installStatus(Intent intent) {
+        int status = intent.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, Integer.MIN_VALUE);
+        if (status == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            if (confirm != null) startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } else if (status != android.content.pm.PackageInstaller.STATUS_SUCCESS && status != android.content.pm.PackageInstaller.STATUS_FAILURE_ABORTED) {
+            String msg = intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE);
+            updateFailed(status == android.content.pm.PackageInstaller.STATUS_FAILURE_CONFLICT || status == android.content.pm.PackageInstaller.STATUS_FAILURE_INCOMPATIBLE
+                    ? getString(R.string.update_other_key) : String.valueOf(msg));
+        }
+    }
+
+    private void updateFailed(String why) {
+        new AlertDialog.Builder(this).setMessage(getString(R.string.update_failed, why)).setPositiveButton(android.R.string.ok, null).show();
     }
 }

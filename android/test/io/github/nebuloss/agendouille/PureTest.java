@@ -85,6 +85,27 @@ public class PureTest {
     }
 
     @Test
+    public void releasesAndChecksums() {
+        assertTrue(Versions.isRelease("0.7.0"));
+        assertTrue(Versions.isRelease("v1.2.3"));
+        assertFalse(Versions.isRelease("dev-1a2b3c4"));
+        assertFalse(Versions.isRelease("dev"));
+        assertTrue(Versions.newer("0.7.0", "v0.7.1"));
+        assertTrue(Versions.newer("0.9.9", "0.10.0"));
+        assertFalse(Versions.newer("0.7.0", "0.7.0"));
+        assertFalse(Versions.newer("0.8.0", "0.7.9"));
+        // A dev build never updates from GitHub: its server gives its APK.
+        assertFalse(Versions.newer("dev-1a2b3c4", "0.7.0"));
+        String sums = "aaaa  x\n" + Checksums.sha256(new byte[]{1, 2, 3}) + "  agendouille-0.7.0.apk\n"
+                + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef *agendouille-linux-amd64\n";
+        assertEquals(Checksums.sha256(new byte[]{1, 2, 3}), Checksums.find(sums, "agendouille-0.7.0.apk"));
+        assertEquals("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", Checksums.find(sums, "agendouille-linux-amd64"));
+        assertNull(Checksums.find(sums, "agendouille-0.6.0.apk"));
+        assertNull(Checksums.find(sums, "x"));
+        assertEquals("039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81", Checksums.sha256(new byte[]{1, 2, 3}));
+    }
+
+    @Test
     public void notEnrollLinks() {
         assertNull(EnrollLink.parse(null));
         assertNull(EnrollLink.parse(""));

@@ -11,7 +11,12 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: the app's version code is the commit count, as
+      # scripts/devdeploy.sh counts it, so a release always installs over
+      # the builds before it (Android refuses a lower code).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -48,7 +53,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           make -C android test SDK="$ANDROID_SDK_ROOT" JAVA_HOME="$JAVA_HOME" LIB="$RUNNER_TEMP/lib"
           args=(SDK="$ANDROID_SDK_ROOT" JAVA_HOME="$JAVA_HOME" KEYSTORE="$RUNNER_TEMP/release.keystore" KS_PASS="$KS_PASS" KEY_ALIAS="$KEY_ALIAS")
-          make -C android apk "${args[@]}" VERSION="$version" VERSION_CODE="$GITHUB_RUN_NUMBER"
+          make -C android apk "${args[@]}" VERSION="$version" VERSION_CODE="$(git rev-list --count HEAD)"
           cp android/build/agendouille.apk internal/web/assets/apk/agendouille.apk
           make -s -C android cert "${args[@]}" > internal/web/assets/apk/cert.txt
           echo "$version" > internal/web/assets/apk/version.txt

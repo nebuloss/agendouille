@@ -3,6 +3,37 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: releases on GitHub, and the app updates itself from them
+
+The user: "a ci that builds the server binaries like claudication or
+cafard and releases them, a deploy script and a one-line install in the
+readme; build and sign the apk from github ci and release it so the app
+can check updates from github directly and self update".
+
+- A `v*` tag runs `release.yml`: the three server binaries with the APK
+  embedded, the APK signed with the release key (three secrets:
+  `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`)
+  and published as `agendouille-<version>.apk`, and `SHA256SUMS`.
+- The APK's version code is the commit count, in the release as in
+  `devdeploy.sh`: a release always installs over the builds before it.
+- A release build of the app checks GitHub's latest release (at most
+  every six hours), downloads its APK, checks it against `SHA256SUMS`, and
+  hands it to Android's `PackageInstaller`, which asks the person (and,
+  once, to allow installs from the app). Android refuses an APK signed
+  with another key: the debug builds of `devdeploy.sh` keep updating from
+  their server, as before; moving a phone to the releases means
+  uninstalling the debug build once.
+- `scripts/deploy.sh [vX.Y.Z]` installs a release on a server, with the
+  release's own `install.sh` (`devdeploy.sh` stays for builds of the
+  working tree). The README opens with the one-line install.
+
+## 2026-11-24: the sign-in page is the root's
+
+The user: "we dont need /signin path in public page we can keep root
+path". Signed out, `/` is the sign-in page; every other page leads to `/`,
+and `/signin` answers 301 to `/` for the links that exist. The admin's
+own `/signin` is unchanged.
+
 ## 2026-11-24: the Android app manages calendars and approves browsers
 
 The user: "a navigation panel with scan qr code (to connect a browser),

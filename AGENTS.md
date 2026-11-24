@@ -85,7 +85,13 @@ M0 and M1 are done. What exists:
   `assetlinks.json`, `src/shared/core/Bridge.ts`,
   `src/shared/components/Scanner.ts`. `scripts/shots/shoot-android.mjs`
   shoots the screens with a fake bridge; `scripts/android-live.sh` runs the
-  sync code on the JVM against a real server. Still to check on a phone.
+  sync code on the JVM against a real server. Since: tabs (Synchro,
+  Calendriers over the bridge's `api` with `ApiPath`, Navigateur to
+  approve a browser), DAVx5 QR codes, crash reports (`CrashLog`), and
+  updates from GitHub's releases (`Updater`, `Checksums`, PackageInstaller).
+  The launcher label is « Guémené ».
+- **Releases:** `release.yml` on a `v*` tag (server binaries, the signed
+  APK, `SHA256SUMS`); `scripts/deploy.sh [tag]` installs one on a server.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.
