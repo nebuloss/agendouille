@@ -684,7 +684,7 @@ internet side can never reach the admin UI. Admin sessions last 12 hours
 | `/calendars` | My calendars and the ones shared with me: create, rename, colour, share, transfer, hide, delete, import, export |
 | `/approve` | Approve a sign-in: scanner and short-code field |
 | `/devices` | Sync devices: add (our app, DAVx5, iPhone, Thunderbird, subscription link), revoke; signed-in browsers: revoke |
-| `/me` | Display name, colour, groups (read only), "Enroll another phone" |
+| `/me` | Display name, colour, groups (read only); another phone is enrolled by the admin (DECISIONS 2026-11-24) |
 
 **The calendar views** (Default):
 - **Calendars list** (side panel on wide screens, a sheet on phones): own

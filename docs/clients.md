@@ -18,8 +18,9 @@ Nobody has a password or an email address.
   agendouille app's Appareils tab (scan, or type the code), or `/approve`
   in a signed-in browser. The approver taps the number the browser shows;
   a wrong one cancels the request.
-- **Another phone** with the agendouille app: Appareils, « agendouille »
-  shows the app's own sign-in code (ten minutes, one use).
+- **Another phone** with the agendouille app: a new QR code from the
+  admin, as for the first. A browser cannot make one: it was approved by
+  a device, and would hand out more than it has.
 
 ## Android: the agendouille app
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/nebuloss/agendouille/internal/web/assets"
 	"io"
 	"net/http"
 	"net/url"
@@ -37,7 +36,6 @@ func (h *handlers) registerFamily(mux *http.ServeMux, guard func(http.Handler) h
 		mux.Handle(pattern, handler)
 	}
 	api("PATCH /api/me", h.patchMe)
-	api("POST /api/me/enrollment", h.selfEnrollment)
 	api("GET /api/people", h.people)
 
 	api("GET /api/calendars", h.calendars)
@@ -206,25 +204,6 @@ func (h *handlers) patchMe(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	}
 	p.User, _ = h.d.Directory.UserByID(r.Context(), p.User.ID)
 	h.me(w, r, p)
-}
-
-// selfEnrollment is "enroll another phone" (PLAN.md 8.5): a link that lives
-// ten minutes, shown as a QR on this signed-in device.
-func (h *handlers) selfEnrollment(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
-	e, err := h.d.Auth.NewEnrollment(r.Context(), p.User.Name, p.User.ID, 10*time.Minute)
-	if err != nil {
-		h.fail(w, r, err)
-		return
-	}
-	link := h.d.PublicURL() + "/enroll/" + e.Token
-	qr, err := webx.QRSVG(link)
-	if err != nil {
-		h.fail(w, r, err)
-		return
-	}
-	webx.JSON(w, http.StatusCreated, map[string]any{"url": link, "qr_svg": qr, "expires_at": e.ExpiresAt,
-		"expires_in_ms": e.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "ttl_ms": (10 * time.Minute).Milliseconds(),
-		"apk": assets.AndroidApp() != nil})
 }
 
 type personView struct {

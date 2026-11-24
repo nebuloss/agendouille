@@ -9,8 +9,7 @@ no AndroidX.
 ## Install
 
 - From the server: the sign-in page (`/`) offers « Télécharger
-  l'application », and the web app's Appareils page shows the app's code
-  with the same link (`/app/agendouille.apk`).
+  l'application » (`/app/agendouille.apk`).
 - From GitHub: `agendouille-<version>.apk` on each
   [release](https://github.com/nebuloss/agendouille/releases), with its
   line in `SHA256SUMS`.
@@ -22,8 +21,8 @@ updates). Android 8 or later; phones without Google Play services work.
 
 The welcome screen offers:
 
-- **Scanner le QR code**: the admin's sign-in QR code, the code of the web
-  app's Appareils page (« agendouille »), or a DAVx5 device's QR code.
+- **Scanner le QR code**: the admin's sign-in QR code (the full app), or
+  a DAVx5 device's QR code (sync only).
 - **Configurer à la main**: the server, a user name and a device password
   (from Appareils, « Autre »), checked over CalDAV.
 

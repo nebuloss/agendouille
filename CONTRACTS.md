@@ -240,7 +240,6 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | GET | `/static/app/...`, `/static/shared/...` | none |
 | POST | `/signout` | `agd_app`, same-origin |
 | GET, PATCH | `/api/me` | `agd_app` (PATCH same-origin) |
-| POST | `/api/me/enrollment` | `agd_app`, same-origin: a 10-minute enrollment link for one's own new phone |
 | GET | `/api/people` | `agd_app`: the users and groups I see |
 | GET, POST | `/api/calendars` | `agd_app` (POST same-origin): my home ; create |
 | GET, PATCH, DELETE | `/api/calendars/{ref}` | `agd_app` (writes same-origin); PATCH by a sharee changes only `hidden` and their own view |

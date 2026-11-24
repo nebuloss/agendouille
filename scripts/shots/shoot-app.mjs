@@ -88,10 +88,6 @@ if (judo) {
     await close();
   } else errors.push('no Modifier on the Judo sheet (is the shared calendar writable?)');
 } else errors.push('no Judo in the week');
-await page.goto(base + '/me', { waitUntil: 'networkidle2' });
-await (await page.$('xpath/.//button[contains(., "Afficher le code")]')).click();
-await shot('me-enroll');
-await close();
 await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
 const add = await page.$('xpath/.//button[contains(., "Android (DAVx5)")]');
 await add.click();

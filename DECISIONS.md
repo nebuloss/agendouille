@@ -3,6 +3,18 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: only the admin makes the app's sign-in codes
+
+The user: "the user should not be able to generate the agendouille QR code
+from the web, since this is the master device". A browser is signed in by
+the app's approval; letting it mint an enrollment link handed a new phone
+the app's full access, more than the browser was given. The web app loses
+« agendouille » (Appareils) and « Afficher le code » (Moi), and the server
+`POST /api/me/enrollment` (a test checks it is gone). Another phone gets a
+QR code from the admin, as the first; a browser on it is approved by the
+app. Device passwords (DAVx5, iPhone, Thunderbird) still come from the web
+app: they sync, nothing more.
+
 ## 2026-11-24: the README points to docs/
 
 The user: "reorganize the README to split correctly with docs; add the

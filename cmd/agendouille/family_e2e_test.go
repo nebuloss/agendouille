@@ -272,9 +272,10 @@ func TestM4FamilyAPI(t *testing.T) {
 	if !strings.Contains(asJSON(ss), `"current":true`) {
 		t.Errorf("sessions: %v", ss)
 	}
-	en, _ := L.json("POST", "/api/me/enrollment", nil, 201)
-	if !strings.Contains(en["url"].(string), "/enroll/") {
-		t.Errorf("self enrollment: %v", en)
+	// The app's sign-in codes come from the admin only: a browser cannot
+	// mint them (it was approved by the app, and would get more than it has).
+	if a := L.call("POST", "/api/me/enrollment", nil); a.status != http.StatusNotFound && a.status != http.StatusMethodNotAllowed {
+		t.Errorf("a browser made an enrollment link: %d %s", a.status, a.body)
 	}
 
 	// Signing out ends this browser's session, and only it.
