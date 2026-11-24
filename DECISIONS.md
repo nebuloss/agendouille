@@ -3,6 +3,19 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: claudication's spacing; the admin's sign-out keeps its icon
+
+The user: "page margins are too small; look at claudication for the
+components' spacing", and the admin's « Se déconnecter » had lost its icon
+on a wide screen (made phone-only when the header was compacted).
+
+claudication's steps, now ours in the three UIs: page margins 16 px (24
+from sm), the header 16 px from the top and the path bar 12 px under its
+row, the page 24 px under the path bar (16 on a phone), 32 px between the
+rail and the page, 20 px between cards, 16 px inside a card (24 from sm),
+card titles text-xl. The rail's sticky top follows (8.5rem, 9rem from md);
+the shots' alignment check still passes at every width.
+
 ## 2026-11-24: « Rechercher une mise à jour »; the updater keeps nothing
 
 The user: "add a check-update button in the app's settings; I hope there
