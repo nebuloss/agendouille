@@ -18,6 +18,7 @@ describe('nextStep', () => {
   it('goes home once approved, waits while pending, starts over otherwise', () => {
     expect(nextStep('approved')).toBe('home');
     expect(nextStep('pending')).toBe('again');
+    expect(nextStep('scanned')).toBe('again');
     for (const s of ['cancelled', 'expired', 'used', 'unknown', 'error'] as const) {
       expect(nextStep(s)).toBe('restart');
     }

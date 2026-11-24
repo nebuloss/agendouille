@@ -13,11 +13,13 @@ Nobody has a password or an email address.
   once, for 72 hours (`enrollment_link_ttl_hours`). Scanned with the
   agendouille app, it signs the app in; opened in a browser, it signs that
   browser in.
-- **Every other browser** shows a QR code, a short code and a number on
-  the sign-in page (`/`). A device already signed in approves it: the
-  agendouille app's Appareils tab (scan, or type the code), or `/approve`
-  in a signed-in browser. The approver taps the number the browser shows;
-  a wrong one cancels the request.
+- **Every other browser** shows a QR code and a short code on the sign-in
+  page (`/`). A device already signed in scans it (the agendouille app's
+  Appareils tab) or types the code (there, or at `/approve` in a signed-in
+  browser); the browser then says whose phone to look at. The phone shows
+  which browser asks and from where, and « Se connecter » or « Ce n'est
+  pas moi », as WhatsApp's and Discord's QR sign-in. Never confirm a code
+  someone sent you: the browser that gets in is theirs.
 - **Another phone** with the agendouille app: a new QR code from the
   admin, as for the first. A browser cannot make one: it was approved by
   a device, and would hand out more than it has.

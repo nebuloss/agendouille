@@ -203,10 +203,11 @@ func (s *Service) AdminSignIn(ctx, password string, r *http.Request) (*http.Cook
 func (s *Service) NewEnrollment(ctx, by Principal, user string, ttl time.Duration) (Enrollment, error)
 func (s *Service) RedeemEnrollmentForApp(ctx, token string, device DeviceInfo) (DeviceSecret, error)
 func (s *Service) RedeemEnrollmentForBrowser(ctx, token string, r *http.Request) (*http.Cookie, error)
-func (s *Service) StartApproval(ctx, r *http.Request) (Approval, error)  // id, code, short code, number
-func (s *Service) LookupApproval(ctx, p *Principal, code string) (ApprovalView, error) // UA, IP, three numbers
-func (s *Service) Approve(ctx, p *Principal, code string, number int) error
-func (s *Service) WaitApproval(ctx, id string) (*http.Cookie, error)     // long-poll
+func (s *Service) StartApproval(ctx, r *http.Request) (Approval, error)  // id, code, short code
+func (s *Service) LookupApproval(ctx, p *Principal, code string) (ApprovalView, error) // UA, IP; the browser hears who looked
+func (s *Service) Approve(ctx, p *Principal, code string) error           // « Se connecter »
+func (s *Service) Refuse(ctx, p *Principal, code string) error            // « Ce n'est pas moi »
+func (s *Service) WaitApproval(ctx, id, ua string, seenKnown bool) (secret, seen string, err error) // long-poll
 func (s *Service) AppSession(ctx, p *Principal) (*http.Cookie, error)    // device kind "app" only
 func (s *Service) NewDevice(ctx, p *Principal, kind, label, cap string) (DeviceSecret, error)
 ```
@@ -231,12 +232,12 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | Method | Path | Auth |
 |---|---|---|
 | GET | `/signin` | none (starts an approval) |
-| GET | `/signin/wait/{id}` | none; long-poll (25 s): `{"status": "approved"}` with the `agd_app` cookie, `pending`, or 410 `cancelled`/`expired`/`used`; `?then=redirect` answers 303 to `/` or back to `/signin` instead, for a browser without the bundle |
+| GET | `/signin/wait/{id}` | none; long-poll (25 s): `{"status": "approved"}` with the `agd_app` cookie, `{"status": "scanned", "name": "Léa"}` once a device looked the code up (not again with `?seen=1`), `pending`, or 410 `cancelled` (refused)/`expired`/`used`; `?then=redirect` answers 303 to `/` instead, for a browser without the bundle |
 | GET, POST | `/enroll/{token}` | the token (GET shows "Continue"; POST redeems for this browser, so link previews do not burn it) |
 | GET | `/.well-known/assetlinks.json` | none |
 | GET | `/app/agendouille.apk`, `/app/version` | none |
 | GET | `/`, `/calendars`, `/approve`, `/devices`, `/me` | `agd_app` (else to `/signin`) |
-| POST | `/approve` | `agd_app`, same-origin; the form flow of `/api/approvals/{code}`: `code` alone shows the three numbers, `code` and `number` approves |
+| POST | `/approve` | `agd_app`, same-origin; the form flow of `/api/approvals/{code}`: `code` alone asks to confirm, with `decision=approve` it approves, with `decision=refuse` it refuses |
 | GET | `/static/app/...`, `/static/shared/...` | none |
 | POST | `/signout` | `agd_app`, same-origin |
 | GET, PATCH | `/api/me` | `agd_app` (PATCH same-origin) |
@@ -251,8 +252,9 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | POST | `/api/calendars/{ref}/events` | readwrite, same-origin |
 | PUT, DELETE | `/api/calendars/{ref}/events/{name}` | readwrite, same-origin, `If-Match` |
 | POST | `/api/calendars/{ref}/events/{name}/move` | readwrite on both, same-origin, `If-Match` |
-| GET | `/api/approvals/{code}` | `agd_app`: what is asking (UA, IP, three numbers) |
-| POST | `/api/approvals/{code}` | `agd_app`, same-origin: `{"number": 42}` |
+| GET | `/api/approvals/{code}` | `agd_app`: what is asking (UA, IP); the waiting browser hears who looked |
+| POST | `/api/approvals/{code}` | `agd_app`, same-origin: approves (empty body) |
+| DELETE | `/api/approvals/{code}` | `agd_app`, same-origin: refuses; the browser starts over |
 | GET, POST | `/api/devices` ; DELETE `/api/devices/{id}` | `agd_app` (writes same-origin); own devices |
 | GET | `/api/devices/{id}/mobileconfig?t=` | own device: `agd_app` and the one-time token the POST answered, within 10 minutes |
 | GET, DELETE | `/api/sessions[/{id}]` | `agd_app`; own sessions |
@@ -300,7 +302,7 @@ cookie on the admin surface is ignored.
 | 400 | `bad_request` (`field`) |
 | 401 | `unauthenticated` |
 | 403 | `forbidden`, `cross_origin`, `not_visible` (share target the owner does not see) |
-| 410 | `cancelled` (an approval answered with the wrong number) |
+| 410 | `cancelled` (an approval refused on the approving device) |
 | 503 | `busy` (too many sign-ins waiting) |
 | 404 | `not_found` (also: no access) |
 | 409 | `uid_conflict`, `slug_taken` |
@@ -405,10 +407,9 @@ has `dav_auth` and each device's `has_certificate`. Admin: `GET|PUT
 
 // GET /signin (data for the page) and the approval as seen by the approver
 { "id": "…", "qr_url": "https://agenda.example.org/approve#c=<code>",
-  "short_code": "KQ4-7XM", "number": 42, "expires_at": "…" }
+  "short_code": "KQ4-7XM", "expires_at": "…" }
 // GET /api/approvals/{code}
-{ "user_agent": "Firefox 140 on Linux", "ip": "192.168.1.20",
-  "numbers": [17, 42, 85], "expires_at": "…" }
+{ "user_agent": "Firefox 140 on Linux", "ip": "192.168.1.20", "expires_at": "…" }
 ```
 
 The approval QR carries the code in the URL **fragment**, so it never
@@ -560,7 +561,8 @@ CREATE TABLE approvals (
   id TEXT PRIMARY KEY, code_hash BLOB NOT NULL UNIQUE, short_code_hash BLOB NOT NULL UNIQUE,
   number INTEGER NOT NULL, user_agent TEXT NOT NULL, ip TEXT NOT NULL,
   created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
-  approved_by INTEGER REFERENCES users(id), failed INTEGER NOT NULL DEFAULT 0, used_at TEXT);
+  approved_by INTEGER REFERENCES users(id), failed INTEGER NOT NULL DEFAULT 0, used_at TEXT,
+  seen_by TEXT);  -- number: 0, unused since 2026-11-24; failed: refused
 CREATE TABLE sessions (
   id INTEGER PRIMARY KEY, surface TEXT NOT NULL CHECK (surface IN ('app','admin')),
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,         -- NULL for the admin

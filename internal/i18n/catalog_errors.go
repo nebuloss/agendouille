@@ -50,9 +50,9 @@ func init() {
 			FR: "Ce lien de connexion n’est pas valable. Vérifiez qu’il est complet, ou demandez-en un nouveau.",
 			EN: "This sign-in link is not valid. Check that it is complete, or ask for a new one.",
 		},
-		"error.approval.wrongNumber": {
-			FR: "Ce n’était pas le bon nombre : la demande a été annulée. Recommencez la connexion sur l’autre appareil.",
-			EN: "That was not the right number, so the request was cancelled. Start signing in again on the other device.",
+		"error.approval.refused": {
+			FR: "La connexion a été refusée sur l’autre appareil. Recommencez si c’était bien vous.",
+			EN: "The sign-in was refused on the other device. Start again if it was you.",
 		},
 		"error.approval.expired": {
 			FR: "Ce code a expiré. Recommencez la connexion sur l’autre appareil.",

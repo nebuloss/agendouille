@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -14,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -293,22 +291,23 @@ func TestM1(t *testing.T) {
 		}
 	}
 
-	// --- approval with the wrong number fails, and cancels the request
-	shortCode, number, waitURL := x.startSignin()
-	numbers := x.approvalNumbers(shortCode, leaPhone)
-	wrong := numbers[0]
-	if wrong == number {
-		wrong = numbers[1]
+	// --- « Ce n'est pas moi » refuses, and the browser starts over
+	shortCode, waitURL := x.startSignin()
+	x.lookUp(shortCode, leaPhone)
+	if a := x.do("GET", waitURL, nil, nil); a.status != 200 || !strings.Contains(a.body, `"status":"scanned"`) || !strings.Contains(a.body, `"name":"`) {
+		t.Errorf("the browser after the scan: %d %s", a.status, a.body)
 	}
-	if a := x.approve(shortCode, wrong, leaPhone); a.status != http.StatusGone || !strings.Contains(a.body, "cancelled") {
-		t.Errorf("the wrong number: %d %s", a.status, a.body)
+	if a := x.do("DELETE", x.public+"/api/approvals/"+url.PathEscape(shortCode), nil, cookie(auth.AppCookie, leaPhone)); a.status != http.StatusNoContent {
+		t.Errorf("refusing: %d %s", a.status, a.body)
 	}
-	if a := x.do("GET", waitURL, nil, nil); a.status != http.StatusGone || cookieOf(a, auth.AppCookie) != "" {
-		t.Errorf("the waiting browser after a wrong number: %d %s", a.status, a.body)
+	if a := x.do("GET", waitURL+"?seen=1", nil, nil); a.status != http.StatusGone || !strings.Contains(a.body, "cancelled") || cookieOf(a, auth.AppCookie) != "" {
+		t.Errorf("the waiting browser after a refusal: %d %s", a.status, a.body)
 	}
 
-	// --- and the right one signs the waiting browser in
-	shortCode, number, waitURL = x.startSignin()
+	// --- confirming signs the waiting browser in
+	shortCode, waitURL = x.startSignin()
+	x.lookUp(shortCode, leaPhone)
+	waitURL += "?seen=1"
 	waited := make(chan answer, 1)
 	go func() { waited <- x.do("GET", waitURL, nil, nil) }()
 	time.Sleep(100 * time.Millisecond) // the browser is waiting before the phone approves
@@ -318,11 +317,11 @@ func TestM1(t *testing.T) {
 		r.Header.Set("Origin", "https://evil.example")
 		r.AddCookie(&http.Cookie{Name: auth.AppCookie, Value: leaPhone})
 	}
-	if a := x.do("POST", x.public+"/api/approvals/"+url.PathEscape(shortCode), bytes.NewReader([]byte(`{"number":`+strconv.Itoa(number)+`}`)), evil); a.status != http.StatusForbidden {
+	if a := x.do("POST", x.public+"/api/approvals/"+url.PathEscape(shortCode), bytes.NewReader([]byte(`{}`)), evil); a.status != http.StatusForbidden {
 		t.Errorf("a cross-origin approval: %d, want 403", a.status)
 	}
-	if a := x.approve(shortCode, number, leaPhone); a.status != http.StatusNoContent {
-		t.Fatalf("the right number: %d %s", a.status, a.body)
+	if a := x.approve(shortCode, leaPhone); a.status != http.StatusNoContent {
+		t.Fatalf("confirming: %d %s", a.status, a.body)
 	}
 	w := <-waited
 	laptop := cookieOf(w, auth.AppCookie)
@@ -387,11 +386,11 @@ func TestM1(t *testing.T) {
 	if a := x.do("POST", x.public+"/api/calendars", strings.NewReader(`{"name":"Depuis le téléphone","color":"#43a047"}`), appJSON); a.status != http.StatusCreated {
 		t.Errorf("the app creates a calendar: %d %s", a.status, a.body)
 	}
-	code, number, _ := x.startSignin()
-	if a := x.do("GET", x.public+"/api/approvals/"+url.PathEscape(code), nil, appJSON); a.status != 200 || !strings.Contains(a.body, `"numbers"`) {
+	code, _ := x.startSignin()
+	if a := x.do("GET", x.public+"/api/approvals/"+url.PathEscape(code), nil, appJSON); a.status != 200 || !strings.Contains(a.body, `"user_agent"`) {
 		t.Errorf("the app looks an approval up: %d %s", a.status, a.body)
 	}
-	if a := x.do("POST", x.public+"/api/approvals/"+url.PathEscape(code), strings.NewReader(fmt.Sprintf(`{"number":%d}`, number)), appJSON); a.status != http.StatusNoContent {
+	if a := x.do("POST", x.public+"/api/approvals/"+url.PathEscape(code), strings.NewReader(`{}`), appJSON); a.status != http.StatusNoContent {
 		t.Errorf("the app approves a browser: %d %s", a.status, a.body)
 	}
 
@@ -412,42 +411,40 @@ func TestM1(t *testing.T) {
 
 var (
 	shortCodeRe = regexp.MustCompile(`id="signin-short-code"[^>]*>([^<]+)<`)
-	numberRe    = regexp.MustCompile(`id="signin-number"[^>]*>([0-9]+)<`)
 	waitRe      = regexp.MustCompile(`action="(/signin/wait/[0-9a-f]+)"`)
 )
 
 // startSignin opens the root as a new browser would (the sign-in page) and reads its codes.
-func (x *e2e) startSignin() (shortCode string, number int, waitURL string) {
+func (x *e2e) startSignin() (shortCode, waitURL string) {
 	x.t.Helper()
 	a := x.do("GET", x.public+"/", nil, nil)
-	sc, n, w := shortCodeRe.FindStringSubmatch(a.body), numberRe.FindStringSubmatch(a.body), waitRe.FindStringSubmatch(a.body)
-	if a.status != 200 || sc == nil || n == nil || w == nil {
-		x.t.Fatalf("/signin: %d\n%s", a.status, a.body)
+	sc, w := shortCodeRe.FindStringSubmatch(a.body), waitRe.FindStringSubmatch(a.body)
+	if a.status != 200 || sc == nil || w == nil {
+		x.t.Fatalf("/: %d\n%s", a.status, a.body)
+	}
+	if strings.Contains(a.body, "signin-number") {
+		x.t.Error("the sign-in page still shows a number to pick")
 	}
 	// html/template writes the + of svg+xml as &#43;, which browsers decode.
 	if !strings.Contains(a.body, `src="data:image/svg&#43;xml;base64,`) {
 		i := strings.Index(a.body, `id="signin-qr"`)
-		x.t.Errorf("/signin has no QR code: %s", a.body[max(0, i-200):min(len(a.body), i+100)])
+		x.t.Errorf("the sign-in page has no QR code: %s", a.body[max(0, i-200):min(len(a.body), i+100)])
 	}
-	number, _ = strconv.Atoi(n[1])
-	return sc[1], number, x.public + w[1]
+	return sc[1], x.public + w[1]
 }
 
-func (x *e2e) approvalNumbers(shortCode, session string) []int {
+// lookUp is the phone scanning the code: it sees the waiting browser.
+func (x *e2e) lookUp(shortCode, session string) {
 	x.t.Helper()
 	a := x.do("GET", x.public+"/api/approvals/"+url.PathEscape(shortCode), nil, cookie(auth.AppCookie, session))
-	var view struct {
-		Numbers []int `json:"numbers"`
-	}
-	if err := json.Unmarshal([]byte(a.body), &view); err != nil || a.status != 200 || len(view.Numbers) != 3 {
+	if a.status != 200 || !strings.Contains(a.body, `"user_agent"`) || strings.Contains(a.body, "numbers") {
 		x.t.Fatalf("looking the approval up: %d %s", a.status, a.body)
 	}
-	return view.Numbers
 }
 
-func (x *e2e) approve(shortCode string, number int, session string) answer {
+func (x *e2e) approve(shortCode, session string) answer {
 	x.t.Helper()
-	return x.do("POST", x.public+"/api/approvals/"+url.PathEscape(shortCode), strings.NewReader(`{"number":`+strconv.Itoa(number)+`}`),
+	return x.do("POST", x.public+"/api/approvals/"+url.PathEscape(shortCode), strings.NewReader(`{}`),
 		func(r *http.Request) {
 			r.Header.Set("Content-Type", "application/json")
 			r.AddCookie(&http.Cookie{Name: auth.AppCookie, Value: session})

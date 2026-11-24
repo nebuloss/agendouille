@@ -49,7 +49,7 @@ var (
 	ErrShortPassword = fmt.Errorf("the admin password needs at least %d characters", MinAdminPassword)
 	ErrExpired       = errors.New("expired")
 	ErrUsed          = errors.New("already used")
-	ErrWrongNumber   = errors.New("wrong number: the sign-in was cancelled")
+	ErrRefused       = errors.New("the sign-in was refused on the approving device")
 	ErrBusy          = errors.New("too many sign-ins waiting; try again in a minute")
 	ErrTooMany       = errors.New("device limit reached")
 )

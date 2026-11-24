@@ -582,15 +582,19 @@ losing every device.
 Works in every browser on every system, with nothing installed and nothing
 outside.
 
-1. The browser opens `/signin`. It shows a **QR code**, a **short code**
-   (`KQ4-7XM`) and a **number** (`42`), and waits.
+*Changed 2026-11-24 (DECISIONS): scan and confirm, as WhatsApp and
+Discord, no number to pick.*
+
+1. The browser opens `/`. It shows a **QR code** and a **short code**
+   (`KQ4-7XM`), and waits.
 2. On any device already signed in (usually the phone, in the app) the user
-   taps **Scan**, or opens "Approve a sign-in" in the web app and types the
-   short code (for screens a camera cannot read, and to approve from a
-   computer).
-3. The approving device shows: "Sign in **Firefox on Linux**, from
-   192.168.1.20, as Léa?" and three numbers; the user picks the one the
-   browser shows (`42`). A wrong pick cancels the request.
+   taps **Scan**, or types the short code (for screens a camera cannot
+   read, and to approve from a computer, at `/approve`). The browser then
+   says « Léa, confirmez sur votre téléphone ».
+3. The approving device shows: "**Firefox on Linux**, from 192.168.1.20,
+   is asking to sign in to your account", a warning never to scan a code
+   someone sent, « Se connecter » (after a moment) and « Ce n'est pas
+   moi », which cancels the request.
 4. The waiting browser is signed in within a second.
 
 Codes live **2 minutes** and are single use; at most 200 wait at once

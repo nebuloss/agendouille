@@ -11,7 +11,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +62,7 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.Handle("GET /api/me", h.api(h.me))
 	mux.Handle("GET /api/approvals/{code}", h.api(h.approvalView))
 	mux.Handle("POST /api/approvals/{code}", guard(h.api(h.approvalPost)))
+	mux.Handle("DELETE /api/approvals/{code}", guard(h.api(h.approvalRefuse)))
 
 	mux.HandleFunc("POST /api/app/enroll", h.appEnroll)
 	mux.HandleFunc("POST /api/app/crash", h.appCrash)
@@ -186,7 +186,16 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel = context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 	}
-	secret, err := h.d.Auth.WaitApproval(ctx, r.PathValue("id"), r.UserAgent())
+	secret, seen, err := h.d.Auth.WaitApproval(ctx, r.PathValue("id"), r.UserAgent(), r.URL.Query().Get("seen") == "1")
+	if err == nil && secret == "" && seen != "" {
+		// Someone's device has the code: the page says whose to look at.
+		if redirect {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		webx.JSON(w, http.StatusOK, map[string]string{"status": "scanned", "name": seen})
+		return
+	}
 	if err == nil {
 		auth.SetCookie(w, auth.SurfaceApp, secret, h.secure(), h.d.Settings.Get().SessionTTL())
 		if redirect {
@@ -200,7 +209,7 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		status, state = http.StatusOK, "pending"
-	case errors.Is(err, auth.ErrWrongNumber):
+	case errors.Is(err, auth.ErrRefused):
 		state = "cancelled"
 	case errors.Is(err, auth.ErrUsed):
 		state = "used"
@@ -340,8 +349,8 @@ func (h *handlers) signout(w http.ResponseWriter, r *http.Request) {
 
 func approvalError(err error) (int, string, string) {
 	switch {
-	case errors.Is(err, auth.ErrWrongNumber):
-		return http.StatusGone, "cancelled", "error.approval.wrongNumber"
+	case errors.Is(err, auth.ErrRefused):
+		return http.StatusGone, "cancelled", "error.approval.refused"
 	case errors.Is(err, auth.ErrExpired):
 		return http.StatusGone, "expired", "error.approval.expired"
 	case errors.Is(err, auth.ErrUsed):
@@ -356,14 +365,25 @@ func (h *handlers) approvePage(w http.ResponseWriter, r *http.Request, _ *auth.P
 	h.render(w, r, http.StatusOK, "app/approve.html", "app.title.approve", map[string]any{})
 }
 
-// approvePost is the form flow: a code alone looks the request up and
-// shows the three numbers; a code and a number approves.
+// approvePost is the form flow: a code alone looks the request up and asks
+// to confirm; then « Se connecter » approves and « Ce n'est pas moi »
+// refuses.
 func (h *handlers) approvePost(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
 	code := strings.TrimSpace(r.PostFormValue("code"))
 	data := map[string]any{"Code": code, "User": p.User.DisplayName}
-	if raw := r.PostFormValue("number"); raw != "" {
-		n, _ := strconv.Atoi(raw)
-		if err := h.d.Auth.Approve(r.Context(), p, code, n); err != nil {
+	switch r.PostFormValue("decision") {
+	case "refuse":
+		if err := h.d.Auth.Refuse(r.Context(), p, code); err != nil {
+			status, _, key := approvalError(err)
+			data["Error"] = i18n.T(i18n.FromRequest(r), key)
+			h.render(w, r, status, "app/approve.html", "app.title.approve", data)
+			return
+		}
+		data["Refused"] = true
+		h.render(w, r, http.StatusOK, "app/approve.html", "app.title.approve", data)
+		return
+	case "approve":
+		if err := h.d.Auth.Approve(r.Context(), p, code); err != nil {
 			status, _, key := approvalError(err)
 			data["Error"] = i18n.T(i18n.FromRequest(r), key)
 			h.render(w, r, status, "app/approve.html", "app.title.approve", data)
@@ -412,14 +432,19 @@ func (h *handlers) approvalView(w http.ResponseWriter, r *http.Request, p *auth.
 	webx.JSON(w, http.StatusOK, view)
 }
 
+// approvalPost confirms (the app's « Se connecter »); the body is empty.
 func (h *handlers) approvalPost(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
-	var body struct {
-		Number int `json:"number"`
-	}
-	if !webx.DecodeJSON(w, r, &body) {
+	if err := h.d.Auth.Approve(r.Context(), p, r.PathValue("code")); err != nil {
+		status, code, key := approvalError(err)
+		webx.FailT(w, r, status, code, key)
 		return
 	}
-	if err := h.d.Auth.Approve(r.Context(), p, r.PathValue("code"), body.Number); err != nil {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// approvalRefuse is « Ce n'est pas moi »: the waiting browser starts over.
+func (h *handlers) approvalRefuse(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+	if err := h.d.Auth.Refuse(r.Context(), p, r.PathValue("code")); err != nil {
 		status, code, key := approvalError(err)
 		webx.FailT(w, r, status, code, key)
 		return

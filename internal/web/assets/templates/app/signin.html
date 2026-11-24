@@ -11,12 +11,12 @@
   {{if .Approval}}
   <p class="text-on-surface-variant">{{t "app.signin.how"}}</p>
   <div class="flex justify-center"><img id="signin-qr" class="qr size-[200px] rounded-md3-l p-2 sm:size-[240px]" src="{{.QR}}" alt="{{t "app.signin.qrAlt"}}" width="240" height="240"></div>
-  <div class="grid grid-cols-2 gap-3">
-    <div class="rounded-md3-l bg-surface-container p-3 text-center sm:bg-surface-lowest"><p class="text-xs font-semibold text-on-surface-variant">{{t "app.signin.code"}}</p>
+  <div class="flex justify-center">
+    <div class="rounded-md3-l bg-surface-container px-6 py-3 text-center sm:bg-surface-lowest"><p class="text-xs font-semibold text-on-surface-variant">{{t "app.signin.code"}}</p>
       <p id="signin-short-code" class="font-mono text-2xl font-semibold tracking-widest">{{.Approval.ShortCode}}</p></div>
-    <div class="rounded-md3-l bg-primary-container p-3 text-center text-on-primary-container"><p class="text-xs font-semibold">{{t "app.signin.number"}}</p>
-      <p id="signin-number" class="text-2xl font-semibold">{{.Approval.Number}}</p></div>
   </div>
+  <!-- Once a phone has the code: whose to look at (SigninPage). -->
+  <p id="signin-scanned" hidden class="rounded-md3-m bg-secondary-container px-4 py-3 text-center font-medium text-on-secondary-container" role="status" data-template="{{t "app.signin.scanned"}}"></p>
   <div id="signin-timer" data-remaining-ms="{{.RemainingMs}}" data-ttl-ms="{{.TTLMs}}">
     <p class="text-center text-xs text-on-surface-variant">{{t "app.signin.valid"}}</p>
   </div>

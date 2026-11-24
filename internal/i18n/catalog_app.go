@@ -83,12 +83,15 @@ func init() {
 		// Signing in: the code another device approves.
 		"app.signin.title": {FR: "Se connecter", EN: "Sign in"},
 		"app.signin.how": {
-			FR: "Sur un appareil déjà connecté, scannez ce code avec l’appareil photo, ou ouvrez «\u00a0Approuver une connexion\u00a0» et saisissez le code ci-dessous.",
-			EN: "On a device that is already signed in, scan this code with the camera, or open “Approve a sign-in” and enter the code below.",
+			FR: "Dans l’application agendouille, onglet Appareils, scannez ce code, puis confirmez sur le téléphone. Sans appareil photo, saisissez le code ci-dessous.",
+			EN: "In the agendouille app, Devices tab, scan this code, then confirm on the phone. Without a camera, type the code below.",
+		},
+		"app.signin.scanned": {
+			FR: "{name}, confirmez sur votre téléphone.",
+			EN: "{name}, confirm on your phone.",
 		},
 		"app.signin.qrAlt":    {FR: "QR code de connexion", EN: "Sign-in QR code"},
 		"app.signin.code":     {FR: "Code", EN: "Code"},
-		"app.signin.number":   {FR: "Nombre à choisir", EN: "Number to choose"},
 		"app.signin.valid":    {FR: "Ce code est valable deux minutes.", EN: "This code is valid for two minutes."},
 		"app.signin.auto":     {FR: "Cette page s’ouvrira d’elle-même une fois la connexion approuvée.", EN: "This page will continue on its own once the sign-in is approved."},
 		"app.signin.newCode":  {FR: "Obtenir un nouveau code", EN: "Get a new code"},
@@ -117,9 +120,14 @@ func init() {
 			FR: "Connecter «\u00a0{device}\u00a0», depuis l’adresse {ip}, en tant que {user}\u00a0?",
 			EN: "Sign in “{device}”, from {ip}, as {user}?",
 		},
-		"app.approve.pick": {
-			FR: "Touchez le nombre affiché sur l’autre écran. Un mauvais choix annule la demande.",
-			EN: "Tap the number shown on the other screen. A wrong choice cancels the request.",
+		"app.approve.warning": {
+			FR: "Ne confirmez que si ce navigateur est le vôtre et que vous l’avez devant vous. Ne scannez jamais un QR code que quelqu’un vous a envoyé.",
+			EN: "Only confirm if this browser is yours and in front of you. Never scan a QR code someone sent you.",
+		},
+		"app.approve.confirm": {FR: "Se connecter", EN: "Sign in"},
+		"app.approve.refused": {
+			FR: "Connexion refusée. L’autre appareil devra recommencer.",
+			EN: "Sign-in refused. The other device will have to start again.",
 		},
 		"app.approve.notMe":     {FR: "Ce n’est pas moi", EN: "This wasn’t me"},
 		"app.approve.codeLabel": {FR: "Code affiché sur l’autre écran", EN: "Code shown on the other screen"},

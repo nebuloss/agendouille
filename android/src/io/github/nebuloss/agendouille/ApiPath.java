@@ -24,7 +24,7 @@ public final class ApiPath {
         if (!bare.matches("[A-Za-z0-9/_.%:~-]+")) return false;
         if (method.equals("GET") && (bare.equals("/api/me") || bare.equals("/api/people"))) return true;
         if (bare.startsWith("/api/approvals/")) {
-            return (method.equals("GET") || method.equals("POST")) && bare.substring("/api/approvals/".length()).matches("[A-Za-z0-9-]+");
+            return (method.equals("GET") || method.equals("POST") || method.equals("DELETE")) && bare.substring("/api/approvals/".length()).matches("[A-Za-z0-9-]+");
         }
         if (bare.equals("/api/devices") || bare.equals("/api/sessions")) return method.equals("GET");
         if (bare.matches("/api/(devices|sessions)/[0-9]+")) return method.equals("DELETE");

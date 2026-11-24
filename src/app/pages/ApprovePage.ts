@@ -12,10 +12,20 @@ export function codeFromHash(hash: string): string {
  * the lookup form, so the person goes straight to picking the number. The
  * fragment is cleared so the code does not stay in the history.
  */
+/** How long « Se connecter » waits before it can be pressed. */
+export const CONFIRM_DELAY_MS = 1500;
+
 export class ApprovePage implements Page {
   constructor(private readonly doc: Document) {}
 
   start(): void {
+    // « Se connecter » waits a moment: time to read who is asking, against
+    // a QR code someone relayed (Discord does the same).
+    const confirm = this.doc.querySelector<HTMLButtonElement>('#approve-confirm [data-approve]');
+    if (confirm !== null) {
+      confirm.disabled = true;
+      this.doc.defaultView?.setTimeout(() => { confirm.disabled = false; }, CONFIRM_DELAY_MS);
+    }
     const code = codeFromHash(this.doc.location.hash);
     if (code === '') return;
     this.doc.defaultView?.history.replaceState(null, '', this.doc.location.pathname);

@@ -156,11 +156,6 @@
     "GET /api/approvals/PKW-6VY": {
       "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
       "ip": "192.168.1.24",
-      "numbers": [
-        30,
-        72,
-        15
-      ],
       "expires_at": {
         "in_minutes": 2
       }

@@ -42,8 +42,8 @@ which opens a session for the person.
   « Transférer », « Supprimer »; for one shared with me, « Personnaliser »
   and « Masquer ».
 - **Appareils**: « Connecter un navigateur » (scan a browser's sign-in QR
-  code, or type its code, then tap its number), the synced devices and the
-  signed-in browsers, each with « Déconnecter ».
+  code, or type its code, then « Se connecter »), the synced devices and
+  the signed-in browsers, each with « Déconnecter ».
 - **Réglages**: language, appearance (light, dark, as the phone), version.
 
 ## Updates

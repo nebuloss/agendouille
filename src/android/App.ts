@@ -25,7 +25,7 @@ import { parseState, type AppState, type CalendarState } from '@/android/state.t
 import { bridgeApi } from '@/android/api.ts';
 import { seg, type Api } from '@/shared/core/Api.ts';
 import { CalendarsPage, browserName, kindLabel, type Device, type People, type Session } from '@/app/pages/Manage.ts';
-import { codeFromHash } from '@/app/pages/ApprovePage.ts';
+import { CONFIRM_DELAY_MS, codeFromHash } from '@/app/pages/ApprovePage.ts';
 import { t } from '@/android/App.msg.ts';
 
 /** The bridge's error as a sentence: the app's message, else its code's. */
@@ -430,27 +430,43 @@ export class App {
     await this.approve(c);
   }
 
-  /** The waiting browser, then its number among three (PLAN.md 8.2). */
+  /**
+   * The waiting browser, to confirm or refuse (PLAN.md 8.2), as WhatsApp's
+   * and Discord's QR sign-in: who is asking and from where, a warning, and
+   * « Se connecter » after a moment.
+   */
   private async approve(code: string): Promise<void> {
-    let view: { user_agent: string; ip: string; numbers: number[] };
+    let view: { user_agent: string; ip: string };
     try {
       view = await this.api.get(`/approvals/${seg(code)}`);
     } catch (e) {
       this.toasts.error(e);
       return;
     }
-    const numbers = h('div', { class: 'grid grid-cols-3 gap-3' }, ...view.numbers.map((n) =>
-      h('button', { type: 'submit', value: String(n), formnovalidate: true, class: 'state-layer h-16 rounded-md3-l bg-secondary-container text-2xl font-semibold text-on-secondary-container' }, String(n))));
-    const v = await dialog(this.doc, t('approveTitle'), [
-      h('p', {}, t('approveQuestion', { device: browserName(view.user_agent), ip: view.ip })),
-      h('p', { class: 'text-sm text-on-surface-variant' }, t('approvePick')),
-      numbers,
-    ], [{ label: t('notMe'), value: '' }]);
-    if (v === '') return;
+    const asked = dialog(this.doc, t('approveTitle'), [
+      h('div', { class: 'flex items-center gap-3 rounded-md3-l bg-surface-high p-3' },
+        h('span', { class: 'grid size-10 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container' }, icon('laptop')),
+        h('span', { class: 'flex min-w-0 flex-col' },
+          h('span', { class: 'truncate font-medium' }, browserName(view.user_agent)),
+          h('span', { class: 'text-sm text-on-surface-variant' }, t('fromAddress', { ip: view.ip })))),
+      h('p', { class: 'text-sm' }, t('approveQuestion')),
+      h('p', { class: ui.notice }, icon('warn'), t('approveWarning')),
+    ], [{ label: t('notMe'), value: 'no' }, { label: t('approveConfirm'), value: 'yes', kind: 'filled' }]);
+    const yes = this.doc.querySelector<HTMLButtonElement>('dialog[open] button[value="yes"]');
+    if (yes !== null) {
+      yes.disabled = true;
+      this.doc.defaultView?.setTimeout(() => { yes.disabled = false; }, CONFIRM_DELAY_MS);
+    }
+    const v = await asked;
     try {
-      await this.api.post(`/approvals/${seg(code)}`, { number: Number(v) });
-      this.toasts.show(t('approved'));
-      void this.page?.refresh();
+      if (v === 'yes') {
+        await this.api.post(`/approvals/${seg(code)}`, {});
+        this.toasts.show(t('approved'));
+        void this.page?.refresh();
+      } else if (v === 'no') {
+        await this.api.delete(`/approvals/${seg(code)}`);
+        this.toasts.show(t('refused'));
+      }
     } catch (e) {
       this.toasts.error(e);
     }

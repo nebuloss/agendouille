@@ -68,6 +68,7 @@ public class PureTest {
         assertTrue(ApiPath.allowed("POST", "/api/calendars/x/transfer"));
         assertTrue(ApiPath.allowed("GET", "/api/approvals/PKW-6VY"));
         assertTrue(ApiPath.allowed("POST", "/api/approvals/PKW-6VY"));
+        assertTrue(ApiPath.allowed("DELETE", "/api/approvals/PKW-6VY"));
         assertTrue(ApiPath.allowed("GET", "/api/devices"));
         assertTrue(ApiPath.allowed("DELETE", "/api/devices/12"));
         assertTrue(ApiPath.allowed("GET", "/api/sessions"));

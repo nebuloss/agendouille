@@ -196,7 +196,7 @@ func TestDeviceLimit(t *testing.T) {
 	}
 }
 
-func TestApprovalWithTheRightNumber(t *testing.T) {
+func TestApprovalScannedThenConfirmed(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	phone := &Principal{User: f.lea, Surface: SurfaceApp}
@@ -204,35 +204,39 @@ func TestApprovalWithTheRightNumber(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(a.ShortCode) != 7 || a.ShortCode[3] != '-' || a.Number < 10 || a.Number > 99 {
+	if len(a.ShortCode) != 7 || a.ShortCode[3] != '-' {
 		t.Fatalf("approval %+v", a)
 	}
+	// Nobody has the code yet: the browser keeps waiting.
+	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	if _, _, err := f.auth.WaitApproval(short, a.ID, "", false); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("before the scan: %v", err)
+	}
+	cancel()
 	view, err := f.auth.LookupApproval(ctx, phone, strings.ToLower(strings.ReplaceAll(a.ShortCode, "-", " ")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(view.Numbers) != 3 || view.UserAgent != "Firefox on Linux" || view.IP != "192.168.1.20" {
+	if view.UserAgent != "Firefox on Linux" || view.IP != "192.168.1.20" {
 		t.Fatalf("view %+v", view)
 	}
-	found := false
-	for _, n := range view.Numbers {
-		found = found || n == a.Number
-	}
-	if !found {
-		t.Fatalf("the right number %d is not among %v", a.Number, view.Numbers)
+	// The browser hears whose phone has it, once.
+	secret, seen, err := f.auth.WaitApproval(ctx, a.ID, "Firefox on Linux", false)
+	if err != nil || secret != "" || seen == "" {
+		t.Fatalf("after the scan: %q %q %v", secret, seen, err)
 	}
 
 	got := make(chan string, 1)
 	errs := make(chan error, 1)
 	go func() {
-		s, err := f.auth.WaitApproval(ctx, a.ID, "Firefox on Linux")
+		s, _, err := f.auth.WaitApproval(ctx, a.ID, "Firefox on Linux", true)
 		got <- s
 		errs <- err
 	}()
-	if err := f.auth.Approve(ctx, phone, a.Code, a.Number); err != nil {
+	if err := f.auth.Approve(ctx, phone, a.Code); err != nil {
 		t.Fatal(err)
 	}
-	secret := <-got
+	secret = <-got
 	if err := <-errs; err != nil {
 		t.Fatal(err)
 	}
@@ -240,26 +244,26 @@ func TestApprovalWithTheRightNumber(t *testing.T) {
 	if err != nil || p.User.Name != "lea" {
 		t.Fatalf("the approved browser: %+v %v", p, err)
 	}
-	if _, err := f.auth.WaitApproval(ctx, a.ID, ""); !errors.Is(err, ErrUsed) {
+	if _, _, err := f.auth.WaitApproval(ctx, a.ID, "", true); !errors.Is(err, ErrUsed) {
 		t.Errorf("collected twice: %v", err)
 	}
-	if err := f.auth.Approve(ctx, phone, a.Code, a.Number); err == nil {
+	if err := f.auth.Approve(ctx, phone, a.Code); err == nil {
 		t.Error("approved twice")
 	}
 }
 
-func TestApprovalWithTheWrongNumberIsCancelled(t *testing.T) {
+func TestApprovalRefused(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	phone := &Principal{User: f.lea, Surface: SurfaceApp}
 	a, _ := f.auth.StartApproval(ctx, "x", "y")
-	if err := f.auth.Approve(ctx, phone, a.Code, a.Number+1); !errors.Is(err, ErrWrongNumber) {
-		t.Fatalf("wrong number: %v", err)
+	if err := f.auth.Refuse(ctx, phone, a.Code); err != nil {
+		t.Fatalf("refuse: %v", err)
 	}
-	if err := f.auth.Approve(ctx, phone, a.Code, a.Number); !errors.Is(err, ErrInvalid) {
-		t.Errorf("the right number after a wrong one: %v, want the request gone", err)
+	if err := f.auth.Approve(ctx, phone, a.Code); !errors.Is(err, ErrInvalid) {
+		t.Errorf("approving after a refusal: %v, want the request gone", err)
 	}
-	if _, err := f.auth.WaitApproval(ctx, a.ID, ""); !errors.Is(err, ErrWrongNumber) {
+	if _, _, err := f.auth.WaitApproval(ctx, a.ID, "", false); !errors.Is(err, ErrRefused) {
 		t.Errorf("the waiting browser hears: %v", err)
 	}
 }
@@ -268,17 +272,17 @@ func TestApprovalNeedsASignedInUserAndExpires(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	a, _ := f.auth.StartApproval(ctx, "x", "y")
-	if err := f.auth.Approve(ctx, &Principal{Admin: true, Surface: SurfaceAdmin}, a.Code, a.Number); !errors.Is(err, ErrInvalid) {
+	if err := f.auth.Approve(ctx, &Principal{Admin: true, Surface: SurfaceAdmin}, a.Code); !errors.Is(err, ErrInvalid) {
 		t.Errorf("the admin approved a family sign-in: %v", err)
 	}
-	if err := f.auth.Approve(ctx, nil, a.Code, a.Number); !errors.Is(err, ErrInvalid) {
+	if err := f.auth.Approve(ctx, nil, a.Code); !errors.Is(err, ErrInvalid) {
 		t.Errorf("nobody approved: %v", err)
 	}
 	f.clock.Add(ApprovalTTL)
-	if err := f.auth.Approve(ctx, &Principal{User: f.lea, Surface: SurfaceApp}, a.Code, a.Number); !errors.Is(err, ErrExpired) {
+	if err := f.auth.Approve(ctx, &Principal{User: f.lea, Surface: SurfaceApp}, a.Code); !errors.Is(err, ErrExpired) {
 		t.Errorf("after two minutes: %v", err)
 	}
-	if _, err := f.auth.WaitApproval(ctx, a.ID, ""); !errors.Is(err, ErrExpired) {
+	if _, _, err := f.auth.WaitApproval(ctx, a.ID, "", false); !errors.Is(err, ErrExpired) {
 		t.Errorf("the waiting browser: %v", err)
 	}
 }

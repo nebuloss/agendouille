@@ -3,6 +3,34 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: signing a browser in is scan and confirm, no number
+
+The user: "simplify QR code scanning for the web view; look at what
+Discord or WhatsApp do, but we don't need to select numbers".
+
+WhatsApp Web scans with no confirmation (behind a fingerprint check);
+Discord scans, then asks « Log in » or « Cancel » on the phone, shows the
+browser who scanned it, and waits a moment before « Log in » can be
+pressed. Neither matches numbers. We follow Discord:
+
+- The browser shows a QR code and a short code. Once a device looks the
+  code up, the browser says « Léa, confirmez sur votre téléphone »
+  (`seen_by`, migration 0010; `/signin/wait` answers `scanned` once).
+- The approving device shows the browser and its address, a warning never
+  to confirm a code someone sent, « Se connecter » (enabled after 1.5 s)
+  and « Ce n'est pas moi » (`DELETE /api/approvals/{code}`), which ends
+  the request; the browser starts over with a new code.
+- `Approve` takes no number; `ErrWrongNumber` became `ErrRefused`; the
+  `number` column stays, 0.
+
+What it costs: number matching stopped someone who shows our QR code on
+their own page from getting a blind "yes" (PLAN 8.2). Without it, a person
+tricked into scanning a relayed code signs the attacker's browser in, as
+on Discord and WhatsApp. What is left against it: the code lives two
+minutes, only a signed-in family member can approve, the phone names the
+browser and its address and warns, the button waits a moment, and the
+browser's session can be ended from Appareils.
+
 ## 2026-11-24: only the admin makes the app's sign-in codes
 
 The user: "the user should not be able to generate the agendouille QR code
