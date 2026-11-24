@@ -156,15 +156,13 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	trusted := s.d.Trusted()
-	fromProxy := auth.FromProxy(r, trusted)
-	p, err := s.d.Auth.Dav(r, auth.ClientIP(r, trusted).String(), fromProxy)
+	ip := auth.ClientIP(r, s.d.Trusted()).String()
+	p, err := s.d.Auth.Basic(r, ip)
 	if err != nil {
 		// What failed, never the credential: a client that cannot sign in
-		// is found here (DECISIONS: device keys).
+		// is found here.
 		user, _, basic := r.BasicAuth()
-		s.d.Log.Info("caldav sign-in refused", "ip", auth.ClientIP(r, trusted).String(), "mode", s.d.Auth.DavAuthMode(r.Context()),
-			"basic_user", user, "basic", basic, "certificate", s.d.Auth.CertState(r, fromProxy), "agent", r.UserAgent())
+		s.d.Log.Info("caldav sign-in refused", "ip", ip, "basic_user", user, "basic", basic, "agent", r.UserAgent())
 		w.Header().Set("WWW-Authenticate", `Basic realm="agendouille", charset="UTF-8"`)
 		http.Error(w, "a device credential is needed", http.StatusUnauthorized)
 		return

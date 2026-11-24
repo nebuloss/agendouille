@@ -53,9 +53,6 @@ admin_api -X POST "http://$admin/api/admin/backups"
 ln -sfn "$HOME/shots/node_modules" scripts/shots/node_modules
 node scripts/shots/shoot.mjs "http://$admin" "$pw" "$out"
 node scripts/shots/shoot-app.mjs "$first" "$out"
-# The certificate pass: CalDAV in "both" mode, a DAVx5 device added.
-admin_api -X PUT --data '{"mode":"both"}' "http://$admin/api/admin/dav-auth"
-node scripts/shots/shoot-app.mjs "$(enroll)" "$out" certs
 # The calendar's hover states and the event editor, light and dark.
 node scripts/shots/shoot-editor.mjs "$(enroll)" "$out"
 # The English pass, both UIs.

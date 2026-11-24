@@ -53,23 +53,15 @@ interface Device {
   created_at: string;
   last_used_at?: string;
   last_ip?: string;
-  has_certificate?: boolean;
 }
 
-/** What the server hands over once: a certificate to download (DECISIONS: device keys). */
-interface CertificateHandover {
-  certificate_url?: string;
-  certificate_password?: string;
-}
-
-interface AddedDevice extends CertificateHandover {
+interface AddedDevice {
   id: number;
   label: string;
   kind: string;
   server: string;
   username: string;
   secret: string;
-  dav_auth: string;
 }
 
 interface Session {
@@ -97,13 +89,7 @@ interface UserDetail {
   sessions: Session[];
   calendars_owned: CalendarMeta[];
   calendars_shared: { id: string; ref: string; name: string; access: string; via: string }[];
-  /** Their own sign-in policy ("" follows the server's), the one in force, the server's. */
-  dav_auth: '' | DavMode;
-  dav_auth_effective: DavMode;
-  dav_auth_server: DavMode;
 }
-
-type DavMode = 'password' | 'both' | 'keys';
 
 /** "vu il y a 3 jours", or "jamais vu". */
 const seen = (iso: string | undefined): string => iso === undefined || iso === '' ? t('neverSeen') : t('seenAgo', { ago: ago(iso) });
@@ -212,8 +198,6 @@ export class UserPage extends AdminPage {
                 ...(x.client ? [x.client] : [])].join(' · '),
               tags: x.last_used_at === undefined ? [h('span', { class: ui.pill.muted }, t('neverSynced'))] : [],
               actions: [
-                // A certificate only matters when this user's devices use one.
-                d.dav_auth_effective !== 'password' ? action(t('certificate'), () => this.newCertificate(x), 'text', 'lock', 'sm') : null,
                 action(t('revoke'), () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), t('deviceRevoked')), 'danger-text', 'trash', 'sm'),
               ],
             })), t('noDevices'))),
@@ -262,7 +246,6 @@ export class UserPage extends AdminPage {
         tileLink(String(d.calendars_shared.length), t('sharedTile', { count: d.calendars_shared.length }), `${base}/calendars`),
         tileLink(String(d.sessions.length), t('browsersTile', { count: d.sessions.length }), `${base}/devices`)),
       this.profile(u),
-      this.policyCard(u, d),
       section(t('account'),
         h('div', { class: 'flex flex-wrap items-center gap-2' },
           u.disabled
@@ -384,45 +367,6 @@ export class UserPage extends AdminPage {
   }
 
 
-  /**
-   * How this user's devices sign in to CalDAV: as the server says, or their
-   * own policy (DECISIONS: a sign-in policy per user).
-   */
-  private policyCard(u: User, d: UserDetail): HTMLElement {
-    const label: Record<DavMode, string> = { password: t('modePassword'), both: t('modeBoth'), keys: t('modeKeys') };
-    const choices: ['' | DavMode, string][] = [
-      ['', t('modeServer', { mode: label[d.dav_auth_server] })],
-      ['password', label.password], ['both', label.both], ['keys', label.keys],
-    ];
-    const group = h('div', { class: 'flex flex-wrap gap-2', role: 'radiogroup', 'aria-label': t('policyTitle') },
-      ...choices.map(([value, text]) => {
-        const on = d.dav_auth === value;
-        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on),
-          class: on ? 'state-layer inline-flex min-h-9 items-center gap-2 rounded-md3-full bg-secondary-container px-4 text-sm font-semibold text-on-secondary-container'
-            : 'state-layer inline-flex min-h-9 items-center gap-2 rounded-md3-full border border-outline-variant px-4 text-sm text-on-surface' },
-        on ? icon('check') : null, text);
-        b.addEventListener('click', () => {
-          if (!on) void this.act(() => this.api.put(`${this.path()}/dav-auth`, { mode: value }), t('policySaved'));
-        });
-        return b;
-      }));
-    return card(t('policyTitle'), [],
-      h('p', { class: 'text-sm text-on-surface-variant' }, t('policyHelp', { name: u.display_name })),
-      group);
-  }
-
-  /** A certificate to download once, with its password and what to do with it. */
-  private certificateBlock(c: CertificateHandover): Child[] {
-    if (c.certificate_url === undefined) return [];
-    return [
-      h('h3', { class: 'text-base font-semibold text-on-surface' }, t('certTitle')),
-      h('p', { class: 'flex justify-center' }, h('a', { class: ui.btn('filled'), href: c.certificate_url, download: '' }, icon('download'), t('certDownload'))),
-      h('p', { class: 'text-sm' }, t('certPassword')),
-      secretField(c.certificate_password ?? '', t('certPassword')),
-      h('p', { class: 'text-sm text-on-surface-variant' }, t('certHelp')),
-    ];
-  }
-
   /** A new device for this user, its manual settings shown once. */
   private async addDevice(u: User): Promise<void> {
     const kind = styleControl(h('select', {},
@@ -436,31 +380,16 @@ export class UserPage extends AdminPage {
       });
     if (!ok || added === null) return;
     const d: AddedDevice = added;
-    const keysOnly = d.dav_auth === 'keys';
     await dialog(this.doc, t('deviceAdded', { name: d.label }), [
-      h('p', {}, keysOnly ? t('manualKeys') : t('manualIntro')),
+      h('p', {}, t('manualIntro')),
       h('dl', { class: ui.kv },
         h('dt', {}, t('manualServer')), h('dd', {}, h('code', {}, d.server)),
-        ...(keysOnly ? [] : [
-          h('dt', {}, t('manualUser')), h('dd', {}, h('code', {}, d.username)),
-          h('dt', {}, t('manualPassword')), h('dd', {}, secretField(d.secret, t('manualPassword')))])),
-      ...this.certificateBlock(d),
+        h('dt', {}, t('manualUser')), h('dd', {}, h('code', {}, d.username)),
+        h('dt', {}, t('manualPassword')), h('dd', {}, secretField(d.secret, t('manualPassword')))),
       h('p', { class: ui.notice }, icon('warn'), t('shownOnce')),
     ], [{ label: t('done'), value: 'ok', kind: 'filled' }]);
     this.doc.dispatchEvent(new Event('agd:changed'));
     await this.refresh();
-  }
-
-  /** A new client certificate for a device; the one it had stops working. */
-  private async newCertificate(x: Device): Promise<void> {
-    if (!(await confirmDialog(this.doc, t('certConfirmTitle', { name: x.label }), t('certConfirmBody'), t('certCreate'), true))) return;
-    try {
-      const c = await this.api.post<CertificateHandover>(`${this.path()}/devices/${x.id}/certificate`);
-      await dialog(this.doc, t('certFor', { name: x.label }), [...this.certificateBlock(c),
-        h('p', { class: ui.notice }, icon('warn'), t('shownOnce'))], [{ label: t('done'), value: 'ok', kind: 'filled' }]);
-    } catch (e) {
-      this.toasts.error(e);
-    }
   }
 
   /** Removing asks, calendar by calendar, whom to give it to or to delete it (PLAN.md 6). */

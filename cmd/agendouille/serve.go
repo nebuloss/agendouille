@@ -100,14 +100,6 @@ func openServices(ctx context.Context, cfg *config.Config) (*services, error) {
 	h := hub.New()
 	cal := calendar.New(st.DB(), time.Now, set, dir, sharing.New(st.DB(), dir), h)
 	a := auth.New(st.DB(), time.Now, set, dir)
-	// Device certificates (DECISIONS: device keys): the CA lives beside the
-	// database, made the first time.
-	ca, err := auth.LoadCA(cfg.DataDir)
-	if err != nil {
-		st.Close()
-		return nil, fmt.Errorf("the device certificate authority: %w", err)
-	}
-	a.UseCA(ca)
 	return &services{store: st, settings: set, dir: dir, auth: a, calendar: cal, hub: h}, nil
 }
 

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/i18n"
 	"github.com/nebuloss/agendouille/internal/store"
 	"github.com/nebuloss/agendouille/internal/web/webx"
@@ -49,18 +48,6 @@ func (h *handlers) currentNotices(r *http.Request) ([]notice, error) {
 			n.severity = "warn"
 		}
 		out = append(out, notice{ID: "server:" + w.Code, Kind: "server", Severity: n.severity, Title: w.Message, Link: n.link})
-	}
-	if mode := h.d.Auth.DavAuthMode(ctx); mode != auth.DavPassword {
-		if n, err := h.d.Auth.DevicesWithoutCert(ctx); err == nil && n > 0 {
-			title := "notice.devices_without_certificate.title.other"
-			if n == 1 {
-				title = "notice.devices_without_certificate.title.one"
-			}
-			out = append(out, notice{ID: "server:devices_without_certificate", Kind: "device", Severity: "warn",
-				Title:  i18n.T(l, title, "count", strconv.Itoa(n)),
-				Detail: i18n.T(l, "notice.devices_without_certificate.detail"),
-				Link:   "/settings"})
-		}
 	}
 	stale, err := h.d.Auth.StaleDevices(ctx)
 	if err != nil {

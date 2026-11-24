@@ -5,18 +5,6 @@ package i18n
 // spreadsheet. The rows themselves stay data: action codes, user names.
 func init() {
 	register(map[string]map[Lang]string{
-		"notice.devices_without_certificate.title.one": {
-			FR: "{count} appareil sans certificat ne se synchronise plus",
-			EN: "{count} device without a certificate no longer syncs",
-		},
-		"notice.devices_without_certificate.title.other": {
-			FR: "{count} appareils sans certificat ne se synchronisent plus",
-			EN: "{count} devices without a certificate no longer sync",
-		},
-		"notice.devices_without_certificate.detail": {
-			FR: "La connexion CalDAV exige désormais un certificat. Chaque utilisateur peut en obtenir un depuis la page Appareils de l’application.",
-			EN: "CalDAV sign-in now requires a certificate. Each user can get one from the Devices page in the app.",
-		},
 		"notice.device.stale.title": {
 			FR: "« {device} » ne s’est pas synchronisé depuis une semaine",
 			EN: "“{device}” has not synced for a week",

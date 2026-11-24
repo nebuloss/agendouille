@@ -264,40 +264,6 @@ const shown = (v: unknown): string => (Array.isArray(v) ? (v.length === 0 ? '—
  * seconds (DECISIONS: settings in the configuration file).
  */
 export class SettingsPage extends AdminPage {
-  /**
-   * How CalDAV signs a device in: the one choice made here rather than in
-   * the configuration file (the user's call; DECISIONS: device keys).
-   */
-  private async davAuthCard(): Promise<HTMLElement> {
-    const st = await this.api.get<{ mode: string; devices_without_certificate: number }>('/dav-auth');
-    const choices: [string, Key, Key, Key][] = [
-      ['password', 'modePassword', 'modePasswordHelp', 'modeSetPassword'],
-      ['both', 'modeBoth', 'modeBothHelp', 'modeSetBoth'],
-      ['keys', 'modeKeys', 'modeKeysHelp', 'modeSetKeys'],
-    ];
-    const options = choices.map(([value, label, help, done]) => {
-      const on = st.mode === value;
-      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on),
-        class: on ? 'state-layer flex flex-1 flex-col gap-1 rounded-md3-l bg-secondary-container p-3 text-left text-on-secondary-container ring-2 ring-primary'
-          : 'state-layer flex flex-1 flex-col gap-1 rounded-md3-l bg-surface-lowest p-3 text-left text-on-surface' },
-      h('b', { class: 'flex items-center gap-2' }, on ? icon('check') : null, t(label)), h('span', { class: 'text-xs opacity-80' }, t(help)));
-      b.addEventListener('click', () => {
-        if (on) return;
-        void this.act(() => this.api.put('/dav-auth', { mode: value }), t(done));
-      });
-      return b;
-    });
-    return card(t('davAuthTitle'), [],
-      h('p', { class: 'text-sm text-on-surface-variant' }, t('davAuthIntro')),
-      h('div', { class: 'flex flex-col gap-2 md:flex-row', role: 'radiogroup', 'aria-label': t('davAuthLabel') }, ...options),
-      st.mode !== 'password' && st.devices_without_certificate > 0
-        ? h('p', { class: ui.notice }, icon('warn'), t('devicesWithoutCert', { count: st.devices_without_certificate }))
-        : null,
-      st.mode !== 'password'
-        ? h('p', { class: 'text-xs text-on-surface-variant' }, t('proxyNote'))
-        : null);
-  }
-
   protected async render(): Promise<Child[]> {
     const { settings, path, exists } = await this.api.get<{ settings: Setting[]; path: string; exists: boolean }>('/settings');
     const groups = new Map<string, Setting[]>();
@@ -321,7 +287,7 @@ export class SettingsPage extends AdminPage {
             changed ? h('span', { class: 'text-xs text-on-surface-variant' }, t('defaultValue', { value: shown(st.default), env: st.env }))
               : h('span', { class: 'text-xs text-on-surface-variant' }, st.env)));
       }))));
-    return [await this.davAuthCard(), how, h('div', { class: ui.cards }, ...cards)];
+    return [how, h('div', { class: ui.cards }, ...cards)];
   }
 }
 

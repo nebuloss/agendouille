@@ -198,10 +198,6 @@ func init() {
 			FR: "Cet appareil n’a pas pu être ajouté. Rechargez la page, puis réessayez.",
 			EN: "This device could not be added. Reload the page and try again.",
 		},
-		"error.certificate.linkGone": {
-			FR: "Ce lien a déjà été utilisé ou a expiré. Demandez un nouveau certificat pour cet appareil.",
-			EN: "This link has already been used or has expired. Ask for a new certificate for this device.",
-		},
 		"error.profile.linkGone": {
 			FR: "Ce lien de profil a déjà été utilisé ou a expiré. Ajoutez l’appareil à nouveau.",
 			EN: "This profile link has already been used or has expired. Add the device again.",
@@ -255,10 +251,6 @@ func init() {
 		"error.admin.badBefore": {
 			FR: "La date de début de la liste n’est pas valable. Rechargez la page.",
 			EN: "The list’s starting date is not valid. Reload the page.",
-		},
-		"error.admin.davAuthMode": {
-			FR: "Ce mode de connexion n’est pas valable. Choisissez l’un des modes proposés.",
-			EN: "This sign-in mode is not valid. Choose one of the modes offered.",
 		},
 		"error.admin.confirmRestore": {
 			FR: "Saisissez le nom du fichier de la sauvegarde pour confirmer la restauration.",

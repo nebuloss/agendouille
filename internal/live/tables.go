@@ -20,7 +20,6 @@ var Tables = map[string][]Topic{
 	"objects":           {Calendars},
 	"changes":           {Calendars, Activity},
 	"audit":             {Activity},
-	"switches":          {Settings},
 	"settings":          {Settings},
 	"notice_reads":      {Notices},
 	"admin":             {}, // the admin password: no screen shows it

@@ -33,7 +33,7 @@ func ClientIP(r *http.Request, trusted []netip.Prefix) netip.Addr {
 }
 
 // FromProxy reports whether the request's TCP peer is a trusted proxy: the
-// only one whose forwarded headers (a client certificate) count.
+// only one whose forwarded headers count.
 func FromProxy(r *http.Request, trusted []netip.Prefix) bool {
 	peer := remoteAddr(r.RemoteAddr)
 	return peer.IsValid() && inAny(peer, trusted)

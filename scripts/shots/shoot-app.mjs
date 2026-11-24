@@ -4,7 +4,7 @@
 // Usage: node shoot-app.mjs <enrollment URL> <out dir>
 import puppeteer from 'puppeteer-core';
 
-const [enroll, out, pass] = process.argv.slice(2);
+const [enroll, out] = process.argv.slice(2);
 const base = new URL(enroll).origin;
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'], headless: true });
 const errors = [];
@@ -16,25 +16,6 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 page.on('pageerror', (e) => errors.push(`page: ${e.message}`));
 await page.emulateTimezone('America/New_York'); // the family zone wins over the browser's
-// The certificate pass (the mode is not password): sign in, add a DAVx5
-// device, shoot the dialog with its certificate, and stop.
-if (pass === 'certs') {
-  await page.setViewport({ width: 1280, height: 900 });
-  await page.goto(enroll, { waitUntil: 'networkidle2' });
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[type=submit]')]);
-  await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
-  await wait(400);
-  await page.screenshot({ path: `${out}/app-devices-certs.png` });
-  await (await page.$('xpath/.//button[contains(., "Android (DAVx5)")]')).click();
-  await wait(300);
-  await (await page.$('xpath/.//dialog//button[contains(., "Ajouter")]')).click();
-  await wait(600);
-  await page.screenshot({ path: `${out}/app-device-added-certs.png` });
-  await browser.close();
-  console.log(errors.length ? errors.join('\n') : 'certs: no console errors');
-  process.exit(0);
-}
-
 // Signed out first: the sign-in page, its QR and its countdown.
 await page.setViewport({ width: 390, height: 844, isMobile: true });
 await page.goto(base + '/', { waitUntil: 'networkidle2' });

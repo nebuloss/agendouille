@@ -238,19 +238,9 @@ export interface Device {
   client: string;
   created_at: string;
   last_used_at?: string;
-  has_certificate?: boolean;
 }
 
-type DavAuth = 'password' | 'both' | 'keys';
-
-/** A device's certificate, handed over once (DECISIONS: device keys). */
-interface CertificateHandover {
-  certificate_url?: string;
-  certificate_password?: string;
-  dav_auth?: DavAuth;
-}
-
-interface NewDevice extends Device, CertificateHandover {
+interface NewDevice extends Device {
   username: string;
   secret: string;
   davx5_uri?: string;
@@ -298,30 +288,23 @@ export function kindLabel(kind: string): string {
 export class DevicesPage extends AppPage {
   protected async render(): Promise<Child[]> {
     const [devices, links, sessions, cals] = await Promise.all([
-      this.api.get<{ devices: Device[]; dav_auth?: DavAuth }>('/devices'), this.api.get<{ links: Link[] }>('/links'),
+      this.api.get<{ devices: Device[] }>('/devices'), this.api.get<{ links: Link[] }>('/links'),
       this.api.get<{ sessions: Session[] }>('/sessions'), this.api.get<Calendars>('/calendars'),
     ]);
     const name = (ref: string): string => cals.calendars.find((c) => c.ref === ref)?.name ?? ref;
-    const mode: DavAuth = devices.dav_auth ?? 'password';
     return [
       section(t('syncDevice'),
-        h('p', { class: 'text-sm text-on-surface-variant' }, mode === 'password' ? t('modePassword') : mode === 'both' ? t('modeBoth') : t('modeKeys')),
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('modePassword')),
         h('div', { class: 'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap' },
-          action('Android (DAVx5)', () => this.add('davx5', mode), 'filled', 'phone'),
-          action(kindLabel('ios'), () => this.add('ios', mode), 'tonal', 'phone'),
-          action(kindLabel('thunderbird'), () => this.add('thunderbird', mode), 'tonal', 'laptop'),
-          action(kindLabel('other'), () => this.add('other', mode), 'outlined', 'devices')),
-        mode !== 'password' && devices.devices.some((d) => !d.has_certificate)
-          ? h('p', { class: ui.notice }, icon('warn'), t('noCertificateNotice'))
-          : null,
+          action('Android (DAVx5)', () => this.add('davx5'), 'filled', 'phone'),
+          action(kindLabel('ios'), () => this.add('ios'), 'tonal', 'phone'),
+          action(kindLabel('thunderbird'), () => this.add('thunderbird'), 'tonal', 'laptop'),
+          action(kindLabel('other'), () => this.add('other'), 'outlined', 'devices')),
         table([t('device'), t('access'), t('lastSync'), ''], devices.devices.map((d) => [
-          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' },
-            mode === 'password' ? kindLabel(d.kind)
-              : d.has_certificate ? t('kindWithCertificate', { kind: kindLabel(d.kind) }) : t('kindWithoutCertificate', { kind: kindLabel(d.kind) }))),
+          h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' }, kindLabel(d.kind))),
           chip(d.cap === 'read' ? t('accessRead') : t('accessReadwrite'), d.cap === 'read' ? 'neutral' : 'accent', undefined, this.doc),
           chip(ago(d.last_used_at), recencyTone(d.last_used_at), 'clock', this.doc),
           h('span', { class: 'flex flex-wrap justify-end gap-1' },
-            mode !== 'password' ? action(t('certificate'), () => this.newCertificate(d), d.has_certificate ? 'text' : 'tonal', 'lock', 'sm') : null,
             action(t('removeDevice'), () => this.confirmed(t('removeDeviceTitle', { name: d.label }), t('removeDeviceText'), t('removeDeviceButton'),
               () => this.api.delete(`/devices/${d.id}`), t('deviceRemoved')), 'danger-text', 'trash', 'sm')),
         ]), t('noDevice'))),
@@ -345,42 +328,7 @@ export class DevicesPage extends AppPage {
     ];
   }
 
-  /**
-   * A device's certificate, as DAVx5 (or Thunderbird) takes it: download
-   * the .p12 once, install it with its password, then choose it in DAVx5.
-   */
-  private certificateBlock(c: CertificateHandover, server: string): Child[] {
-    if (c.certificate_url === undefined) return [];
-    return [
-      h('h3', { class: 'text-base font-semibold text-on-surface' }, t('certificateHeading')),
-      h('p', { class: 'flex justify-center' }, h('a', { class: ui.btn('filled'), href: c.certificate_url, download: 'agendouille-appareil.p12' }, icon('download'), t('downloadCertificate'))),
-      h('p', { class: 'text-sm' }, t('certificatePasswordIntro')),
-      secretField(c.certificate_password ?? '', t('certificatePassword')),
-      h('ol', { class: 'm-0 list-decimal space-y-1 pl-5 text-sm' },
-        h('li', {}, t('certificateStep1')),
-        h('li', {}, t('certificateStep2')),
-        h('li', {}, c.dav_auth === 'keys' ? t('certificateStep3Keys', { server }) : t('certificateStep3Both'))),
-    ];
-  }
-
-  private async newCertificate(d: Device): Promise<void> {
-    // A new certificate ends the one the device has: danger style then.
-    const ok = await confirmDialog(this.doc, t('newCertificateTitle', { name: d.label }),
-      d.has_certificate ? t('newCertificateReplaces') : t('newCertificateNeeded'), t('newCertificateButton'), d.has_certificate === true);
-    if (!ok) return;
-    try {
-      const c = await this.api.post<CertificateHandover>(`/devices/${d.id}/certificate`);
-      const server = `${this.doc.location.origin}/dav/`;
-      await dialog(this.doc, t('certificateOf', { name: d.label }), [...this.certificateBlock(c, server),
-        h('p', { class: ui.notice }, icon('warn'), t('certificateOnce'))],
-      [{ label: t('done'), value: 'ok', kind: 'filled' }]);
-      await this.refresh();
-    } catch (e) {
-      this.toasts.error(e);
-    }
-  }
-
-  private async add(kind: string, mode: DavAuth = 'password'): Promise<void> {
+  private async add(kind: string): Promise<void> {
     const label = h('input', { required: true, value: kind === 'ios' ? 'iPhone' : kind === 'davx5' ? t('defaultPhone') : t('defaultComputer') });
     const cap = segmented(this.doc, t('access'), [{ value: 'readwrite', label: t('accessReadwriteShort') }, { value: 'read', label: t('accessReadShort') }], 'readwrite');
     const v = await dialog(this.doc, t('addDeviceTitle', { kind: kindLabel(kind) }), [field(t('name'), label),
@@ -399,8 +347,7 @@ export class DevicesPage extends AppPage {
       h('dt', {}, t('username')), h('dd', {}, h('code', {}, d.username)),
       h('dt', {}, t('password')), h('dd', {}, secretField(d.secret, t('devicePassword'))));
     const body: Child[] = [];
-    const keysOnly = (d.dav_auth ?? mode) === 'keys';
-    if (d.davx5_uri !== undefined && !keysOnly) {
+    if (d.davx5_uri !== undefined) {
       body.push(h('p', {}, t('davx5Intro')));
       if (d.qr_svg !== undefined) body.push(h('img', { class: 'qr mx-auto rounded-md3-l p-2', src: svgDataUrl(d.qr_svg), alt: t('davx5QrAlt'), width: 240, height: 240 }));
       body.push(h('p', { class: 'flex justify-center' }, h('a', { href: d.davx5_uri, class: ui.btn('tonal') }, icon('phone'), t('openInDavx5'))));
@@ -409,13 +356,8 @@ export class DevicesPage extends AppPage {
       body.push(h('p', {}, t('iosIntro')),
         h('p', {}, h('a', { class: ui.btn('filled'), href: d.mobileconfig_url }, t('installProfile'))));
     }
-    if (keysOnly) {
-      body.push(...this.certificateBlock(d, d.manual.server),
-        h('p', { class: 'text-sm' }, t('serverAddress'), ' ', h('code', {}, d.manual.server)));
-    } else {
-      body.push(h('p', { class: 'text-sm' }, t('byHand')), manual, ...this.certificateBlock(d, d.manual.server));
-    }
-    body.push(h('p', { class: ui.notice }, icon('warn'), keysOnly ? t('certificateOnceRemove') : t('passwordOnceRemove')));
+    body.push(h('p', { class: 'text-sm' }, t('byHand')), manual,
+      h('p', { class: ui.notice }, icon('warn'), t('passwordOnceRemove')));
     await dialog(this.doc, t('deviceAdded', { name: d.label }), body, [{ label: t('done'), value: 'ok', kind: 'filled' }]);
     await this.refresh();
   }

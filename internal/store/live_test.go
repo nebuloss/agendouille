@@ -50,14 +50,14 @@ func TestCommitsAreTold(t *testing.T) {
 		mu.Unlock()
 	})
 	ctx := context.Background()
-	if _, err := s.DB().ExecContext(ctx, `INSERT INTO switches(key, value, updated_at) VALUES ('x', 'y', 'z')`); err != nil {
+	if _, err := s.DB().ExecContext(ctx, `INSERT INTO notice_reads(id, read_at) VALUES ('x', 'z')`); err != nil {
 		t.Fatal(err)
 	}
 	tx, _ := s.DB().BeginTx(ctx, nil)
-	_, _ = tx.ExecContext(ctx, `INSERT INTO switches(key, value, updated_at) VALUES ('gone', 'y', 'z')`)
+	_, _ = tx.ExecContext(ctx, `INSERT INTO notice_reads(id, read_at) VALUES ('gone', 'z')`)
 	_ = tx.Rollback()
 	err = InTx(ctx, s.DB(), func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `UPDATE switches SET value = 'w' WHERE key = 'x'`); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE notice_reads SET read_at = 'w' WHERE id = 'x'`); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, detail) VALUES ('t', 'a', 'k', 'x', '')`)
@@ -68,7 +68,7 @@ func TestCommitsAreTold(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(told) != 2 || told[0][0] != "switches" || len(told[1]) != 2 || told[1][0] != "audit" || told[1][1] != "switches" {
+	if len(told) != 2 || told[0][0] != "notice_reads" || len(told[1]) != 2 || told[1][0] != "audit" || told[1][1] != "notice_reads" {
 		t.Errorf("told: %v", told)
 	}
 	if topics := live.ForTables([]string{"changes", "objects", "audit"}); len(topics) != 2 {

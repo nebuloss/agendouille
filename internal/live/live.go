@@ -23,14 +23,14 @@ type Topic string
 const (
 	// People: users and groups, who is in which.
 	People Topic = "people"
-	// Devices: devices, their certificates and last sync, sign-in links,
+	// Devices: devices and their last sync, sign-in links,
 	// approvals, browser sessions, subscription links.
 	Devices Topic = "devices"
 	// Calendars: calendars, their members, their events (counted, never read).
 	Calendars Topic = "calendars"
 	// Activity: the audit log and the change log.
 	Activity Topic = "activity"
-	// Settings: the configuration file and the admin's switches.
+	// Settings: the configuration file.
 	Settings Topic = "settings"
 	// Notices: the notifications marked read.
 	Notices Topic = "notices"

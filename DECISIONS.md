@@ -3,6 +3,31 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: client certificates removed; a device's password is enough
+
+The user asked whether certificate sign-in was worth keeping, given that a
+device's credential is set up once; then "yes remove it".
+
+A device's password is already a server-made random secret, never typed
+(a QR code, a link, a profile, the app), one per device, revocable alone,
+sent only over HTTPS. A certificate only helped when that password leaked
+and the device's `.p12` did not, which a stolen phone does not do, and it
+cost: its own CA, the DMZ proxy asking for the certificate and passing it
+in `X-Client-Cert` (a header the server had to trust from
+`trusted_proxies`), three modes and a per-user policy, a `.p12` shown
+once, the iPhone's poor support, the app's none, and the failed DAVx5
+setup it caused.
+
+Gone: `internal/auth/certs.go` (the CA, issuing, the modes), the
+`go-pkcs12` module, the admin's mode card and per-user policy, the
+« Certificat » actions and `.p12` downloads (admin and web app), the
+notice of devices without a certificate, the docs' sections. Migration
+0011 drops `devices.cert_fingerprint`/`cert_expires_at`, `users.dav_auth`
+and the `switches` table. CalDAV signs a device in with `Basic` only; a
+test checks a certificate header alone gets 401. `ca.pem` and `ca.key` in
+the data directory are no longer read and can be deleted; the proxy's
+`ssl_verify_client` and `X-Client-Cert` lines can go.
+
 ## 2026-11-24: claudication's spacing; the admin's sign-out keeps its icon
 
 The user: "page margins are too small; look at claudication for the

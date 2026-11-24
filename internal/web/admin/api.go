@@ -45,10 +45,7 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/users/{name}/enrollments/{id}", h.showEnrollment)
 	api("DELETE /api/admin/users/{name}/enrollments/{id}", h.revokeEnrollment)
 	api("POST /api/admin/users/{name}/devices", h.addDevice)
-	api("PUT /api/admin/users/{name}/dav-auth", h.userDavAuth)
 	api("DELETE /api/admin/users/{name}/devices/{id}", h.revokeDevice)
-	api("POST /api/admin/users/{name}/devices/{id}/certificate", h.newCertificate)
-	api("GET /api/admin/users/{name}/devices/{id}/certificate.p12", h.certificateFile)
 	api("DELETE /api/admin/users/{name}/sessions/{id}", h.revokeSession)
 	api("GET /api/admin/groups", h.groups)
 	api("POST /api/admin/groups", h.addGroup)
@@ -70,8 +67,6 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/backups/{file}", h.downloadBackup)
 	api("POST /api/admin/backups/{file}/restore", h.restore)
 	api("GET /api/admin/system", h.system)
-	api("GET /api/admin/dav-auth", h.davAuth)
-	api("PUT /api/admin/dav-auth", h.setDavAuth)
 	api("GET /api/admin/notices", h.notices)
 	api("GET /api/admin/events", h.events)
 	api("POST /api/admin/notices/read", h.readNotices)
@@ -418,7 +413,6 @@ func (h *handlers) user(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"user": u, "groups": groups, "enrollments": enrollments, "devices": devices,
-		"dav_auth": h.d.Auth.UserDavAuthOwn(ctx, u.ID), "dav_auth_effective": h.d.Auth.UserDavAuth(ctx, u.ID), "dav_auth_server": h.d.Auth.DavAuthMode(ctx),
 		"sessions": sessions, "calendars_owned": owned, "calendars_shared": shared})
 }
 
@@ -1037,32 +1031,6 @@ func (h *handlers) settings(w http.ResponseWriter, r *http.Request) {
 		path = config.DefaultPath
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"settings": out, "path": path, "exists": h.d.Config.Path != ""})
-}
-
-// davAuth is how CalDAV signs a device in, chosen in the admin UI (the one
-// switch kept out of the configuration file, the user's call), and how
-// many devices have no certificate yet.
-func (h *handlers) davAuth(w http.ResponseWriter, r *http.Request) {
-	n, err := h.d.Auth.DevicesWithoutCert(r.Context())
-	if err != nil {
-		h.failIn(w, r, err)
-		return
-	}
-	webx.JSON(w, http.StatusOK, map[string]any{"mode": h.d.Auth.DavAuthMode(r.Context()), "devices_without_certificate": n})
-}
-
-func (h *handlers) setDavAuth(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Mode string `json:"mode"`
-	}
-	if !decode(w, r, &body) {
-		return
-	}
-	if err := h.d.Auth.SetDavAuthMode(r.Context(), "admin", body.Mode); err != nil {
-		h.failIn(w, r, validation{key: "error.admin.davAuthMode"})
-		return
-	}
-	h.davAuth(w, r)
 }
 
 // --- backups

@@ -6,6 +6,5 @@ the service units (`agendouille.service`, `agendouille.openrc`,
 and the proxy examples (`nginx.conf.example`, `Caddyfile.example`).
 
 The guides are in `docs/`: [install](../docs/install.md),
-[deployment](../docs/deployment.md) (the proxy, device certificates,
-backups, logs), [configuration](../docs/configuration.md) and
+[deployment](../docs/deployment.md) (the proxy, backups, logs), [configuration](../docs/configuration.md) and
 [clients](../docs/clients.md) (with the by-hand checklist).

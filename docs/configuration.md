@@ -33,7 +33,7 @@ installer writes the file once and never overwrites it.
 | `public_listen` | off | CalDAV and the family web app, behind the DMZ proxy (`0.0.0.0:8791`). Off until both this and `public_url` are set. |
 | `public_url` | | The family's `https://` address. In every QR code and every phone: pick it once. |
 | `public_allow_insecure` | `false` | Accept an `http://` public URL (a test on the LAN). |
-| `trusted_proxies` | `[]` | Whose `X-Forwarded-For` (and client certificate) is believed. |
+| `trusted_proxies` | `[]` | Whose `X-Forwarded-For` is believed. |
 | `backup_schedule` | `"03:30"` | A backup a day, server time. |
 | `backup_keep` | `14` | Backups kept. |
 | `sync_token_retention_days` | `180` | How long a CalDAV client can be away and still sync by changes only. |
@@ -47,12 +47,9 @@ installer writes the file once and never overwrites it.
 | `session_ttl_days` | `90` | How long a browser stays signed in. |
 | `app_sync_interval_minutes` | `30` | How often the Android app syncs on its own. |
 
-## In the admin UI, not the file
+## Not in the file
 
-How CalDAV devices sign in (« Mot de passe », « Mot de passe et
-certificat », « Certificat seul »), globally and per user, is chosen in the
-admin UI and applies at once: see [clients](clients.md#device-keys). The
-admin password is set with `agendouille admin passwd`.
+The admin password, set with `agendouille admin passwd`.
 
 ## Example
 

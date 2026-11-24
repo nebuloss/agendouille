@@ -63,22 +63,14 @@ Appareils, « Liens d'abonnement »: an `https://…/ics/…` address that any
 calendar application can subscribe to, for one or more calendars, read
 only. Removing the link stops it at once.
 
-## Device keys
+## Device passwords
 
-Each synced device has its own credential, revoked on its own (Appareils,
-« Supprimer »; or the admin UI). The admin chooses how CalDAV devices sign
-in (admin UI, Réglages, « Connexion des appareils »), and can set it per
-user:
-
-| Mode | What a device presents | Clients |
-|---|---|---|
-| « Mot de passe » | its password | all |
-| « Mot de passe et certificat » | both: a stolen password is not enough | DAVx5, Thunderbird; the iPhone not always |
-| « Certificat seul » | a client certificate (`.p12`) | DAVx5, Thunderbird |
-
-agendouille is its own certificate authority; a device's `.p12` is shown
-once, at creation (or « Certificat » on its row makes a new one). The DMZ
-proxy has to ask for it and pass it on: [deployment](deployment.md#device-certificates).
+Each synced device has its own password, made by the server (long and
+random, never typed: it reaches the device by a QR code, a link, a profile
+or the app's sign-in), shown once, and revoked on its own (Appareils,
+« Supprimer », or the admin UI) without touching the others. Appareils
+shows when each one last synced. That is the only way a CalDAV client
+signs in; client certificates were removed (DECISIONS 2026-11-24).
 
 ## Checked by hand
 

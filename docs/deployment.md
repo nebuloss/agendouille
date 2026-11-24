@@ -40,7 +40,7 @@ Then, in `/etc/agendouille.yaml` (applied within seconds):
   links and every phone's account point there, so pick it once: changing
   it means setting every phone up again.
 - `trusted_proxies`: the proxy's address, so the activity log shows the
-  family's addresses and device certificates can be passed on.
+  family's addresses.
 
 ### Nginx Proxy Manager
 
@@ -57,26 +57,6 @@ location /api/live {
     include /etc/nginx/conf.d/include/proxy.conf;
 }
 ```
-
-### Device certificates
-
-When the admin chooses « Mot de passe et certificat » or « Certificat seul »
-for CalDAV (see [clients](clients.md#device-keys)), agendouille checks the
-certificate itself; the proxy only asks the client for one and passes it
-on. With `ca.pem` copied from the server's `data_dir` to the proxy:
-
-```nginx
-ssl_verify_client optional_no_ca;
-ssl_client_certificate /data/custom_ssl/agendouille-ca.pem; # names the CA to clients
-location /dav/ {
-    proxy_pass http://<server>:8791;
-    proxy_set_header X-Client-Cert $ssl_client_escaped_cert;
-    include /etc/nginx/conf.d/include/proxy.conf;
-}
-```
-
-A client cannot forge it: the server reads the header only from
-`trusted_proxies` and verifies the certificate against its own CA.
 
 ## The admin UI on the LAN
 

@@ -42,9 +42,9 @@ proxy: [deployment](docs/deployment.md).
 | | |
 |---|---|
 | [Install](docs/install.md) | Installing, upgrading, the first steps, a lost admin password. |
-| [Deployment](docs/deployment.md) | The two listeners, the DMZ proxy, device certificates, backups, logs. |
+| [Deployment](docs/deployment.md) | The two listeners, the DMZ proxy, backups, logs. |
 | [Configuration](docs/configuration.md) | `/etc/agendouille.yaml`: every setting, which apply live. |
-| [Clients](docs/clients.md) | Signing in without passwords; the Android app, DAVx5, iPhone, Thunderbird, read-only links; device keys. |
+| [Clients](docs/clients.md) | Signing in without passwords; the Android app, DAVx5, iPhone, Thunderbird, read-only links; device passwords. |
 | [The Android app](docs/android-app.md) | Installing it, its tabs, its updates. |
 | [Command line](docs/cli.md) | `agendouille serve` and the operator's commands. |
 | [Development](docs/development.md) | The layout, building and testing, the scripts, releasing. |
