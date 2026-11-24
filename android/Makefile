@@ -78,6 +78,9 @@ $(B)/classes.dex: $(B)/classes.stamp
 	@rm -rf $(B)/dex && mkdir -p $(B)/dex
 	$(BUILD_TOOLS)/d8 --release --min-api 26 --lib $(PLATFORM) --output $(B)/dex $$(find $(B)/classes -name '*.class')
 	@cp $(B)/dex/classes.dex $@
+	@# Phones without Google Play services are supported (DECISIONS): nothing
+	@# of com.google.android.gms in the app's code, ever.
+	@! LC_ALL=C grep -q 'com/google/android/gms' $@ || { echo "classes.dex refers to Google Play services"; rm -f $@; exit 1; }
 
 $(B)/agendouille.apk: $(B)/base.apk $(B)/classes.dex $(KEYSTORE)
 	@cp $(B)/base.apk $(B)/unaligned.apk

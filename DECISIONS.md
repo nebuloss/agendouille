@@ -3,6 +3,18 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the Android app needs no Google Play services
+
+The user: "we must support devices without play services too". The app
+uses only the platform: the system WebView, the camera through
+`getUserMedia` and `jsqr` in the page, AccountManager, the sync adapter and
+CalendarContract, the Keystore, its own CalDAV client, App Links or
+`agendouille://`, and the APK from the family's server for updates. No
+library of Google's; `BarcodeDetector` is not touched (in the WebView it
+binds Play services, and killed the app). The Makefile fails a build whose
+`classes.dex` names `com.google.android.gms`. Push (M9) is UnifiedPush, not
+Firebase, for the same reason.
+
 ## 2026-11-24: the admin UI stays current as claudication's does
 
 *Replaces* the five-second fingerprint polling of the same day (the user:
