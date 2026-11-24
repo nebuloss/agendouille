@@ -31,7 +31,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   page.on('requestfailed', (r) => errors.push(`${name} failed: ${r.url()}`));
   await page.setViewport({ width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
-  await page.evaluateOnNewDocument((lang, signedIn) => {
+  await page.evaluateOnNewDocument((lang, signedIn, crashed) => {
     Object.defineProperty(navigator, 'language', { get: () => lang });
     const state = {
       account: signedIn ? { server: 'https://agendouille.patapouf.club', host: 'agendouille.patapouf.club', username: 'lea', mode: 'enrolled' } : null,
@@ -42,6 +42,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
         { id: 2, name: 'École', color: '#e8710a', sync: true, read_only: true },
         { id: 3, name: 'Perso de Léa', color: '#7b1fa2', sync: false, read_only: false },
       ] : [],
+      crash: crashed ? 'agendouille dev on Google Pixel 8, Android 15 (35)\nthe page\'s renderer stopped: it crashed, priority 2' : null,
     };
     window.addEventListener('load', () => setTimeout(() => {
       const ch = new MessageChannel();
@@ -52,7 +53,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       };
       window.postMessage('agendouille-bridge', '*', [ch.port1]);
     }, 50));
-  }, lang, signedIn);
+  }, lang, signedIn, name === 'welcome-dark');
   await page.goto(base + '/index.html', { waitUntil: 'networkidle0' });
   await new Promise((r) => setTimeout(r, 500));
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });

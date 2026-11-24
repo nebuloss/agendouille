@@ -2,6 +2,13 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    crashTitle: 'L’application s’est arrêtée',
+    crashBody: 'Voici ce qui s’est passé. Envoyez-le au serveur pour que l’administrateur puisse corriger le problème.',
+    crashSend: 'Envoyer au serveur',
+    crashSent: 'Rapport envoyé. Merci !',
+    crashCopy: 'Copier',
+    crashCopied: 'Rapport copié.',
+    crashDismiss: 'Ignorer',
     welcome: 'Bienvenue',
     welcomeBody: 'agendouille synchronise les calendriers de votre famille avec ceux de ce téléphone. Connectez-le à votre serveur pour commencer.',
     scan: 'Scanner le QR code',
@@ -44,6 +51,13 @@ export const t = messages({
     removed: 'Compte retiré.',
   },
   en: {
+    crashTitle: 'The app stopped',
+    crashBody: 'Here is what happened. Send it to the server so the administrator can fix the problem.',
+    crashSend: 'Send to the server',
+    crashSent: 'Report sent. Thank you.',
+    crashCopy: 'Copy',
+    crashCopied: 'Report copied.',
+    crashDismiss: 'Dismiss',
     welcome: 'Welcome',
     welcomeBody: 'agendouille syncs your family’s calendars with this phone’s. Connect it to your server to start.',
     scan: 'Scan the QR code',

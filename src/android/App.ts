@@ -35,6 +35,7 @@ export class App {
 
   private show(s: AppState): void {
     this.root.replaceChildren();
+    if (s.crash !== null) append(this.root, this.crashCard(s));
     append(this.root, ...(s.account === null ? this.welcome() : this.account(s)));
   }
 
@@ -48,6 +49,24 @@ export class App {
       this.toasts.error(new Error(reason(e)));
       return false;
     }
+  }
+
+  /** The report of what made the app stop last time: copy it, send it, or let it be. */
+  private crashCard(s: AppState): HTMLElement {
+    const report = h('pre', { class: 'max-h-48 overflow-auto rounded-md3-m bg-surface-lowest p-3 font-mono text-[11px] whitespace-pre-wrap' }, s.crash ?? '');
+    const copy = h('button', { type: 'button', class: ui.btn('text', 'sm') }, icon('copy'), t('crashCopy'));
+    copy.addEventListener('click', () => {
+      void navigator.clipboard?.writeText(s.crash ?? '').then(() => this.toasts.show(t('crashCopied')), () => undefined);
+    });
+    const sendIt = h('button', { type: 'button', class: ui.btn('tonal', 'sm'), disabled: s.account === null }, icon('upload'), t('crashSend'));
+    sendIt.addEventListener('click', () => void this.act('crash.send', undefined, t('crashSent')));
+    const dismiss = h('button', { type: 'button', class: ui.btn('text', 'sm') }, icon('close'), t('crashDismiss'));
+    dismiss.addEventListener('click', () => void this.act('crash.clear'));
+    return h('section', { class: 'mt-4 flex flex-col gap-3 rounded-md3-xl bg-error-container p-5 text-on-error-container' },
+      h('h2', { class: 'text-lg font-medium' }, t('crashTitle')),
+      h('p', { class: 'text-sm' }, t('crashBody')),
+      report,
+      h('div', { class: 'flex flex-wrap gap-2' }, sendIt, copy, dismiss));
   }
 
   // --- welcome

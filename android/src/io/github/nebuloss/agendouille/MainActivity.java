@@ -71,6 +71,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        CrashLog.install(this);
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
         web = new WebView(this);
         WebSettings s = web.getSettings();
@@ -95,6 +96,19 @@ public final class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 connectBridge();
+            }
+
+            // The page's renderer died (a crash in the WebView, or killed for
+            // memory, as the camera can bring about): without this the app
+            // dies with it. The screens are made again, and the report kept.
+            @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                CrashLog.write(MainActivity.this, "the page's renderer stopped: " + (detail.didCrash() ? "it crashed" : "the system ended it")
+                        + ", priority " + detail.rendererPriorityAtExit());
+                port = null;
+                web = null;
+                recreate();
+                return true;
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
@@ -273,6 +287,13 @@ public final class MainActivity extends Activity {
             case "account.remove":
                 removeAccount(r.id);
                 break;
+            case "crash.clear":
+                CrashLog.clear(this);
+                io.execute(() -> send(BridgeCodec.ok(r.id, state())));
+                break;
+            case "crash.send":
+                sendCrash(r.id);
+                break;
             case "open":
                 ui.post(() -> openOutside(Uri.parse(r.args.optString("url"))));
                 send(BridgeCodec.ok(r.id, null));
@@ -337,6 +358,8 @@ public final class MainActivity extends Activity {
                 }
             }
             o.put("calendars", cals);
+            String crash = CrashLog.read(this);
+            o.put("crash", crash != null ? crash : JSONObject.NULL);
             return o;
         } catch (Exception e) {
             return new JSONObject();
@@ -479,6 +502,30 @@ public final class MainActivity extends Activity {
             Credentials.remove(this);
             SyncStatus.clear(this);
             send(BridgeCodec.ok(id, state()));
+        });
+    }
+
+    /**
+     * The last crash report to the server's log (/api/app/crash): to the
+     * account's server, else to the server the screens name (args.server).
+     */
+    private void sendCrash(long id) {
+        io.execute(() -> {
+            String report = CrashLog.read(this);
+            Credentials c = Credentials.load(this);
+            if (report == null || c == null) {
+                send(BridgeCodec.error(id, "no_server", getString(R.string.crash_no_server)));
+                return;
+            }
+            try {
+                JSONObject body = new JSONObject().put("report", report).put("app_version", version()).put("model", Build.MANUFACTURER + " " + Build.MODEL);
+                Http.Answer a = Http.call("POST", c.server + "/api/app/crash", null, null, null, body.toString(), userAgent());
+                if (a.status / 100 != 2) throw new IOException("HTTP " + a.status);
+                CrashLog.clear(this);
+                send(BridgeCodec.ok(id, state()));
+            } catch (Exception e) {
+                send(BridgeCodec.error(id, "offline", getString(R.string.offline)));
+            }
         });
     }
 

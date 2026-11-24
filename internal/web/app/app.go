@@ -64,6 +64,7 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.Handle("POST /api/approvals/{code}", guard(h.api(h.approvalPost)))
 
 	mux.HandleFunc("POST /api/app/enroll", h.appEnroll)
+	mux.HandleFunc("POST /api/app/crash", h.appCrash)
 	mux.HandleFunc("GET /app/agendouille.apk", h.apkFile)
 	mux.HandleFunc("GET /davx5/{token}", h.davx5Page)
 	mux.HandleFunc("GET /.well-known/assetlinks.json", h.assetLinks)
@@ -462,4 +463,30 @@ func initial(display, name string) string {
 		}
 	}
 	return "?"
+}
+
+// appCrash is the Android app's report of what made it stop (CrashLog),
+// written to the server's log for the administrator: a phone's own log is
+// out of their reach. No credential (the app may not be signed in yet), and
+// small: 16 KB at most, one log line.
+func (h *handlers) appCrash(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Report     string `json:"report"`
+		AppVersion string `json:"app_version"`
+		Model      string `json:"model"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
+	if !webx.DecodeJSON(w, r, &body) {
+		return
+	}
+	h.d.Log.Warn("android app crash", "ip", h.clientIP(r), "app_version", truncateText(body.AppVersion, 40),
+		"model", truncateText(body.Model, 80), "report", truncateText(body.Report, 12000))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func truncateText(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
 }

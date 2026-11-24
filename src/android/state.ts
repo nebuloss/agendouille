@@ -33,6 +33,8 @@ export interface AppState {
   permissions: { calendar: boolean; camera: boolean };
   sync: SyncState;
   calendars: CalendarState[];
+  /** What made the app stop last time, or null. */
+  crash: string | null;
 }
 
 export const EMPTY: AppState = {
@@ -40,6 +42,7 @@ export const EMPTY: AppState = {
   permissions: { calendar: false, camera: false },
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
+  crash: null,
 };
 
 /** Reads what the app sent, keeping only what the screens use. */
@@ -62,6 +65,7 @@ export function parseState(v: unknown): AppState {
       error: typeof s['error'] === 'string' ? s['error'] : null,
       events: typeof s['events'] === 'number' ? s['events'] : 0,
     },
+    crash: typeof o['crash'] === 'string' && o['crash'] !== '' ? o['crash'] : null,
     calendars: cals.map((c) => ({
       id: typeof c['id'] === 'number' ? c['id'] : 0,
       name: str(c['name']),

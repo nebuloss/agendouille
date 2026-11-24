@@ -24,6 +24,10 @@ func init() {
 			FR: "agendouille a besoin de JavaScript pour fonctionner.",
 			EN: "agendouille needs JavaScript to work.",
 		},
+		"layout.source": {
+			FR: "Code source sur GitHub",
+			EN: "Source on GitHub",
+		},
 		"layout.loading": {
 			FR: "Chargement…",
 			EN: "Loading…",

@@ -20,4 +20,5 @@
   <string name="manual_missing">Saisissez le nom d’utilisateur et le mot de passe de l’appareil.</string>
   <string name="manual_refused">Le serveur a refusé ce nom d’utilisateur ou ce mot de passe. Vérifiez-les, puis réessayez.</string>
   <string name="manual_not_caldav">Ce serveur ne répond pas comme un serveur agendouille (HTTP %1$d). Vérifiez l’adresse.</string>
+  <string name="crash_no_server">Le rapport pourra être envoyé une fois ce téléphone connecté à un serveur. Copiez-le en attendant.</string>
 </resources>
