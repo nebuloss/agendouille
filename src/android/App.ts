@@ -271,6 +271,8 @@ export class App {
   private readonly api: Api;
   private state: AppState | null = null;
   private tab: Tab = 'sync';
+  /** Réglages, or its permissions' view. */
+  private settingsView: 'main' | 'permissions' = 'main';
   private page: ApiPage | null = null;
 
   constructor(private readonly doc: Document, private readonly root: HTMLElement, private readonly bridge: Bridge) {
@@ -292,7 +294,7 @@ export class App {
     // while the sync reports, unless the account itself changed.
     const same = before?.account != null && s.account != null && before.account.server === s.account.server
       && before.account.username === s.account.username && before.crash === s.crash;
-    if (this.tab !== 'sync' && same) return;
+    if (this.tab !== 'sync' && this.tab !== 'settings' && same) return;
     if (s.account === null) this.tab = 'sync';
     this.draw();
   }
@@ -312,7 +314,7 @@ export class App {
     if (this.tab === 'sync') append(this.root, ...this.account(s));
     else if (this.tab === 'calendars') this.calendarsTab(s);
     else if (this.tab === 'devices') this.devicesTab(s);
-    else append(this.root, ...this.settingsTab());
+    else append(this.root, ...(this.settingsView === 'permissions' ? this.permissionsView(s) : this.settingsTab(s)));
     append(this.root, this.nav());
   }
 
@@ -328,6 +330,7 @@ export class App {
       b.addEventListener('click', () => {
         if (this.tab === tab) return;
         this.tab = tab;
+        this.settingsView = 'main';
         this.draw();
         this.doc.defaultView?.scrollTo(0, 0);
       });
@@ -388,6 +391,78 @@ export class App {
     this.mount(s, (doc) => new PhoneDevices(doc, this.api, () => this.state?.account?.device_id ?? 0, this.connectBrowser()));
   }
 
+  /** A bridge call that opens one of Android's screens; its result comes back with onResume. */
+  private open(call: string): void {
+    void this.bridge.call(call).catch((e: unknown) => this.toasts.error(new Error(reason(e))));
+  }
+
+  /** Synchro, until the app is left out of battery optimisation: why, and the way. */
+  private backgroundCard(s: AppState): HTMLElement {
+    const allow = h('button', { type: 'button', class: ui.btn('filled', 'sm') }, icon('check'), t('allowBackground'));
+    allow.addEventListener('click', () => this.open('battery.request'));
+    const autostart = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('repeat'), t('autostart'));
+    autostart.addEventListener('click', () => this.open('autostart.open'));
+    return h('section', { class: 'flex flex-col gap-3 rounded-md3-xl bg-warning-container p-5 text-on-warning-container' },
+      h('h2', { class: 'flex items-center gap-2 text-lg font-medium' }, icon('warn'), t('backgroundTitle')),
+      h('p', { class: 'text-sm' }, t('backgroundBody')),
+      s.xiaomi ? h('p', { class: 'text-sm' }, t('xiaomiBody')) : null,
+      h('div', { class: 'flex flex-wrap gap-2' }, allow, s.xiaomi ? autostart : null));
+  }
+
+  /** Réglages' card: how many permissions are missing, and the view of them all. */
+  private permissionsCard(s: AppState): HTMLElement {
+    const p = s.permissions;
+    const missing = [p.calendar, p.notifications, p.camera, p.battery].filter((x) => !x).length;
+    const go = h('button', { type: 'button', class: `${ui.btn('tonal')} self-start` }, icon('lock'), t('checkPermissions'));
+    go.addEventListener('click', () => {
+      this.settingsView = 'permissions';
+      this.draw();
+      this.doc.defaultView?.scrollTo(0, 0);
+    });
+    return card(t('permissions'), [],
+      h('div', {}, missing === 0 ? chip(t('allGranted'), 'ok', 'check') : chip(t('someMissing', { count: missing }), 'warn', 'warn')),
+      go);
+  }
+
+  /** Each permission: what it is for, granted or not, and the way to grant it. */
+  private permissionsView(s: AppState): Child[] {
+    const p = s.permissions;
+    const back = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} -ml-3 self-start` }, icon('left'), t('tabSettings'));
+    back.addEventListener('click', () => {
+      this.settingsView = 'main';
+      this.draw();
+    });
+    const row = (ic: Parameters<typeof icon>[0], title: string, why: string, ok: boolean | null, call: string, label: string, actionCall?: (b: HTMLElement) => void): HTMLElement => {
+      const b = h('button', { type: 'button', class: ui.btn(ok === false ? 'filled' : 'text', 'sm') }, label);
+      if (actionCall) actionCall(b);
+      else b.addEventListener('click', () => void this.bridge.call(call).then((st) => { if (st) this.show(parseState(st)); }, (e: unknown) => this.toasts.error(new Error(reason(e)))));
+      return h('div', { class: 'flex items-start gap-4 px-4 py-3' },
+        h('span', { class: 'pt-0.5 text-primary' }, icon(ic)),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1.5' },
+          h('span', { class: 'text-base font-medium' }, title),
+          h('span', { class: 'text-sm text-on-surface-variant' }, why),
+          h('span', { class: 'flex flex-wrap items-center gap-2' },
+            ok === null ? chip(t('toCheck'), 'neutral', 'info') : ok ? chip(t('granted'), 'ok', 'check') : chip(t('notGranted'), 'warn', 'warn'),
+            ok === true ? null : b)));
+    };
+    const opener = (call: string) => (b: HTMLElement): void => b.addEventListener('click', () => this.open(call));
+    const rows = [
+      row('calendar', t('permCalendar'), t('permCalendarWhy'), p.calendar, 'calendar.request', t('allow')),
+      row('bell', t('permNotifications'), t('permNotificationsWhy'), p.notifications, 'notifications.request', t('allow')),
+      row('qr', t('permCamera'), t('permCameraWhy'), p.camera, 'camera.request', t('allow')),
+      row('clock', t('permBattery'), t('permBatteryWhy'), p.battery, 'battery.request', t('allow'), opener('battery.request')),
+      ...(s.xiaomi ? [row('repeat', t('permAutostart'), t('permAutostartWhy'), null, 'autostart.open', t('open'), opener('autostart.open'))] : []),
+    ];
+    const settings = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} self-start` }, icon('gear'), t('appSettings'));
+    settings.addEventListener('click', () => this.open('settings.open'));
+    return [
+      h('div', { class: 'flex flex-col gap-2 pt-2' }, back, h('h1', { class: 'text-[22px] leading-7 font-normal' }, t('permissions'))),
+      h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...rows),
+      h('p', { class: 'px-1 text-sm text-on-surface-variant' }, t('deniedTwice')),
+      settings,
+    ];
+  }
+
   // --- Réglages
 
   /** « Rechercher une mise à jour »: the app checks now; Android's own dialog offers it. */
@@ -408,7 +483,7 @@ export class App {
     return b;
   }
 
-  private settingsTab(): Child[] {
+  private settingsTab(s: AppState): Child[] {
     // The language: kept for the next start (main.ts), then the page again in it.
     const language = segmented(this.doc, t('language'),
       (Object.keys(LANGS) as Lang[]).map((l) => ({ value: l, label: LANGS[l], lead: flag(l, 16, this.doc), lang: l })), lang(this.doc),
@@ -422,6 +497,7 @@ export class App {
       heading(t('tabSettings')),
       card(t('language'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('languageHint')), h('div', {}, language)),
       card(t('appearance'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')), h('div', {}, theme)),
+      this.permissionsCard(s),
       card(t('about'), [],
         h('dl', { class: ui.kv },
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
@@ -611,7 +687,9 @@ export class App {
         h('p', { class: 'text-sm' }, t('permissionBody')),
         h('div', {}, allow)));
     }
-    out.push(this.syncCard(s), this.accountCard(s));
+    out.push(this.syncCard(s));
+    if (!s.permissions.battery) out.push(this.backgroundCard(s));
+    out.push(this.accountCard(s));
     return out;
   }
 

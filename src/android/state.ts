@@ -34,7 +34,16 @@ export interface SyncState {
 
 export interface AppState {
   account: AccountState | null;
-  permissions: { calendar: boolean; camera: boolean };
+  permissions: {
+    calendar: boolean;
+    camera: boolean;
+    /** Notifications (Android 13 on asks): sync errors and updates. */
+    notifications: boolean;
+    /** Left out of battery optimisation: background syncs not held back. */
+    battery: boolean;
+  };
+  /** A Xiaomi phone (MIUI): background starts need « Démarrage automatique » too. */
+  xiaomi: boolean;
   sync: SyncState;
   calendars: CalendarState[];
   /** What made the app stop last time, or null. */
@@ -43,7 +52,8 @@ export interface AppState {
 
 export const EMPTY: AppState = {
   account: null,
-  permissions: { calendar: false, camera: false },
+  permissions: { calendar: false, camera: false, notifications: false, battery: false },
+  xiaomi: false,
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
   crash: null,
@@ -63,7 +73,8 @@ export function parseState(v: unknown): AppState {
       ? { server: str(a['server']), host: str(a['host']), username: str(a['username']), mode: a['mode'] === 'manual' ? 'manual' : a['mode'] === 'qr' ? 'qr' : 'enrolled',
         device_id: typeof a['device_id'] === 'number' ? a['device_id'] : 0 }
       : null,
-    permissions: { calendar: p['calendar'] === true, camera: p['camera'] === true },
+    permissions: { calendar: p['calendar'] === true, camera: p['camera'] === true, notifications: p['notifications'] === true, battery: p['battery'] === true },
+    xiaomi: o['xiaomi'] === true,
     sync: {
       state: (['never', 'idle', 'syncing', 'error'] as const).find((x) => x === s['state']) ?? 'never',
       last_sync: typeof s['last_sync'] === 'string' ? s['last_sync'] : null,

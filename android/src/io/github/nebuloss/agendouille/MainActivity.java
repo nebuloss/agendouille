@@ -55,6 +55,7 @@ public final class MainActivity extends Activity {
     static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final int REQ_CAMERA = 1;
     private static final int REQ_CALENDAR = 2;
+    private static final int REQ_NOTIFY = 3;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -62,6 +63,7 @@ public final class MainActivity extends Activity {
     private WebMessagePort port;
     private long pendingCamera = -1;
     private long pendingCalendar = -1;
+    private long pendingNotify = -1;
     private Object syncObserver;
     private final SharedPreferences.OnSharedPreferenceChangeListener statusListener = (p, k) -> pushState();
     private String pendingLink;
@@ -149,6 +151,43 @@ public final class MainActivity extends Activity {
         SyncStatus.prefs(this).registerOnSharedPreferenceChangeListener(statusListener);
         pushState();
         checkConfig();
+        syncIfStale();
+    }
+
+    /** Opening the app brings the calendars up to date, unless they just were. */
+    private void syncIfStale() {
+        if (Credentials.load(this) == null || !granted(Manifest.permission.WRITE_CALENDAR)) return;
+        long last = SyncStatus.prefs(this).getLong("last_sync", 0);
+        if (System.currentTimeMillis() - last > 5 * 60_000L) syncNow();
+    }
+
+    /** Whether Android leaves the app's background syncs alone (Doze, app standby). */
+    private boolean batteryExempt() {
+        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    /** Xiaomi's MIUI (and Redmi, POCO) blocks background starts without « Démarrage automatique ». */
+    private static boolean xiaomi() {
+        String m = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);
+        return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco");
+    }
+
+    /** Starts the first of these screens the phone has; false when none. */
+    private boolean openFirst(Intent... intents) {
+        for (Intent i : intents) {
+            try {
+                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return true;
+            } catch (ActivityNotFoundException | SecurityException ignored) {
+                // not on this phone: the next one
+            }
+        }
+        return false;
+    }
+
+    private Intent appDetails() {
+        return new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
     }
 
     @Override
@@ -298,6 +337,29 @@ public final class MainActivity extends Activity {
             case "update.check":
                 updateCheck(r.id);
                 break;
+            case "notifications.request":
+                if (Build.VERSION.SDK_INT < 33 || granted("android.permission.POST_NOTIFICATIONS")) {
+                    io.execute(() -> send(BridgeCodec.ok(r.id, state())));
+                } else {
+                    pendingNotify = r.id;
+                    requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, REQ_NOTIFY);
+                }
+                break;
+            case "battery.request":
+                // Android's own « Autoriser » prompt; its settings list where a phone lacks it.
+                openFirst(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())),
+                        new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS), appDetails());
+                send(BridgeCodec.ok(r.id, null)); // the state comes back with onResume
+                break;
+            case "autostart.open":
+                openFirst(new Intent().setComponent(new android.content.ComponentName("com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity")), appDetails());
+                send(BridgeCodec.ok(r.id, null));
+                break;
+            case "settings.open":
+                openFirst(appDetails());
+                send(BridgeCodec.ok(r.id, null));
+                break;
             case "crash.clear":
                 CrashLog.clear(this);
                 io.execute(() -> send(BridgeCodec.ok(r.id, state())));
@@ -321,6 +383,10 @@ public final class MainActivity extends Activity {
             pendingCamera = -1;
             if (granted(Manifest.permission.CAMERA)) send(BridgeCodec.ok(id, null));
             else send(BridgeCodec.error(id, "camera_denied", getString(R.string.camera_needed)));
+        } else if (request == REQ_NOTIFY && pendingNotify >= 0) {
+            long id = pendingNotify;
+            pendingNotify = -1;
+            io.execute(() -> send(BridgeCodec.ok(id, state())));
         } else if (request == REQ_CALENDAR && pendingCalendar >= 0) {
             long id = pendingCalendar;
             pendingCalendar = -1;
@@ -346,7 +412,10 @@ public final class MainActivity extends Activity {
                 o.put("account", JSONObject.NULL);
             }
             boolean cal = granted(Manifest.permission.READ_CALENDAR) && granted(Manifest.permission.WRITE_CALENDAR);
-            o.put("permissions", new JSONObject().put("calendar", cal).put("camera", granted(Manifest.permission.CAMERA)));
+            o.put("permissions", new JSONObject().put("calendar", cal).put("camera", granted(Manifest.permission.CAMERA))
+                    .put("notifications", Build.VERSION.SDK_INT < 33 || granted("android.permission.POST_NOTIFICATIONS"))
+                    .put("battery", batteryExempt()));
+            o.put("xiaomi", xiaomi());
             SharedPreferences p = SyncStatus.prefs(this);
             boolean active = c != null && ContentResolver.isSyncActive(c.account, CalendarContract.AUTHORITY);
             JSONObject sync = new JSONObject().put("state", active ? "syncing" : p.getString("state", "never"))
@@ -641,6 +710,7 @@ public final class MainActivity extends Activity {
                 }
                 if (a.status != 200) return;
                 JSONObject o = new JSONObject(a.body);
+                applyInterval(c, o.optLong("sync_interval_s"));
                 String theirs = o.optString("apk_version");
                 String sha = o.optString("apk_sha256");
                 if (!release && Versions.updateAvailable(version(), theirs, !sha.isEmpty())) ui.post(() -> offerUpdate(c.server, theirs, sha));
@@ -774,5 +844,16 @@ public final class MainActivity extends Activity {
 
     private void updateFailed(String why) {
         new AlertDialog.Builder(this).setMessage(getString(R.string.update_failed, why)).setPositiveButton(android.R.string.ok, null).show();
+    }
+
+    /** The server's sync interval (app_sync_interval_minutes), 15 minutes at least as Android wants. */
+    private void applyInterval(Credentials c, long seconds) {
+        if (seconds <= 0) return;
+        long s = Math.max(15 * 60, seconds);
+        SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
+        if (p.getLong("sync_interval_s", 0) == s) return;
+        ContentResolver.removePeriodicSync(c.account, CalendarContract.AUTHORITY, new Bundle());
+        ContentResolver.addPeriodicSync(c.account, CalendarContract.AUTHORITY, new Bundle(), s);
+        p.edit().putLong("sync_interval_s", s).apply();
     }
 }

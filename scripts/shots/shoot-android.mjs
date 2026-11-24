@@ -46,7 +46,8 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
     Object.defineProperty(navigator, 'language', { get: () => lang });
     const state = {
       account: signedIn ? data.account : null,
-      permissions: { calendar: signedIn, camera: false },
+      permissions: { calendar: signedIn, camera: false, notifications: true, battery: false },
+      xiaomi: true,
       sync: data.sync,
       calendars: signedIn ? data.calendars : [],
       crash: crashed ? data.crash : null,
@@ -73,6 +74,12 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       await (await page.$$('nav button'))[i].click();
       await new Promise((r) => setTimeout(r, 500));
       await page.screenshot({ path: `${out}/android-${lang}-${shot}.png` });
+      if (shot === 'settings') {
+        // The permissions, each with its state and its way.
+        await (await page.$('xpath/.//button[contains(., "Vérifier les autorisations")]')).click();
+        await new Promise((r) => setTimeout(r, 300));
+        await page.screenshot({ path: `${out}/android-${lang}-permissions.png`, fullPage: true });
+      }
       if (shot === 'calendars') {
         // One calendar's page.
         await (await page.$$('#app-content button.min-h-14'))[0].click();

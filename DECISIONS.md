@@ -1134,3 +1134,17 @@ member is always the person at the server's shell, and a printed password
 would end up in the journal of an internet-facing host. `serve` refuses to
 start until `agendouille member add <name> --admin` has made one, and
 that command prints a one-time invitation link instead of a password.
+
+## 2026-11-24: the Android app asks to be left out of battery optimisation
+
+Under Doze and app standby, Android defers the periodic syncs of an app
+under battery optimisation to maintenance windows, hours apart on an idle
+phone; MIUI also blocks background starts without « Démarrage
+automatique ». A sync app is exactly the case Android's policy allows
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` for, and DAVx5 asks the same. The app
+shows a card in Synchro until it is exempt, a permissions view in Réglages,
+and opens MIUI's autostart screen on Xiaomi phones (it cannot read that
+setting). It also follows the server's `app_sync_interval_minutes` instead of
+a fixed 30 minutes, and syncs when opened if the last sync is over five
+minutes old. No foreground service and no push: UnifiedPush stays the plan
+for real-time changes.

@@ -35,7 +35,9 @@ which opens a session for the person.
 - **Synchro**: the last sync, « Synchroniser » now, how many events and
   calendars are on the phone, the account, « Se déconnecter » (removes the
   account and its calendars from the phone; an app sign-in also removes the
-  device on the server).
+  device on the server). Until the app is left out of battery
+  optimisation, a « Synchronisation en arrière-plan » card asks for it (and,
+  on a Xiaomi phone, for « Démarrage automatique »).
 - **Calendriers**: mine and those shared with me. A calendar's page:
   « Synchroniser sur ce téléphone », its shares (each one's access in
   place; « Partager avec d'autres » picks groups and people), « Modifier »,
@@ -45,8 +47,25 @@ which opens a session for the person.
   code, or type its code, then « Se connecter »), the synced devices and
   the signed-in browsers, each with « Déconnecter », and « Déconnecter tous
   les navigateurs » (this phone stays signed in).
-- **Réglages**: language, appearance (light, dark, as the phone), version,
-  and « Rechercher une mise à jour ».
+- **Réglages**: « Autorisations » (each permission, granted or not, with
+  its button: calendar, notifications, camera, battery and, on a Xiaomi
+  phone, autostart), language, appearance (light, dark, as the phone),
+  version, and « Rechercher une mise à jour ».
+
+## Background sync
+
+The app syncs through Android's sync framework, as DAVx5 does: every
+`app_sync_interval_minutes` (the server's setting, 15 minutes at least),
+when an event is changed on the phone, and when the app is opened (if the
+last sync is over five minutes old). There is no push yet: a change made
+elsewhere arrives at the next sync.
+
+Android holds back the background work of apps under battery optimisation,
+sometimes for hours on a phone left idle. Allow the app in Synchro or in
+Réglages, Autorisations. On Xiaomi phones (MIUI, Redmi, POCO), also turn on
+« Démarrage automatique » for agendouille, or it only syncs while open:
+Android cannot tell the app whether it is on, so the app only opens the
+setting.
 
 ## Updates
 

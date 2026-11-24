@@ -19,6 +19,9 @@
   <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
   <uses-permission android:name="android.permission.READ_SYNC_STATS" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- To ask, once, to be left out of battery optimisation: syncing in the
+       background is the app's whole job (DAVx5 asks the same). -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
   <!-- Updates from GitHub, installed through PackageInstaller (DECISIONS). -->
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-feature android:name="android.hardware.camera" android:required="false" />
