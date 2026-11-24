@@ -151,14 +151,23 @@ public final class MainActivity extends Activity {
         SyncStatus.prefs(this).registerOnSharedPreferenceChangeListener(statusListener);
         pushState();
         checkConfig();
-        syncIfStale();
+        syncOnOpen();
     }
 
-    /** Opening the app brings the calendars up to date, unless they just were. */
-    private void syncIfStale() {
+    private long openedSync;
+
+    /**
+     * Opening the app brings the calendars up to date. Coming back from one
+     * of Android's screens (a permission, the installer) within half a
+     * minute does not sync again.
+     */
+    private void syncOnOpen() {
         if (Credentials.load(this) == null || !granted(Manifest.permission.WRITE_CALENDAR)) return;
-        long last = SyncStatus.prefs(this).getLong("last_sync", 0);
-        if (System.currentTimeMillis() - last > 5 * 60_000L) syncNow();
+        ChangeJob.schedule(this);
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (openedSync != 0 && now - openedSync < 30_000L) return;
+        openedSync = now;
+        syncNow();
     }
 
     /** Whether Android leaves the app's background syncs alone (Doze, app standby). */

@@ -22,6 +22,8 @@
   <!-- To ask, once, to be left out of battery optimisation: syncing in the
        background is the app's whole job (DAVx5 asks the same). -->
   <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+  <!-- To watch the phone's calendars again after a reboot (ChangeJob). -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <!-- Updates from GitHub, installed through PackageInstaller (DECISIONS). -->
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -66,6 +68,18 @@
           android:name="android.content.SyncAdapter"
           android:resource="@xml/syncadapter" />
     </service>
+
+    <!-- An event changed on the phone goes to the server within seconds. -->
+    <service
+        android:name=".ChangeJob"
+        android:exported="false"
+        android:permission="android.permission.BIND_JOB_SERVICE" />
+    <receiver android:name=".ChangeJob$Boot" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
 
     <service
         android:name=".AuthenticatorService"

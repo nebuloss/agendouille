@@ -1167,3 +1167,17 @@ sets `shown`, `/api/app/config` lists the calendars turned off
 (`not_shown`), and each sync of the app brings the phone in line. DAVx5 and
 other CalDAV clients are not affected: they keep their own per-calendar
 choice, and `hidden` (« Masquer ») still takes a calendar off every device.
+
+## 2026-11-24: a phone's change syncs within seconds; opening the app syncs
+
+Android's own upload trigger (the sync adapter's supportsUploading) is
+batched and deferred. The app schedules a JobScheduler job on the calendar
+provider's content URI: within seconds of a change it looks for the
+account's events waiting to go up (DIRTY or DELETED) and asks for an
+expedited sync; the sync clears those flags, so it never loops. A content
+trigger fires once and is not kept across reboots: the job schedules
+itself again, and so do the app, each sync, BOOT_COMPLETED and
+MY_PACKAGE_REPLACED. Opening the app now always syncs (not within 30
+seconds of the last opening, for the round trips through Android's
+screens). A change made elsewhere still waits for the periodic sync: push
+(UnifiedPush) is the way to make that instant.

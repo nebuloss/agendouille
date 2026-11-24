@@ -63,8 +63,9 @@ which opens a session for the person.
 
 The app syncs through Android's sync framework, as DAVx5 does: every
 `app_sync_interval_minutes` (the server's setting, 15 minutes at least),
-when an event is changed on the phone, and when the app is opened (if the
-last sync is over five minutes old). There is no push yet: a change made
+when the app is opened, and within seconds of an event being created,
+changed or deleted on the phone (in any calendar app, the app closed or
+not: a job Android runs when the phone's calendars change). There is no push yet: a change made
 elsewhere arrives at the next sync.
 
 Android holds back the background work of apps under battery optimisation,

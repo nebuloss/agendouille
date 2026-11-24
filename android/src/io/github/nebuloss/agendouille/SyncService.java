@@ -72,6 +72,7 @@ public final class SyncService extends Service {
                 }
                 result.stats.numSkippedEntries += up.conflicts;
                 SyncStatus.done(ctx, cals.events());
+                ChangeJob.schedule(ctx); // watching the phone's changes, after a reboot too
             } catch (Dav.Unauthorized e) {
                 result.stats.numAuthExceptions++;
                 SyncStatus.failed(ctx, ctx.getString(R.string.sync_refused));
