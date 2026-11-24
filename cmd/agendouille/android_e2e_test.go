@@ -57,4 +57,27 @@ func TestDAVx5PageAndAppPieces(t *testing.T) {
 			t.Errorf("%s: %d, want %d (APK embedded: %v)", p, a.status, want, want == http.StatusOK)
 		}
 	}
+
+	// The sign-in page on a phone: never the QR code (a phone cannot scan
+	// its own screen); on Android, the app alone when the server has it.
+	android := func(r *http.Request) {
+		r.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 14; 23078PND5G) Mobile")
+	}
+	iphone := func(r *http.Request) {
+		r.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile")
+	}
+	a = x.do("GET", x.public+"/", nil, android)
+	if assets.AndroidApp() != nil {
+		if !strings.Contains(a.body, "/app/agendouille.apk") || strings.Contains(a.body, "signin-short-code") || strings.Contains(a.body, "signin-qr") {
+			t.Errorf("Android, the app embedded: the download only, got %s", a.body)
+		}
+	} else if strings.Contains(a.body, "signin-qr") || !strings.Contains(a.body, "signin-short-code") {
+		t.Errorf("Android, no app: the code without the QR code, got %s", a.body)
+	}
+	if a := x.do("GET", x.public+"/", nil, iphone); strings.Contains(a.body, "signin-qr") || !strings.Contains(a.body, "signin-short-code") {
+		t.Errorf("iPhone: the code without the QR code, got %s", a.body)
+	}
+	if a := x.do("GET", x.public+"/", nil, nil); !strings.Contains(a.body, "signin-qr") {
+		t.Errorf("desktop: the QR code, got %s", a.body)
+	}
 }

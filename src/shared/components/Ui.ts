@@ -336,6 +336,32 @@ export function segmented<T extends string>(doc: Document, label: string, option
   };
 }
 
+/**
+ * An on/off switch (Material's): a button with role="switch", never a
+ * checkbox the WebView would draw in its own style.
+ */
+export function switchButton(doc: Document, label: string, on: boolean, onChange: (on: boolean) => void): HTMLButtonElement {
+  const thumb = h('span', { class: '' });
+  const b = h('button', { type: 'button', role: 'switch', 'aria-label': label, class: '' }, thumb) as HTMLButtonElement;
+  const draw = (v: boolean): void => {
+    b.setAttribute('aria-checked', String(v));
+    b.className = v
+      ? 'relative inline-flex h-8 w-13 shrink-0 items-center rounded-full border-2 border-primary bg-primary transition-colors'
+      : 'relative inline-flex h-8 w-13 shrink-0 items-center rounded-full border-2 border-outline bg-surface-highest transition-colors';
+    thumb.className = v
+      ? 'inline-block size-6 translate-x-[22px] rounded-full bg-on-primary transition-transform'
+      : 'inline-block size-4 translate-x-[6px] rounded-full bg-outline transition-transform';
+  };
+  draw(on);
+  b.addEventListener('click', () => {
+    const v = b.getAttribute('aria-checked') !== 'true';
+    draw(v);
+    onChange(v);
+  });
+  void doc;
+  return b;
+}
+
 /** The language, side by side with their flags; choosing one reloads the page in it. */
 export function langChoice(doc: Document = document): HTMLElement {
   const options = (Object.keys(LANGS) as Lang[]).map((l) => ({ value: l, label: LANGS[l], lead: flag(l, 16, doc), lang: l }));

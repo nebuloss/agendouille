@@ -12,7 +12,7 @@
 import { append, h, type Child } from '@/shared/core/Dom.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
-import { Toasts, card, chip, confirmDialog, dialog, field, formDialog, segmented, stat, swatch, themeToggle } from '@/shared/components/Ui.ts';
+import { Toasts, card, chip, confirmDialog, dialog, field, formDialog, segmented, switchButton, stat, swatch, themeToggle } from '@/shared/components/Ui.ts';
 import { recencyTone } from '@/shared/components/tone.ts';
 import { flag } from '@/shared/components/flags.ts';
 import { LANGS, lang, setLang, type Lang } from '@/shared/i18n/i18n.ts';
@@ -483,6 +483,19 @@ export class App {
     return b;
   }
 
+  /** « Versions de développement »: where updates come from. */
+  private devUpdatesRow(s: AppState): HTMLElement {
+    const sw = switchButton(this.doc, t('devUpdates'), s.devUpdates, (on) => {
+      void this.bridge.call('updates.dev', { on }).then((st) => { if (st) this.show(parseState(st)); },
+        (e: unknown) => this.toasts.error(new Error(reason(e))));
+    });
+    return h('label', { class: 'flex items-center gap-4' },
+      h('span', { class: 'flex min-w-0 flex-1 flex-col gap-0.5' },
+        h('span', { class: 'text-base font-medium' }, t('devUpdates')),
+        h('span', { class: 'text-sm text-on-surface-variant' }, s.devUpdates ? t('devUpdatesOn') : t('devUpdatesOff'))),
+      sw);
+  }
+
   private settingsTab(s: AppState): Child[] {
     // The language: kept for the next start (main.ts), then the page again in it.
     const language = segmented(this.doc, t('language'),
@@ -502,6 +515,7 @@ export class App {
         h('dl', { class: ui.kv },
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
           h('dt', {}, t('android')), h('dd', {}, String(this.bridge.hello?.android ?? '?'))),
+        this.devUpdatesRow(s),
         this.updateButton()),
     ];
   }

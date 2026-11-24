@@ -30,4 +30,5 @@
   <string name="update_downloading">Downloading the update…</string>
   <string name="update_failed">The update failed: %1$s</string>
   <string name="update_other_key">this app was installed from another build (signed with another key). Uninstall it once, then install the app from the GitHub release.</string>
+    <string name="update_older">This version is older than the one on the phone: Android would refuse it.</string>
 </resources>

@@ -144,8 +144,16 @@ func (h *handlers) shell(page, titleKey string) withPrincipal {
 	}
 }
 
-// signin starts an approval and shows its QR code, short code and number.
+// signin starts an approval and shows its QR code and short code. On an
+// Android phone, when this server has the app, it offers only the app: a
+// phone cannot scan its own screen, and the app is how a phone signs in.
+// Another phone gets the short code, without the QR code.
 func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
+	platform := platformOf(r.UserAgent())
+	if apk := assets.AndroidApp(); apk != nil && platform == "android" {
+		h.render(w, r, http.StatusOK, "app/signin.html", "app.title.signin", map[string]any{"AppOnly": true, "APKSHA256": apk.SHA256})
+		return
+	}
 	a, err := h.d.Auth.StartApproval(r.Context(), r.UserAgent(), h.clientIP(r))
 	if err != nil {
 		status, key := http.StatusInternalServerError, "error.internal"
@@ -159,18 +167,16 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	}
 	// The code rides in the fragment, which browsers never send: it stays
 	// out of every server and proxy log (CONTRACTS.md 3.4).
-	qr, err := webx.QRDataURL(h.d.PublicURL() + "/approve#c=" + a.Code)
-	if err != nil {
-		h.d.Log.Error("drawing a QR code", "err", err)
-	}
 	// What is left, not when: the page counts it down on its own clock, so
 	// a phone whose clock is wrong still refreshes the code on time.
-	data := map[string]any{"Approval": a, "QR": qr,
+	data := map[string]any{"Approval": a, "Mobile": platform != "desktop",
 		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()}
-	// The Android app, when this server has it, and only on an Android
-	// phone: nowhere else can it be installed.
-	if apk := assets.AndroidApp(); apk != nil && platformOf(r.UserAgent()) == "android" {
-		data["APKSHA256"] = apk.SHA256
+	if platform == "desktop" {
+		qr, err := webx.QRDataURL(h.d.PublicURL() + "/approve#c=" + a.Code)
+		if err != nil {
+			h.d.Log.Error("drawing a QR code", "err", err)
+		}
+		data["QR"] = qr
 	}
 	h.render(w, r, http.StatusOK, "app/signin.html", "app.title.signin", data)
 }

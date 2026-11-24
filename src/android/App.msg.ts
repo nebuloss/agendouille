@@ -2,6 +2,9 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    devUpdates: 'Versions de développement',
+    devUpdatesOn: 'Mises à jour depuis le serveur, dès qu’il a une nouvelle version, même en test.',
+    devUpdatesOff: 'Mises à jour depuis les versions publiées sur GitHub seulement.',
     backgroundTitle: 'Synchronisation en arrière-plan',
     backgroundBody: 'Android retarde les synchronisations des applications qui économisent la batterie, parfois de plusieurs heures. Autorisez agendouille à se synchroniser en arrière-plan.',
     xiaomiBody: 'Sur ce téléphone Xiaomi, activez aussi le « Démarrage automatique » d’agendouille, sans quoi il ne se synchronise que lorsqu’il est ouvert.',
@@ -165,6 +168,9 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    devUpdates: 'Development builds',
+    devUpdatesOn: 'Updates from the server, as soon as it has a new build, even a test one.',
+    devUpdatesOff: 'Updates from the releases published on GitHub only.',
     backgroundTitle: 'Background sync',
     backgroundBody: 'Android holds back the syncs of apps that save battery, sometimes for hours. Allow agendouille to sync in the background.',
     xiaomiBody: 'On this Xiaomi phone, also turn on agendouille’s “Autostart”, or it only syncs while it is open.',

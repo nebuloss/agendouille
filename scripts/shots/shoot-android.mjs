@@ -48,6 +48,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       account: signedIn ? data.account : null,
       permissions: { calendar: signedIn, camera: false, notifications: true, battery: false },
       xiaomi: true,
+      dev_updates: true,
       sync: data.sync,
       calendars: signedIn ? data.calendars : [],
       crash: crashed ? data.crash : null,
@@ -75,6 +76,11 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       await new Promise((r) => setTimeout(r, 500));
       await page.screenshot({ path: `${out}/android-${lang}-${shot}.png` });
       if (shot === 'settings') {
+        // The bottom: the version, « Versions de développement », the update check.
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await new Promise((r) => setTimeout(r, 300));
+        await page.screenshot({ path: `${out}/android-${lang}-settings-bottom.png` });
+        await page.evaluate(() => window.scrollTo(0, 0));
         // The permissions, each with its state and its way.
         await (await page.$('xpath/.//button[contains(., "Vérifier les autorisations")]')).click();
         await new Promise((r) => setTimeout(r, 300));

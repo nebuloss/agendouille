@@ -49,8 +49,8 @@ func init() {
 		},
 		"app.signin.checksum": {FR: "Empreinte du fichier", EN: "File checksum"},
 		"app.signin.getAppHelp": {
-			FR: "Sur un téléphone Android, l’application agendouille synchronise vos calendriers avec ceux du téléphone.",
-			EN: "On an Android phone, the agendouille app syncs your calendars with the phone’s.",
+			FR: "Sur ce téléphone, utilisez l’application agendouille : elle synchronise vos calendriers avec ceux du téléphone et vous connecte avec le QR code que l’administrateur vous donne.",
+			EN: "On this phone, use the agendouille app: it syncs your calendars with the phone’s, and signs you in with the QR code your admin gives you.",
 		},
 		"app.enroll.getApp": {
 			FR: "Télécharger l’application",
@@ -82,6 +82,10 @@ func init() {
 
 		// Signing in: the code another device approves.
 		"app.signin.title": {FR: "Se connecter", EN: "Sign in"},
+		"app.signin.howMobile": {
+			FR: "Dans l’application agendouille d’un autre téléphone, onglet Appareils, saisissez ce code, puis confirmez.",
+			EN: "In the agendouille app on another phone, Devices tab, type this code, then confirm.",
+		},
 		"app.signin.how": {
 			FR: "Dans l’application agendouille, onglet Appareils, scannez ce code, puis confirmez sur le téléphone. Sans appareil photo, saisissez le code ci-dessous.",
 			EN: "In the agendouille app, Devices tab, scan this code, then confirm on the phone. Without a camera, type the code below.",

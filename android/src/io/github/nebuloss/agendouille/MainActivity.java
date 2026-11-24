@@ -337,6 +337,10 @@ public final class MainActivity extends Activity {
             case "update.check":
                 updateCheck(r.id);
                 break;
+            case "updates.dev":
+                getSharedPreferences("agendouille", MODE_PRIVATE).edit().putBoolean("dev_updates", r.args.optBoolean("on")).remove("update_dismissed").apply();
+                io.execute(() -> send(BridgeCodec.ok(r.id, state())));
+                break;
             case "notifications.request":
                 if (Build.VERSION.SDK_INT < 33 || granted("android.permission.POST_NOTIFICATIONS")) {
                     io.execute(() -> send(BridgeCodec.ok(r.id, state())));
@@ -416,6 +420,7 @@ public final class MainActivity extends Activity {
                     .put("notifications", Build.VERSION.SDK_INT < 33 || granted("android.permission.POST_NOTIFICATIONS"))
                     .put("battery", batteryExempt()));
             o.put("xiaomi", xiaomi());
+            o.put("dev_updates", devUpdates());
             SharedPreferences p = SyncStatus.prefs(this);
             boolean active = c != null && ContentResolver.isSyncActive(c.account, CalendarContract.AUTHORITY);
             JSONObject sync = new JSONObject().put("state", active ? "syncing" : p.getString("state", "never"))
@@ -697,8 +702,8 @@ public final class MainActivity extends Activity {
      * server that embeds it.
      */
     private void checkConfig() {
-        boolean release = Versions.isRelease(version());
-        if (release) checkGitHub();
+        boolean dev = devUpdates();
+        if (!dev) checkGitHub();
         Credentials c = Credentials.load(this);
         if (c == null) return;
         io.execute(() -> {
@@ -713,7 +718,7 @@ public final class MainActivity extends Activity {
                 applyInterval(c, o.optLong("sync_interval_s"));
                 String theirs = o.optString("apk_version");
                 String sha = o.optString("apk_sha256");
-                if (!release && Versions.updateAvailable(version(), theirs, !sha.isEmpty())) ui.post(() -> offerUpdate(c.server, theirs, sha));
+                if (dev && Versions.updateAvailable(version(), theirs, !sha.isEmpty())) ui.post(() -> offerUpdate(c.server, theirs, sha));
             } catch (Exception ignored) {
                 // Offline: the next start will tell.
             }
@@ -729,10 +734,10 @@ public final class MainActivity extends Activity {
         io.execute(() -> {
             try {
                 String found = null;
-                if (Versions.isRelease(version())) {
+                if (!devUpdates()) {
                     Updater.Release r = Updater.latest(userAgent());
                     getSharedPreferences("agendouille", MODE_PRIVATE).edit().putLong("github_checked", System.currentTimeMillis()).apply();
-                    if (r != null && Versions.newer(version(), r.version)) {
+                    if (r != null && releaseIsNewer(r)) {
                         found = r.version;
                         ui.post(() -> offerGitHubUpdate(r, true));
                     }
@@ -792,7 +797,7 @@ public final class MainActivity extends Activity {
             try {
                 Updater.Release r = Updater.latest(userAgent());
                 p.edit().putLong("github_checked", System.currentTimeMillis()).apply();
-                if (r != null && Versions.newer(version(), r.version)) ui.post(() -> offerGitHubUpdate(r, false));
+                if (r != null && releaseIsNewer(r)) ui.post(() -> offerGitHubUpdate(r, false));
             } catch (Exception ignored) {
                 // Offline, or GitHub unreachable: the next start will tell.
             }
@@ -855,5 +860,31 @@ public final class MainActivity extends Activity {
         ContentResolver.removePeriodicSync(c.account, CalendarContract.AUTHORITY, new Bundle());
         ContentResolver.addPeriodicSync(c.account, CalendarContract.AUTHORITY, new Bundle(), s);
         p.edit().putLong("sync_interval_s", s).apply();
+    }
+
+    /**
+     * Réglages, « Versions de développement »: on, the app takes the
+     * server's build (devdeploy's); off, GitHub's releases only. A dev build
+     * starts with it on, a release with it off.
+     */
+    private boolean devUpdates() {
+        return getSharedPreferences("agendouille", MODE_PRIVATE).getBoolean("dev_updates", !Versions.isRelease(version()));
+    }
+
+    /**
+     * Whether GitHub's latest release is later than this app. Between
+     * releases, by their numbers; from a dev build (no order by name), by
+     * the APK's version code, which Android goes by: the release is
+     * downloaded to see it, then dropped.
+     */
+    private boolean releaseIsNewer(Updater.Release r) throws IOException {
+        if (Versions.isRelease(version())) return Versions.newer(version(), r.version);
+        java.io.File f = Updater.download(this, r, userAgent());
+        try {
+            return Updater.versionCode(this, f) > Updater.installedCode(this);
+        } finally {
+            //noinspection ResultOfMethodCallIgnored
+            f.delete();
+        }
     }
 }

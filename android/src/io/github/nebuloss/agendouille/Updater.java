@@ -108,6 +108,13 @@ final class Updater {
      * ACTION_STATUS to the activity.
      */
     static void install(Context ctx, File apk) throws IOException {
+        // Android refuses a lower version code: say so before it does.
+        long theirs = versionCode(ctx, apk);
+        if (theirs >= 0 && theirs < installedCode(ctx)) {
+            //noinspection ResultOfMethodCallIgnored
+            apk.delete();
+            throw new IOException(ctx.getString(R.string.update_older));
+        }
         PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
         PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         params.setAppPackageName(ctx.getPackageName());
@@ -142,6 +149,28 @@ final class Updater {
      * Only one APK is ever kept, the one being installed; old versions are
      * never stored.
      */
+    /** An APK file's version code (the commit count), or -1. */
+    static long versionCode(Context ctx, File apk) {
+        android.content.pm.PackageInfo pi = ctx.getPackageManager().getPackageArchiveInfo(apk.getPath(), 0);
+        return pi == null ? -1 : code(pi);
+    }
+
+    // getLongVersionCode is Android 9's; before, the int field (min SDK 26).
+    @SuppressWarnings("deprecation")
+    private static long code(android.content.pm.PackageInfo pi) {
+        return Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode;
+    }
+
+    /** This app's version code. */
+    static long installedCode(Context ctx) {
+        try {
+            android.content.pm.PackageInfo pi = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
+            return code(pi);
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return 0;
+        }
+    }
+
     static void cleanup(Context ctx) {
         //noinspection ResultOfMethodCallIgnored
         new File(ctx.getCacheDir(), "update.apk").delete();

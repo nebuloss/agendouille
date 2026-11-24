@@ -44,6 +44,8 @@ export interface AppState {
   };
   /** A Xiaomi phone (MIUI): background starts need « Démarrage automatique » too. */
   xiaomi: boolean;
+  /** Updates from the server's dev build (on) or GitHub's releases only (off). */
+  devUpdates: boolean;
   sync: SyncState;
   calendars: CalendarState[];
   /** What made the app stop last time, or null. */
@@ -54,6 +56,7 @@ export const EMPTY: AppState = {
   account: null,
   permissions: { calendar: false, camera: false, notifications: false, battery: false },
   xiaomi: false,
+  devUpdates: false,
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
   crash: null,
@@ -75,6 +78,7 @@ export function parseState(v: unknown): AppState {
       : null,
     permissions: { calendar: p['calendar'] === true, camera: p['camera'] === true, notifications: p['notifications'] === true, battery: p['battery'] === true },
     xiaomi: o['xiaomi'] === true,
+    devUpdates: o['dev_updates'] === true,
     sync: {
       state: (['never', 'idle', 'syncing', 'error'] as const).find((x) => x === s['state']) ?? 'never',
       last_sync: typeof s['last_sync'] === 'string' ? s['last_sync'] : null,
