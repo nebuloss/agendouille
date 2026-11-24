@@ -121,6 +121,39 @@ final class Updater {
             Intent status = new Intent(ctx, MainActivity.class).setAction(ACTION_STATUS);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? 0x02000000 /* FLAG_MUTABLE */ : 0);
             s.commit(PendingIntent.getActivity(ctx, id, status, flags).getIntentSender());
+        } catch (IOException | RuntimeException e) {
+            // Half written: Android drops the session's copy with it.
+            try {
+                pi.abandonSession(id);
+            } catch (RuntimeException ignored) {
+                // already gone
+            }
+            throw e;
+        } finally {
+            // Android has its own copy now (or nothing): ours goes.
+            //noinspection ResultOfMethodCallIgnored
+            apk.delete();
+        }
+    }
+
+    /**
+     * At start: what an update left, an APK in the cache or an install
+     * session of ours never committed (the app stopped while writing it).
+     * Only one APK is ever kept, the one being installed; old versions are
+     * never stored.
+     */
+    static void cleanup(Context ctx) {
+        //noinspection ResultOfMethodCallIgnored
+        new File(ctx.getCacheDir(), "update.apk").delete();
+        if (Build.VERSION.SDK_INT < 29) return; // isCommitted() is Android 10's
+        PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
+        for (PackageInstaller.SessionInfo s : pi.getMySessions()) {
+            if (s.isCommitted()) continue; // waiting for the person's yes: theirs to answer
+            try {
+                pi.abandonSession(s.getSessionId());
+            } catch (RuntimeException ignored) {
+                // gone meanwhile
+            }
         }
     }
 

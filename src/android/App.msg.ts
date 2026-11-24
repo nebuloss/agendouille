@@ -2,6 +2,9 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    checkUpdate: 'Rechercher une mise à jour',
+    updateFound: 'La version {version} est disponible.',
+    upToDateApp: 'L’application est à jour ({version}).',
     upToDate: 'À jour',
     syncFailed: 'Échec',
     eventsStat: 'événements sur le téléphone',
@@ -131,6 +134,9 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    checkUpdate: 'Check for updates',
+    updateFound: 'Version {version} is available.',
+    upToDateApp: 'The app is up to date ({version}).',
     upToDate: 'Up to date',
     syncFailed: 'Failed',
     eventsStat: 'events on the phone',

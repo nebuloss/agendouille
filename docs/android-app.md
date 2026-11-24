@@ -44,11 +44,13 @@ which opens a session for the person.
 - **Appareils**: « Connecter un navigateur » (scan a browser's sign-in QR
   code, or type its code, then « Se connecter »), the synced devices and
   the signed-in browsers, each with « Déconnecter ».
-- **Réglages**: language, appearance (light, dark, as the phone), version.
+- **Réglages**: language, appearance (light, dark, as the phone), version,
+  and « Rechercher une mise à jour ».
 
 ## Updates
 
-The app checks when it opens:
+The app checks when it opens, and when « Rechercher une mise à jour »
+(Réglages) is tapped, which also ignores an earlier « Plus tard »:
 
 - **A release** (from GitHub) checks GitHub's latest release, at most every
   six hours.
@@ -57,7 +59,10 @@ The app checks when it opens:
 
 Either way it downloads the APK itself, checks its SHA-256 (the release's
 `SHA256SUMS`, or the server's announced sum), and hands it to Android's
-installer, which asks to confirm. Android refuses an APK signed with
+installer, which asks to confirm. Only one APK is ever kept, in the app's
+cache, while it is being installed: it is deleted once Android has its
+copy, and an install that stopped halfway is cleaned up at the next start.
+Old versions are never stored. Android refuses an APK signed with
 another key: every build is signed with the release key when the build
 machine has it, so releases and dev builds install over each other, the
 higher version code (the commit count) winning.

@@ -56,6 +56,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       ch.port2.onmessage = (e) => {
         const r = JSON.parse(e.data);
         const result = r.call === 'hello' ? data.hello
+          : r.call === 'update.check' ? { current: data.hello.app_version, available: null }
           : r.call === 'api' ? { status: 200, body: JSON.stringify(data.api[`${r.args.method} ${r.args.path}`] ?? {}) }
             : state;
         ch.port2.postMessage(JSON.stringify({ id: r.id, ok: true, result }));

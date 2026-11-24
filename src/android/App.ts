@@ -379,6 +379,24 @@ export class App {
 
   // --- Réglages
 
+  /** « Rechercher une mise à jour »: the app checks now; Android's own dialog offers it. */
+  private updateButton(): HTMLElement {
+    const b = h('button', { type: 'button', class: `${ui.btn('tonal')} self-start` }, icon('download'), t('checkUpdate'));
+    b.addEventListener('click', () => void (async () => {
+      b.disabled = true;
+      try {
+        const r = await this.bridge.call<{ current?: string; available?: string | null }>('update.check');
+        if (r.available) this.toasts.show(t('updateFound', { version: r.available }));
+        else this.toasts.show(t('upToDateApp', { version: r.current ?? '' }));
+      } catch (e) {
+        this.toasts.error(new Error(reason(e)));
+      } finally {
+        b.disabled = false;
+      }
+    })());
+    return b;
+  }
+
   private settingsTab(): Child[] {
     // The language: kept for the next start (main.ts), then the page again in it.
     const language = segmented(this.doc, t('language'),
@@ -396,7 +414,8 @@ export class App {
       card(t('about'), [],
         h('dl', { class: ui.kv },
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
-          h('dt', {}, t('android')), h('dd', {}, String(this.bridge.hello?.android ?? '?')))),
+          h('dt', {}, t('android')), h('dd', {}, String(this.bridge.hello?.android ?? '?'))),
+        this.updateButton()),
     ];
   }
 

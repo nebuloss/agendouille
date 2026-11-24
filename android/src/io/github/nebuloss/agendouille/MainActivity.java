@@ -72,6 +72,7 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         CrashLog.install(this);
+        if (saved == null) Updater.cleanup(this);
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
         web = new WebView(this);
         WebSettings s = web.getSettings();
@@ -293,6 +294,9 @@ public final class MainActivity extends Activity {
                 break;
             case "api":
                 api(r.id, r.args.optString("method"), r.args.optString("path"), r.args.isNull("body") ? null : r.args.optString("body", null));
+                break;
+            case "update.check":
+                updateCheck(r.id);
                 break;
             case "crash.clear":
                 CrashLog.clear(this);
@@ -646,10 +650,53 @@ public final class MainActivity extends Activity {
         });
     }
 
+    /**
+     * « Rechercher une mise à jour » (Réglages): now, whatever the six hours
+     * and an earlier « Plus tard » say. Answers {current, available}: the
+     * version offered (and its dialog shown), or null when up to date.
+     */
+    private void updateCheck(long id) {
+        io.execute(() -> {
+            try {
+                String found = null;
+                if (Versions.isRelease(version())) {
+                    Updater.Release r = Updater.latest(userAgent());
+                    getSharedPreferences("agendouille", MODE_PRIVATE).edit().putLong("github_checked", System.currentTimeMillis()).apply();
+                    if (r != null && Versions.newer(version(), r.version)) {
+                        found = r.version;
+                        ui.post(() -> offerGitHubUpdate(r, true));
+                    }
+                } else {
+                    Credentials c = Credentials.load(this);
+                    if (c != null) {
+                        Http.Answer a = Http.call("GET", c.server + "/api/app/config", c.username, c.secret, null, null, userAgent());
+                        if (a.status == 200) {
+                            JSONObject o = new JSONObject(a.body);
+                            String theirs = o.optString("apk_version"), sha = o.optString("apk_sha256");
+                            if (Versions.updateAvailable(version(), theirs, !sha.isEmpty())) {
+                                found = theirs;
+                                ui.post(() -> offerUpdate(c.server, theirs, sha, true));
+                            }
+                        }
+                    }
+                }
+                send(BridgeCodec.ok(id, new JSONObject().put("current", version()).put("available", found == null ? JSONObject.NULL : found)));
+            } catch (IOException e) {
+                send(BridgeCodec.error(id, "offline", getString(R.string.offline)));
+            } catch (Exception e) {
+                send(BridgeCodec.error(id, "error", String.valueOf(e.getMessage())));
+            }
+        });
+    }
+
     /** A dev build: the server's own APK, downloaded and installed here, as a release's. */
     private void offerUpdate(String server, String theirs, String sha256) {
+        offerUpdate(server, theirs, sha256, false);
+    }
+
+    private void offerUpdate(String server, String theirs, String sha256, boolean asked) {
         SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
-        if (theirs.equals(p.getString("update_dismissed", ""))) return;
+        if (!asked && theirs.equals(p.getString("update_dismissed", ""))) return;
         new AlertDialog.Builder(this)
                 .setTitle(R.string.update_title)
                 .setMessage(getString(R.string.update_body, theirs, version()))
@@ -675,16 +722,16 @@ public final class MainActivity extends Activity {
             try {
                 Updater.Release r = Updater.latest(userAgent());
                 p.edit().putLong("github_checked", System.currentTimeMillis()).apply();
-                if (r != null && Versions.newer(version(), r.version)) ui.post(() -> offerGitHubUpdate(r));
+                if (r != null && Versions.newer(version(), r.version)) ui.post(() -> offerGitHubUpdate(r, false));
             } catch (Exception ignored) {
                 // Offline, or GitHub unreachable: the next start will tell.
             }
         });
     }
 
-    private void offerGitHubUpdate(Updater.Release r) {
+    private void offerGitHubUpdate(Updater.Release r, boolean asked) {
         SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
-        if (r.version.equals(p.getString("update_dismissed", ""))) return;
+        if (!asked && r.version.equals(p.getString("update_dismissed", ""))) return;
         new AlertDialog.Builder(this)
                 .setTitle(R.string.update_title)
                 .setMessage(getString(R.string.update_body_github, r.version, version()))

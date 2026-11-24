@@ -3,6 +3,21 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: « Rechercher une mise à jour »; the updater keeps nothing
+
+The user: "add a check-update button in the app's settings; I hope there
+is clean cache management, so as not to store all old app versions".
+
+- Réglages has « Rechercher une mise à jour » (bridge `update.check`): it
+  checks now, past the six hours between automatic checks and an earlier
+  « Plus tard », shows Android's offer when there is one, else says the app
+  is up to date.
+- The updater only ever had one file (`cache/update.apk`, overwritten); now
+  it is deleted as soon as the install session has its copy, a session
+  that fails while being written is abandoned, and at start
+  (`Updater.cleanup`) a leftover APK is deleted and our sessions never
+  committed are abandoned (one waiting for the person's yes is left).
+
 ## 2026-11-24: colour that means something, as claudication
 
 The user: "more colour and contrast in the app and the website (look at
