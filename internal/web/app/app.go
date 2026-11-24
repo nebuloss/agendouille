@@ -167,25 +167,17 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	// a phone whose clock is wrong still refreshes the code on time.
 	data := map[string]any{"Approval": a, "QR": qr,
 		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()}
-	// The Android app, when this server has it: syncing a phone starts
-	// there. An Android phone gets the button; a computer a QR code its
-	// owner scans with the phone's camera; an iPhone nothing (no app).
-	if apk := assets.AndroidApp(); apk != nil {
+	// The Android app, when this server has it, and only on an Android
+	// phone: nowhere else can it be installed.
+	if apk := assets.AndroidApp(); apk != nil && platformOf(r.UserAgent()) == "android" {
 		data["APKSHA256"] = apk.SHA256
-		data["Platform"] = platformOf(r.UserAgent())
-		if data["Platform"] == "desktop" {
-			if q, err := webx.QRDataURL(h.d.PublicURL() + "/app/agendouille.apk"); err == nil {
-				data["APKQR"] = q
-			}
-		}
 	}
 	h.render(w, r, http.StatusOK, "app/signin.html", "app.title.signin", data)
 }
 
-// platformOf tells, from a User-Agent, what the sign-in page offers for the
-// Android app: "android", "ios" (iPhone, iPad; an iPad's Safari says
-// Macintosh, and gets the computer's QR code, which does no harm) or
-// "desktop".
+// platformOf tells, from a User-Agent, "android", "ios" (iPhone, iPad; an
+// iPad's Safari says Macintosh) or "desktop": the sign-in page offers the
+// Android app on Android only.
 func platformOf(ua string) string {
 	switch {
 	case strings.Contains(ua, "Android"):

@@ -8,10 +8,8 @@ no AndroidX.
 
 ## Install
 
-- From the server: the sign-in page (`/`) offers it by platform: on an
-  Android phone, « Télécharger l'application »; on a computer, a QR code
-  to scan with the phone's camera (and a direct link); on an iPhone,
-  nothing (`/app/agendouille.apk`).
+- From the server: the sign-in page (`/`) offers « Télécharger
+  l'application » on an Android phone only (`/app/agendouille.apk`).
 - From GitHub: `agendouille-<version>.apk` on each
   [release](https://github.com/nebuloss/agendouille/releases), with its
   line in `SHA256SUMS`.

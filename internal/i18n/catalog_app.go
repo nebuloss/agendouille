@@ -47,14 +47,7 @@ func init() {
 			FR: "Ouvrir dans l’application",
 			EN: "Open in the app",
 		},
-		"app.signin.checksum":    {FR: "Empreinte du fichier", EN: "File checksum"},
-		"app.signin.apkQrAlt":    {FR: "QR code pour télécharger l’application Android", EN: "QR code to download the Android app"},
-		"app.signin.getAppTitle": {FR: "L’application Android", EN: "The Android app"},
-		"app.signin.getAppDesktop": {
-			FR: "Scannez ce code avec l’appareil photo de votre téléphone Android pour télécharger l’application, qui synchronise vos calendriers avec ceux du téléphone.",
-			EN: "Scan this code with your Android phone’s camera to download the app, which syncs your calendars with the phone’s.",
-		},
-		"app.signin.getAppHere": {FR: "Ou téléchargez-la ici", EN: "Or download it here"},
+		"app.signin.checksum": {FR: "Empreinte du fichier", EN: "File checksum"},
 		"app.signin.getAppHelp": {
 			FR: "Sur un téléphone Android, l’application agendouille synchronise vos calendriers avec ceux du téléphone.",
 			EN: "On an Android phone, the agendouille app syncs your calendars with the phone’s.",

@@ -3,16 +3,13 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
-## 2026-11-24: the sign-in page offers the app by platform
+## 2026-11-24: the sign-in page offers the app on Android only
 
 The user: "detect the browser platform to show the download app button on
-a phone and a QR code on a computer". The server reads the User-Agent
-(`platformOf`): Android gets « Télécharger l'application »; a computer a QR
-code of `/app/agendouille.apk` to scan with the phone's camera, with a
-direct link under it; an iPhone or iPad nothing, the app being Android
-only (an iPad whose Safari says Macintosh gets the computer's QR code,
-which does no harm). The app's scanner refuses the download code as not a
-sign-in page's.
+a phone", then "I don't want the Android app download link on the desktop
+page". The server reads the User-Agent (`platformOf`): an Android phone
+gets « Télécharger l'application » and its checksum; a computer, an iPhone
+or an iPad nothing.
 
 ## 2026-11-24: the web app's sections: Agenda, Calendriers, Appareils, Profil
 
