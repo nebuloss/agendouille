@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 128" width="640" height="128" role="img" aria-labelledby="title desc">
+  <title id="title">agendouille</title>
+  <desc id="desc">An andouille and its slice, the app's own mark, beside the word agendouille.</desc>
+  <style>
+    .word { fill: #2b211c; }
+    .tag { fill: #7a6a62; }
+    @media (prefers-color-scheme: dark) {
+      .word { fill: #f4ece6; }
+      .tag { fill: #b9aaa1; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="casing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8a5c45"/>
+      <stop offset="1" stop-color="#4e3226"/>
+    </linearGradient>
+    <radialGradient id="cut" cx=".42" cy=".4" r=".7">
+      <stop offset="0" stop-color="#f3d9c4"/>
+      <stop offset="1" stop-color="#dcae93"/>
+    </radialGradient>
+  </defs>
+  <!-- The mark: internal/web/assets/static/shared/icon.svg, drawn twice
+       over. Keep the two the same picture. -->
+  <g transform="translate(0 0) scale(2)">
+    <rect width="64" height="64" rx="14" fill="#fbeedd"/>
+    <path d="M14 44 Q30 18 50 16" fill="none" stroke="url(#casing)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M12.5 38.5 Q27 15 47 11.5" fill="none" stroke="#b88a6e" stroke-width="2.6" stroke-linecap="round" opacity=".75"/>
+    <path d="M8.6 36 L19.8 43.6" stroke="#f1e4c6" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M9.6 50.4 Q5.5 54 4.5 58 M9.6 50.4 Q5.4 50.4 3.4 52.4" fill="none" stroke="#b08550" stroke-width="2" stroke-linecap="round"/>
+    <path d="M45.4 8.2 L47 24.2" stroke="#f1e4c6" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M58.2 14.8 Q61 12 62 9.2 M58.2 14.8 Q61.2 16.8 62.2 19.4" fill="none" stroke="#b08550" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="45" cy="48.5" rx="13.5" ry="12.5" fill="#2e1c14" opacity=".25"/>
+    <circle cx="44" cy="46" r="13" fill="#4e3226"/>
+    <circle cx="44" cy="46" r="11.4" fill="url(#cut)"/>
+    <g fill="none" stroke="#9c5644">
+      <circle cx="44" cy="46" r="9.6" stroke-width="1.5"/>
+      <circle cx="44" cy="46" r="7.4" stroke-width="1.5"/>
+      <circle cx="44" cy="46" r="5.2" stroke-width="1.5"/>
+      <circle cx="44" cy="46" r="3" stroke-width="1.5"/>
+    </g>
+    <circle cx="44" cy="46" r="1" fill="#9c5644"/>
+    <path d="M36 40 Q39 36.4 43.5 35.6" fill="none" stroke="#fff6ee" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
+  </g>
+  <!-- The word. -->
+  <text class="word" x="152" y="74" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="46" font-weight="650" letter-spacing="-0.5">agendouille</text>
+  <text class="tag" x="154" y="102" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="17" letter-spacing="0.3">the family's calendars, at home, on every phone</text>
+</svg>

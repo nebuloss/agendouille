@@ -1,11 +1,9 @@
 <p align="center">
-  <img src="internal/web/assets/static/shared/icon.svg" alt="" width="112" height="112">
+  <img src="res/images/agendouille.svg" alt="agendouille" width="520">
 </p>
 
-# agendouille
-
-> *agendouille*: an *agenda* with the *-ouille* of *andouille*. The
-> family's calendars, not serious ones.
+*agendouille*, n. — an *agenda* with the *-ouille* of *andouille*. The
+family's calendars, not serious ones.
 
 A self-hosted calendar server for a family, at home, with nothing outside.
 
