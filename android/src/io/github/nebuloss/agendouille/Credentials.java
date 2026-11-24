@@ -80,7 +80,7 @@ final class Credentials {
         // when the phone changes an event.
         android.content.ContentResolver.setIsSyncable(a, android.provider.CalendarContract.AUTHORITY, 1);
         android.content.ContentResolver.setSyncAutomatically(a, android.provider.CalendarContract.AUTHORITY, true);
-        android.content.ContentResolver.addPeriodicSync(a, android.provider.CalendarContract.AUTHORITY, new Bundle(), 30 * 60);
+        android.content.ContentResolver.addPeriodicSync(a, android.provider.CalendarContract.AUTHORITY, new Bundle(), 15 * 60);
         return new Credentials(a, server, username, secret, deviceId, mode);
     }
 

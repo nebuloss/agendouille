@@ -45,7 +45,7 @@ installer writes the file once and never overwrites it.
 | `palette` | twelve colours | The colours offered for calendars and people. |
 | `enrollment_link_ttl_hours` | `72` | How long the admin's sign-in QR codes work. |
 | `session_ttl_days` | `90` | How long a browser stays signed in. |
-| `app_sync_interval_minutes` | `30` | How often the Android app syncs on its own. |
+| `app_sync_interval_minutes` | `15` | How often the Android app syncs on its own. |
 
 ## Not in the file
 

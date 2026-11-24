@@ -76,7 +76,7 @@ func Default() Values {
 		Palette:                append([]string(nil), DefaultPalette...),
 		EnrollmentLinkTTLHours: 72,
 		SessionTTLDays:         90,
-		AppSyncIntervalMinutes: 30,
+		AppSyncIntervalMinutes: 15,
 	}
 }
 

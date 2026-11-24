@@ -826,7 +826,7 @@ flags and `AGENDOUILLE_*` variables; unknown keys are errors (as cafard).
 | | `palette` | the twelve colours |
 | | `enrollment_link_ttl_hours` | 72 |
 | | `session_ttl_days` | 90 |
-| | `app_sync_interval_minutes` | 30 (at least 15: Android's floor) |
+| | `app_sync_interval_minutes` | 15 (Android's floor) |
 
 - Setting names carry their unit (`_days`, `_hours`, `_minutes`), so a
   value typed in a shell cannot be read in the wrong one.

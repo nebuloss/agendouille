@@ -54,4 +54,4 @@
 #           "#ad1457", "#558b2f", "#4527a0", "#d84315", "#00695c", "#5d4037"]
 # enrollment_link_ttl_hours: 72
 # session_ttl_days: 90
-# app_sync_interval_minutes: 30
+# app_sync_interval_minutes: 15
