@@ -46,6 +46,8 @@ export interface AppState {
   xiaomi: boolean;
   /** Updates from the server's dev build (on) or GitHub's releases only (off). */
   devUpdates: boolean;
+  /** Instant sync (UnifiedPush): the distributors installed, the one in use, whether it works. */
+  push: PushState;
   sync: SyncState;
   calendars: CalendarState[];
   /** What made the app stop last time, or null. */
@@ -57,6 +59,7 @@ export const EMPTY: AppState = {
   permissions: { calendar: false, camera: false, notifications: false, battery: false },
   xiaomi: false,
   devUpdates: false,
+  push: { distributors: [], distributor: null, enabled: true, server: false, active: false, error: null },
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
   crash: null,
@@ -79,6 +82,7 @@ export function parseState(v: unknown): AppState {
     permissions: { calendar: p['calendar'] === true, camera: p['camera'] === true, notifications: p['notifications'] === true, battery: p['battery'] === true },
     xiaomi: o['xiaomi'] === true,
     devUpdates: o['dev_updates'] === true,
+    push: parsePush(o['push']),
     sync: {
       state: (['never', 'idle', 'syncing', 'error'] as const).find((x) => x === s['state']) ?? 'never',
       last_sync: typeof s['last_sync'] === 'string' ? s['last_sync'] : null,
@@ -94,5 +98,31 @@ export function parseState(v: unknown): AppState {
       read_only: c['read_only'] === true,
       ref: str(c['ref']),
     })),
+  };
+}
+
+/** UnifiedPush as Java reports it (MainActivity.pushInfo). */
+export interface PushState {
+  distributors: { package: string; label: string }[];
+  distributor: string | null;
+  enabled: boolean;
+  /** The server offers push (WebDAV-Push), as the last sync saw. */
+  server: boolean;
+  /** The distributor gave an endpoint: messages arrive. */
+  active: boolean;
+  /** The distributor's last failure (REGISTRATION_FAILED's reason). */
+  error: string | null;
+}
+
+function parsePush(v: unknown): PushState {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const list = Array.isArray(o['distributors']) ? (o['distributors'] as Record<string, unknown>[]) : [];
+  return {
+    distributors: list.map((d) => ({ package: String(d['package'] ?? ''), label: String(d['label'] ?? d['package'] ?? '') })),
+    distributor: typeof o['distributor'] === 'string' ? o['distributor'] : null,
+    enabled: o['enabled'] !== false,
+    server: o['server'] === true,
+    active: o['active'] === true,
+    error: typeof o['error'] === 'string' ? o['error'] : null,
   };
 }

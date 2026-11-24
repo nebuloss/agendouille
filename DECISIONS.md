@@ -1181,3 +1181,34 @@ MY_PACKAGE_REPLACED. Opening the app now always syncs (not within 30
 seconds of the last opening, for the round trips through Android's
 screens). A change made elsewhere still waits for the periodic sync: push
 (UnifiedPush) is the way to make that instant.
+
+## 2026-11-24: push (M9): WebDAV-Push on the server, UnifiedPush in the app
+
+- **WebDAV-Push, the draft (draft-bitfire-webdav-push-00, October 2026),
+  for every client.** The app subscribes over CalDAV like DAVx5, so DAVx5
+  gets instant sync too and the app needs nothing beyond CalDAV (AGENTS:
+  sync is standard CalDAV).
+- **Web Push by hand** (`internal/push/webpush.go`): RFC 8291's aes128gcm
+  and RFC 8292's VAPID with the standard library, checked against RFC
+  8291's own example. The VAPID key is made on first use and kept in the
+  database (`push_keys`), so a backup carries it.
+- **The push resource must be https**, and is never followed on a redirect.
+  It is any host the person's distributor names (their ntfy, on the LAN or
+  not): the server posts only an encrypted message there, for signed-in
+  devices, at most 200 per user.
+- **Not pushed:** the device that made the change (by its credential), and
+  the registrations a request's `Push-Dont-Notify` names. Changes to one
+  calendar within 300 ms go as one message. `Urgency: high`: a family
+  calendar's change is wanted now, and they are few.
+- **Not done: the home set's push** (calendars added or removed, which the
+  draft wants at depth 1 on home sets). A new or deleted calendar reaches a
+  phone at its next sync. A deleted calendar's registrations go with it.
+- **UnifiedPush in the app by hand** (AND_3, no library: Kotlin and AndroidX
+  are out): distributors found with `queryBroadcastReceivers` on the
+  REGISTER action (the `unifiedpush://link` activity is not used: a choice
+  in Réglages does it), identity by `setShareIdentityEnabled` on Android 14
+  and the `pi` PendingIntent before. The app never decrypts a message: any
+  message for its token means "sync". Its keys are kept in the app's
+  preferences (only its public half and the auth secret).
+- **The push server is ntfy, self-hosted**, documented in `docs/push.md`,
+  not embedded.

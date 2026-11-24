@@ -25,6 +25,8 @@ final class Http {
         final String body;
         final List<String> cookies;
         String etag;
+        /** The answer's headers, lower-case names (CalDAV requests only). */
+        Map<String, String> headers = new java.util.HashMap<>();
 
         Answer(int status, String body, List<String> cookies) {
             this.status = status;
@@ -46,6 +48,7 @@ final class Http {
         RawHttp.Answer r = RawHttp.request(null, method, url, h, body == null ? null : body.getBytes(StandardCharsets.UTF_8));
         Answer a = new Answer(r.status, r.text(), new ArrayList<>());
         a.etag = r.headers.get("etag");
+        a.headers = r.headers;
         return a;
     }
 

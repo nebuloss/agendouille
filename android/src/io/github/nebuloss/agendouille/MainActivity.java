@@ -74,7 +74,10 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         CrashLog.install(this);
-        if (saved == null) Updater.cleanup(this);
+        if (saved == null) {
+            Updater.cleanup(this);
+            UnifiedPush.register(this); // the spec asks it at each start, with the same token
+        }
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
         web = new WebView(this);
         WebSettings s = web.getSettings();
@@ -346,6 +349,12 @@ public final class MainActivity extends Activity {
             case "update.check":
                 updateCheck(r.id);
                 break;
+            case "push.set":
+                io.execute(() -> {
+                    setPush(r.args);
+                    send(BridgeCodec.ok(r.id, state()));
+                });
+                break;
             case "updates.dev":
                 getSharedPreferences("agendouille", MODE_PRIVATE).edit().putBoolean("dev_updates", r.args.optBoolean("on")).remove("update_dismissed").apply();
                 io.execute(() -> send(BridgeCodec.ok(r.id, state())));
@@ -430,6 +439,7 @@ public final class MainActivity extends Activity {
                     .put("battery", batteryExempt()));
             o.put("xiaomi", xiaomi());
             o.put("dev_updates", devUpdates());
+            o.put("push", pushInfo());
             SharedPreferences p = SyncStatus.prefs(this);
             boolean active = c != null && ContentResolver.isSyncActive(c.account, CalendarContract.AUTHORITY);
             JSONObject sync = new JSONObject().put("state", active ? "syncing" : p.getString("state", "never"))
@@ -603,6 +613,8 @@ public final class MainActivity extends Activity {
                     // Offline: the device stays listed in agendouille, where it can be removed.
                 }
             }
+            if (c != null) PushSync.clear(this, c, userAgent());
+            UnifiedPush.unregister(this);
             Credentials.remove(this);
             session = null;
             SyncStatus.clear(this);
@@ -895,5 +907,45 @@ public final class MainActivity extends Activity {
             //noinspection ResultOfMethodCallIgnored
             f.delete();
         }
+    }
+
+    /** Push as the screens show it: the distributors, the one in use, whether it works. */
+    private JSONObject pushInfo() throws org.json.JSONException {
+        SharedPreferences p = UnifiedPush.prefs(this);
+        org.json.JSONArray all = new org.json.JSONArray();
+        for (String pkg : UnifiedPush.distributors(this)) {
+            String label = pkg;
+            try {
+                label = String.valueOf(getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(pkg, 0)));
+            } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
+                // gone meanwhile
+            }
+            all.put(new JSONObject().put("package", pkg).put("label", label));
+        }
+        String dist = UnifiedPush.distributor(this);
+        return new JSONObject().put("distributors", all).put("distributor", dist == null ? JSONObject.NULL : dist)
+                .put("enabled", UnifiedPush.enabled(this))
+                .put("server", p.getBoolean("server_push", false))
+                .put("active", UnifiedPush.endpoint(this) != null)
+                .put("error", p.getString("error", null) == null ? JSONObject.NULL : p.getString("error", null));
+    }
+
+    /** Réglages: push on or off, or another distributor. */
+    private void setPush(JSONObject args) {
+        SharedPreferences p = UnifiedPush.prefs(this);
+        if (args.has("distributor")) {
+            String d = args.optString("distributor");
+            if (!d.equals(UnifiedPush.distributor(this))) {
+                UnifiedPush.unregister(this);
+                p.edit().putString("distributor", d).remove("error").apply();
+            }
+        }
+        if (args.has("enabled")) {
+            boolean on = args.optBoolean("enabled");
+            p.edit().putBoolean("enabled", on).remove("error").apply();
+            if (!on) UnifiedPush.unregister(this);
+        }
+        UnifiedPush.register(this);
+        syncNow(); // the server's registrations follow
     }
 }

@@ -526,6 +526,30 @@ Bodies `<D:error xmlns:D="DAV:" xmlns:C="…caldav"><C:…/></D:error>`:
 
 `https://<dav host>/ns/sync/<calendar id>/<n>`.
 
+### 4.5 Push (WebDAV-Push, draft-bitfire-webdav-push-00)
+
+- `DAV:` header: `webdav-push` added. `Allow`: `POST`.
+- Calendar properties, by name only (not in `allprop`), namespace
+  `https://bitfire.at/webdav-push`: `transports` (`web-push` with
+  `vapid-public-key type="p256ecdsa"`), `topic` (the calendar's uid without
+  dashes, 32 hex characters), `supported-triggers` (`content-update` depth 1,
+  `property-update` depth 0).
+- `POST <calendar>` with `push-register`: `204`, `Location:
+  <public_url>/dav/push/<id>`, `Expires` (default 7 days, at most 30). The
+  same push resource again renews it. `403` with `invalid-subscription`
+  (not https, bad key or secret, encoding other than `aes128gcm`),
+  `no-supported-trigger`, `push-not-available` (over 200 per user).
+- `DELETE /dav/push/<id>`: `204`, or `404` (unknown, expired, another
+  user's).
+- Messages: `POST` to the push resource, `Content-Encoding: aes128gcm`
+  (RFC 8291), `Authorization: vapid t=…, k=…` (RFC 8292), `TTL: 86400`,
+  `Urgency: high`, `Topic: <topic>`. Body: `push-message` with `topic`,
+  `content-update` (with `DAV:sync-token`) and/or `property-update`. Not sent
+  to the device that made the change, nor to `Push-Dont-Notify`'s
+  registrations (`*`: none). `404`/`410` drop the registration.
+- `/api/app/config` is unchanged; the app reads the VAPID key from
+  `transports`, like any client.
+
 ---
 
 ## 5. Schema (end state of the v1 migrations)

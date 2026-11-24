@@ -493,6 +493,36 @@ export class App {
     return b;
   }
 
+  /** « Synchronisation instantanée »: UnifiedPush, its distributor, and how it goes. */
+  private pushCard(s: AppState): HTMLElement {
+    const p = s.push;
+    const label = p.distributors.find((d) => d.package === p.distributor)?.label ?? p.distributor ?? '';
+    const status = p.distributors.length === 0 ? chip(t('pushNoDistributor'), 'warn', 'warn')
+      : !p.enabled ? chip(t('pushOff'), 'neutral', 'close')
+        : p.active && p.server ? chip(t('pushActive', { app: label }), 'ok', 'check')
+          : p.error !== null ? chip(t('pushFailed'), 'error', 'warn')
+            : chip(t('pushWaiting', { app: label }), 'neutral', 'clock');
+    const set = (args: Record<string, unknown>): void => {
+      void this.bridge.call('push.set', args).then((st) => { if (st) this.show(parseState(st)); },
+        (e: unknown) => this.toasts.error(new Error(reason(e))));
+    };
+    const body: Child[] = [h('p', { class: 'text-sm text-on-surface-variant' }, t('pushHelp')), h('div', {}, status)];
+    if (p.distributors.length === 0) {
+      body.push(h('p', { class: 'text-sm' }, t('pushInstall')));
+    } else {
+      body.push(h('label', { class: 'flex items-center gap-4' },
+        h('span', { class: 'flex-1 text-base font-medium' }, t('pushSwitch')),
+        switchButton(this.doc, t('pushSwitch'), p.enabled, (on) => set({ enabled: on }))));
+      if (p.enabled && p.distributors.length > 1) {
+        body.push(h('div', { class: 'flex flex-col gap-2' }, h('span', { class: 'text-sm text-on-surface-variant' }, t('pushVia')),
+          h('div', {}, segmented(this.doc, t('pushVia'), p.distributors.map((d) => ({ value: d.package, label: d.label })),
+            p.distributor ?? p.distributors[0]!.package, (v) => set({ distributor: v }), 'sm').el)));
+      }
+      if (p.enabled && p.error !== null) body.push(h('p', { class: 'text-sm text-error' }, pushError(p.error)));
+    }
+    return card(t('pushTitle'), [], ...body);
+  }
+
   /** « Versions de développement »: where updates come from. */
   private devUpdatesRow(s: AppState): HTMLElement {
     const sw = switchButton(this.doc, t('devUpdates'), s.devUpdates, (on) => {
@@ -521,6 +551,7 @@ export class App {
       card(t('language'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('languageHint')), h('div', {}, language)),
       card(t('appearance'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')), h('div', {}, theme)),
       this.permissionsCard(s),
+      this.pushCard(s),
       card(t('about'), [],
         h('dl', { class: ui.kv },
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
@@ -762,5 +793,16 @@ export class App {
         h('dt', {}, t('signedInBy')), h('dd', {}, a.mode === 'enrolled' ? chip(t('byLink'), 'ok', 'check')
           : chip(`${a.mode === 'manual' ? t('byHand') : t('byDavx5')} · ${t('syncOnly')}`, 'warn', 'lock'))),
       h('div', {}, remove));
+  }
+}
+
+/** A distributor's failure, for a person. */
+function pushError(reason: string): string {
+  switch (reason) {
+    case 'VAPID_REQUIRED': return t('pushErrVapid');
+    case 'NETWORK': return t('pushErrNetwork');
+    case 'ACTION_REQUIRED': return t('pushErrAction');
+    case 'TEMP_UNAVAILABLE': return t('pushErrTemp');
+    default: return t('pushErrOther', { reason });
   }
 }

@@ -71,6 +71,8 @@ public final class SyncService extends Service {
                     result.stats.numUpdates += events.sync(c.id, c.url, c.token);
                 }
                 result.stats.numSkippedEntries += up.conflicts;
+                // Push: the server's registrations, one per calendar synced here.
+                PushSync.run(ctx, cred, ua, cals.synced());
                 SyncStatus.done(ctx, cals.events());
                 ChangeJob.schedule(ctx); // watching the phone's changes, after a reboot too
             } catch (Dav.Unauthorized e) {

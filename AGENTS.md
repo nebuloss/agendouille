@@ -102,6 +102,14 @@ M0 and M1 are done. What exists:
   templates, the fake bridge's data). Data and settings go in files there,
   not in a script.
 
+- **M9, push:** `internal/push` (subscriptions, RFC 8291 encryption,
+  VAPID, the sending loop on the hub), WebDAV-Push in `internal/dav/push.go`
+  (properties, `POST` register, `DELETE /dav/push/<id>`, `Push-Dont-Notify`),
+  migration 0012; in the app, `UnifiedPush` (the connector, by hand),
+  `PushSync` (registrations per synced calendar, at each sync), `PushXml`.
+  Tests: `push_e2e_test.go`, `internal/push/webpush_test.go` (RFC 8291's
+  vector), `PushXmlTest`. The push server is ntfy (`docs/push.md`).
+
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.
 

@@ -40,7 +40,8 @@ PURE   := src/io/github/nebuloss/agendouille/EnrollLink.java \
           src/io/github/nebuloss/agendouille/EventWriter.java \
           src/io/github/nebuloss/agendouille/Dav.java \
           src/io/github/nebuloss/agendouille/BridgeCodec.java \
-          src/io/github/nebuloss/agendouille/Versions.java
+          src/io/github/nebuloss/agendouille/Versions.java \
+          src/io/github/nebuloss/agendouille/PushXml.java
 TESTS  := $(shell find test -name '*Test.java')
 TESTCP := $(LIB)/junit-4.13.2.jar:$(LIB)/hamcrest-core-1.3.jar:$(LIB)/json-20240303.jar:$(LIB)/kxml2-2.3.0.jar
 

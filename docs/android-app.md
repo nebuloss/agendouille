@@ -55,7 +55,8 @@ which opens a session for the person.
   les navigateurs » (this phone stays signed in).
 - **Réglages**: « Autorisations » (each permission, granted or not, with
   its button: calendar, notifications, camera, battery and, on a Xiaomi
-  phone, autostart), language, appearance (light, dark, as the phone),
+  phone, autostart), « Synchronisation instantanée » (push: the
+  distributor app, on or off, whether it works), language, appearance (light, dark, as the phone),
   version, « Versions de développement », and « Rechercher une mise à
   jour ».
 
@@ -65,8 +66,10 @@ The app syncs through Android's sync framework, as DAVx5 does: every
 `app_sync_interval_minutes` (the server's setting, 15 minutes at least),
 when the app is opened, and within seconds of an event being created,
 changed or deleted on the phone (in any calendar app, the app closed or
-not: a job Android runs when the phone's calendars change). There is no push yet: a change made
-elsewhere arrives at the next sync.
+not: a job Android runs when the phone's calendars change). A change made
+elsewhere arrives within seconds with instant sync (Réglages, « Synchronisation
+instantanée »: UnifiedPush through ntfy, see [instant sync](push.md)), at the
+next sync without it.
 
 Android holds back the background work of apps under battery optimisation,
 sometimes for hours on a phone left idle. Allow the app in Réglages,
