@@ -76,8 +76,8 @@ func (h *handlers) addDevice(w http.ResponseWriter, r *http.Request) {
 	_ = h.d.Auth.Audit(ctx, "admin", "device", "added", fmt.Sprintf("%s: %s (%s)", u.Name, d.Label, d.Kind))
 	base := h.d.PublicURL()
 	out := map[string]any{"id": d.ID, "kind": d.Kind, "label": d.Label, "cap": d.Cap,
-		"server": base + "/dav/", "username": d.Username, "secret": d.Secret, "dav_auth": h.d.Auth.DavAuthMode(ctx)}
-	if mode := h.d.Auth.DavAuthMode(ctx); mode != auth.DavPassword {
+		"server": base + "/dav/", "username": d.Username, "secret": d.Secret, "dav_auth": h.d.Auth.UserDavAuth(ctx, u.ID)}
+	if mode := h.d.Auth.UserDavAuth(ctx, u.ID); mode != auth.DavPassword {
 		cert, err := h.certificate(r, u.ID, u.Name, d.ID)
 		if err != nil {
 			h.failIn(w, r, err)
@@ -141,4 +141,24 @@ func (h *handlers) certificateFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="agendouille-%s-%d.p12"`, u.Name, id))
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(p.body)
+}
+
+// userDavAuth sets how a user's devices sign in: password, both, keys, or
+// "" for the server's choice (DECISIONS: a sign-in policy per user).
+func (h *handlers) userDavAuth(w http.ResponseWriter, r *http.Request) {
+	u, ok := h.lookupUser(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if err := h.d.Auth.SetUserDavAuth(r.Context(), "admin", u.ID, u.Name, body.Mode); err != nil {
+		h.failIn(w, r, validation{key: "error.admin.davAuthMode"})
+		return
+	}
+	webx.JSON(w, http.StatusOK, map[string]any{"dav_auth": h.d.Auth.UserDavAuthOwn(r.Context(), u.ID), "effective": h.d.Auth.UserDavAuth(r.Context(), u.ID)})
 }

@@ -2,6 +2,13 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    policyTitle: 'Connexion des appareils',
+    policyHelp: 'Comment les appareils de {name} se connectent à CalDAV. Par défaut, comme le reste du serveur (Réglages).',
+    policySaved: 'Mode de connexion enregistré.',
+    modeServer: 'Comme le serveur ({mode})',
+    modePassword: 'Mot de passe',
+    modeBoth: 'Mot de passe et certificat',
+    modeKeys: 'Certificat seul',
     addDevice: 'Ajouter un appareil',
     addDeviceTitle: 'Nouvel appareil pour {name}',
     deviceKind: 'Type',
@@ -164,6 +171,13 @@ export const t = messages({
     browser: 'Navigateur',
   },
   en: {
+    policyTitle: 'Device sign-in',
+    policyHelp: 'How {name}’s devices sign in to CalDAV. By default, as the rest of the server (Settings).',
+    policySaved: 'Sign-in mode saved.',
+    modeServer: 'As the server ({mode})',
+    modePassword: 'Password',
+    modeBoth: 'Password and certificate',
+    modeKeys: 'Certificate only',
     addDevice: 'Add device',
     addDeviceTitle: 'New device for {name}',
     deviceKind: 'Type',

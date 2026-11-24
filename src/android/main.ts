@@ -3,8 +3,12 @@
 // language and theme; the bridge to Java is CONTRACTS.md 6, version 2.
 import './android.css';
 import { App } from '@/android/App.ts';
+import { ownValidation } from '@/shared/components/Validation.ts';
 import { bridge } from '@/shared/core/Bridge.ts';
 import { DEFAULT_LANG, LANGS } from '@/shared/i18n/i18n.ts';
+
+// Field errors in our words and design, not the browser's bubbles.
+ownValidation(document);
 
 // The phone's language, when we speak it: the server is not there to say.
 const wanted = (navigator.language || DEFAULT_LANG).slice(0, 2).toLowerCase();

@@ -3,6 +3,21 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: a sign-in policy per user, and the page's own field errors
+
+- **Per user** (the user: "perhaps we should manage per user certificate
+  or password policy"): `users.dav_auth` (migration 0009) is password,
+  both or keys, or NULL for the server's choice (Réglages). CalDAV checks
+  what came against the device's user's policy: a password names a device
+  (its user's policy may also want its certificate, or refuse passwords);
+  a certificate alone names one too (its user's policy must be keys). The
+  admin sets it on the user's Appareils page; the family app, the
+  "Certificat" actions and the notice follow the user's policy in force.
+- **Field errors** are the page's, in its language and design, never the
+  browser's bubbles: one `invalid` listener per page
+  (`src/shared/components/Validation.ts`) stops the bubble, marks the
+  field and writes why under it.
+
 ## 2026-11-23: the Android app is a sync app, with its own screens
 
 *Replaces* PLAN 7.1's "WebView: the family web app" (the user: "android

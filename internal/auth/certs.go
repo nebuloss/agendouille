@@ -236,8 +236,9 @@ func (s *Service) SetDavAuthMode(ctx context.Context, actor, mode string) error 
 func (s *Service) DevicesWithoutCert(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM devices d JOIN users u ON u.id = d.user_id
-		WHERE d.revoked_at IS NULL AND u.removed_at IS NULL AND (d.cert_fingerprint IS NULL OR d.cert_expires_at <= ?)`,
-		store.Time(s.now())).Scan(&n)
+		WHERE d.revoked_at IS NULL AND u.removed_at IS NULL AND COALESCE(u.dav_auth, ?) <> 'password'
+		AND (d.cert_fingerprint IS NULL OR d.cert_expires_at <= ?)`,
+		s.DavAuthMode(ctx), store.Time(s.now())).Scan(&n)
 	return n, err
 }
 
@@ -273,33 +274,81 @@ func (s *Service) clientCert(r *http.Request, fromProxy bool) (string, error) {
 // peer is a trusted proxy, the only one whose certificate header counts.
 func (s *Service) Dav(r *http.Request, clientIP string, fromProxy bool) (*Principal, error) {
 	ctx := r.Context()
-	mode := s.DavAuthMode(ctx)
 	fp, err := s.clientCert(r, fromProxy)
 	if err != nil {
 		return nil, err
 	}
-	switch mode {
-	case DavBoth:
-		if fp == "" {
-			return nil, ErrInvalid
-		}
+	// A password names a device; a certificate alone names one too. Then
+	// the device's user's policy (theirs, else the server's) says whether
+	// what came is enough.
+	if _, _, ok := r.BasicAuth(); ok {
 		p, err := s.Basic(r, clientIP)
 		if err != nil {
 			return nil, err
 		}
-		var holder sql.NullString
-		if err := s.db.QueryRowContext(ctx, `SELECT cert_fingerprint FROM devices WHERE id = ?`, p.DeviceID).Scan(&holder); err != nil || holder.String != fp {
-			return nil, ErrInvalid
+		switch s.UserDavAuth(ctx, p.User.ID) {
+		case DavKeys:
+			return nil, ErrInvalid // certificates only: a password is not enough, nor needed
+		case DavBoth:
+			var holder sql.NullString
+			if fp == "" || s.db.QueryRowContext(ctx, `SELECT cert_fingerprint FROM devices WHERE id = ?`, p.DeviceID).Scan(&holder) != nil || holder.String != fp {
+				return nil, ErrInvalid
+			}
 		}
 		return p, nil
-	case DavKeys:
-		if fp == "" {
-			return nil, ErrInvalid
-		}
-		return s.deviceByCert(r, fp, clientIP)
-	default:
-		return s.Basic(r, clientIP)
 	}
+	if fp == "" {
+		return nil, ErrInvalid
+	}
+	p, err := s.deviceByCert(r, fp, clientIP)
+	if err != nil {
+		return nil, err
+	}
+	if s.UserDavAuth(ctx, p.User.ID) != DavKeys {
+		return nil, ErrInvalid // their policy wants a password too, or a password only
+	}
+	return p, nil
+}
+
+// UserDavAuth is how a user's devices sign in: their own policy, else the
+// server's (DECISIONS: a sign-in policy per user).
+func (s *Service) UserDavAuth(ctx context.Context, userID int64) string {
+	var own sql.NullString
+	_ = s.db.QueryRowContext(ctx, `SELECT dav_auth FROM users WHERE id = ?`, userID).Scan(&own)
+	if own.String == DavPassword || own.String == DavBoth || own.String == DavKeys {
+		return own.String
+	}
+	return s.DavAuthMode(ctx)
+}
+
+// UserDavAuthOwn is a user's own policy, "" when they follow the server's.
+func (s *Service) UserDavAuthOwn(ctx context.Context, userID int64) string {
+	var own sql.NullString
+	_ = s.db.QueryRowContext(ctx, `SELECT dav_auth FROM users WHERE id = ?`, userID).Scan(&own)
+	return own.String
+}
+
+// SetUserDavAuth sets a user's policy; "" follows the server's again.
+func (s *Service) SetUserDavAuth(ctx context.Context, actor string, userID int64, name, mode string) error {
+	if mode != "" && mode != DavPassword && mode != DavBoth && mode != DavKeys {
+		return fmt.Errorf("%w: dav_auth is password, both, keys or empty", ErrInvalid)
+	}
+	return store.InTx(ctx, s.db, func(tx *sql.Tx) error {
+		var v any
+		if mode != "" {
+			v = mode
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET dav_auth = ? WHERE id = ?`, v, userID); err != nil {
+			return err
+		}
+		shown := mode
+		if shown == "" {
+			shown = "server's"
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, detail) VALUES (?, ?, 'user', 'sign-in policy', ?)`,
+			store.Time(s.now()), actor, name+": "+shown)
+		return err
+	})
 }
 
 // deviceByCert signs in the device holding the certificate fp.

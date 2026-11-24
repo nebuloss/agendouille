@@ -45,6 +45,7 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/users/{name}/enrollments/{id}", h.showEnrollment)
 	api("DELETE /api/admin/users/{name}/enrollments/{id}", h.revokeEnrollment)
 	api("POST /api/admin/users/{name}/devices", h.addDevice)
+	api("PUT /api/admin/users/{name}/dav-auth", h.userDavAuth)
 	api("DELETE /api/admin/users/{name}/devices/{id}", h.revokeDevice)
 	api("POST /api/admin/users/{name}/devices/{id}/certificate", h.newCertificate)
 	api("GET /api/admin/users/{name}/devices/{id}/certificate.p12", h.certificateFile)
@@ -416,6 +417,7 @@ func (h *handlers) user(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"user": u, "groups": groups, "enrollments": enrollments, "devices": devices,
+		"dav_auth": h.d.Auth.UserDavAuthOwn(ctx, u.ID), "dav_auth_effective": h.d.Auth.UserDavAuth(ctx, u.ID), "dav_auth_server": h.d.Auth.DavAuthMode(ctx),
 		"sessions": sessions, "calendars_owned": owned, "calendars_shared": shared})
 }
 

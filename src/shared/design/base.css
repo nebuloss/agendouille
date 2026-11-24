@@ -20,6 +20,9 @@ button, [role="button"], summary { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 }
 
+/* A field marked invalid (src/shared/components/Validation.ts). */
+[aria-invalid="true"] { border-color: var(--color-error) !important; }
+
 /* Form controls follow the theme (color-scheme does the rest). */
 input[type="date"], input[type="time"], input[type="color"] { accent-color: var(--color-primary); }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--color-primary); width: 18px; height: 18px; }

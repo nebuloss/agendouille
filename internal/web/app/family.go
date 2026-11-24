@@ -921,7 +921,7 @@ func (h *handlers) devices(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		h.fail(w, r, err)
 		return
 	}
-	webx.JSON(w, http.StatusOK, map[string]any{"devices": ds, "dav_auth": h.d.Auth.DavAuthMode(r.Context())})
+	webx.JSON(w, http.StatusOK, map[string]any{"devices": ds, "dav_auth": h.d.Auth.UserDavAuth(r.Context(), p.User.ID)})
 }
 
 // profiles keeps a new iPhone device's profile for ten minutes, behind a
@@ -1032,7 +1032,7 @@ func (h *handlers) addDevice(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	}
 	// When CalDAV wants a certificate (DECISIONS: device keys), the device
 	// gets one now: a .p12 to download once, and its password.
-	mode := h.d.Auth.DavAuthMode(r.Context())
+	mode := h.d.Auth.UserDavAuth(r.Context(), p.User.ID)
 	out["dav_auth"] = mode
 	if mode != auth.DavPassword {
 		cert, err := h.certificateFor(r, p, d.ID)
@@ -1076,7 +1076,7 @@ func (h *handlers) newCertificate(w http.ResponseWriter, r *http.Request, p *aut
 		h.fail(w, r, err)
 		return
 	}
-	out["dav_auth"] = h.d.Auth.DavAuthMode(r.Context())
+	out["dav_auth"] = h.d.Auth.UserDavAuth(r.Context(), p.User.ID)
 	webx.JSON(w, http.StatusCreated, out)
 }
 

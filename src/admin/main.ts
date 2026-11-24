@@ -9,6 +9,10 @@ import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UserPage, UsersPage } from '@/admin/pages/Users.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
 import { langMenu, themeButton } from '@/shared/components/Ui.ts';
+import { ownValidation } from '@/shared/components/Validation.ts';
+
+// Field errors in our words and design, not the browser's bubbles.
+ownValidation(document);
 
 const api = adminApi();
 

@@ -7,6 +7,10 @@ import { CalendarsPage, DevicesPage, MePage } from '@/app/pages/Manage.ts';
 import { SigninPage } from '@/app/pages/SigninPage.ts';
 import { Pages, whenReady } from '@/shared/core/Pages.ts';
 import { langMenu } from '@/shared/components/Ui.ts';
+import { ownValidation } from '@/shared/components/Validation.ts';
+
+// Field errors in our words and design, not the browser's bubbles.
+ownValidation(document);
 
 
 export const pages = new Pages({

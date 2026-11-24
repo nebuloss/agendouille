@@ -77,6 +77,19 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
     await page.screenshot({ path: `${out}/phone-rail-open.png` });
     await page.click('.rail-toggle');
     await page.setViewport({ width: 1280, height: 860 });
+    // The devices page (sign-in policy), and a field error of ours.
+    await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle2' });
+    await new Promise((r) => setTimeout(r, 500));
+    await page.screenshot({ path: `${out}/desktop-user-devices.png`, fullPage: true });
+    const addv = await page.$('xpath/.//button[contains(., "Ajouter un appareil")]');
+    if (addv) {
+      await addv.click();
+      await new Promise((r) => setTimeout(r, 300));
+      await (await page.$('xpath/.//dialog//button[@type="submit"]')).click();
+      await new Promise((r) => setTimeout(r, 300));
+      await page.screenshot({ path: `${out}/desktop-field-error.png` });
+      await page.keyboard.press('Escape');
+    }
     // The admin adds a device for someone: its manual settings.
     await page.goto(base + '/users/lea/devices', { waitUntil: 'networkidle2' });
     await new Promise((r) => setTimeout(r, 500));

@@ -97,7 +97,13 @@ interface UserDetail {
   sessions: Session[];
   calendars_owned: CalendarMeta[];
   calendars_shared: { id: string; ref: string; name: string; access: string; via: string }[];
+  /** Their own sign-in policy ("" follows the server's), the one in force, the server's. */
+  dav_auth: '' | DavMode;
+  dav_auth_effective: DavMode;
+  dav_auth_server: DavMode;
 }
+
+type DavMode = 'password' | 'both' | 'keys';
 
 /** "vu il y a 3 jours", or "jamais vu". */
 const seen = (iso: string | undefined): string => iso === undefined || iso === '' ? t('neverSeen') : t('seenAgo', { ago: ago(iso) });
@@ -196,6 +202,7 @@ export class UserPage extends AdminPage {
         // device in, the devices that sync, the browsers signed in.
         return [
           this.signin(u, d.enrollments),
+          this.policyCard(u, d),
           card(t('syncedDevices', { count: d.devices.length }), [action(t('addDevice'), () => this.addDevice(u), 'tonal', 'plus', 'sm')],
             h('p', { class: 'text-sm text-on-surface-variant' }, t('devicesHelp')),
             entries(d.devices.map((x) => ({
@@ -206,7 +213,8 @@ export class UserPage extends AdminPage {
                 ...(x.client ? [x.client] : [])].join(' · '),
               tags: x.last_used_at === undefined ? [h('span', { class: ui.pill.muted }, t('neverSynced'))] : [],
               actions: [
-                action(t('certificate'), () => this.newCertificate(x), 'text', 'lock', 'sm'),
+                // A certificate only matters when this user's devices use one.
+                d.dav_auth_effective !== 'password' ? action(t('certificate'), () => this.newCertificate(x), 'text', 'lock', 'sm') : null,
                 action(t('revoke'), () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), t('deviceRevoked')), 'danger-text', 'trash', 'sm'),
               ],
             })), t('noDevices'))),
@@ -373,6 +381,33 @@ export class UserPage extends AdminPage {
     }), t('noLinks')));
   }
 
+
+  /**
+   * How this user's devices sign in to CalDAV: as the server says, or their
+   * own policy (DECISIONS: a sign-in policy per user).
+   */
+  private policyCard(u: User, d: UserDetail): HTMLElement {
+    const label: Record<DavMode, string> = { password: t('modePassword'), both: t('modeBoth'), keys: t('modeKeys') };
+    const choices: ['' | DavMode, string][] = [
+      ['', t('modeServer', { mode: label[d.dav_auth_server] })],
+      ['password', label.password], ['both', label.both], ['keys', label.keys],
+    ];
+    const group = h('div', { class: 'flex flex-wrap gap-2', role: 'radiogroup', 'aria-label': t('policyTitle') },
+      ...choices.map(([value, text]) => {
+        const on = d.dav_auth === value;
+        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on),
+          class: on ? 'state-layer inline-flex min-h-9 items-center gap-2 rounded-md3-full bg-secondary-container px-4 text-sm font-semibold text-on-secondary-container'
+            : 'state-layer inline-flex min-h-9 items-center gap-2 rounded-md3-full border border-outline-variant px-4 text-sm text-on-surface' },
+        on ? icon('check') : null, text);
+        b.addEventListener('click', () => {
+          if (!on) void this.act(() => this.api.put(`${this.path()}/dav-auth`, { mode: value }), t('policySaved'));
+        });
+        return b;
+      }));
+    return card(t('policyTitle'), [],
+      h('p', { class: 'text-sm text-on-surface-variant' }, t('policyHelp', { name: u.display_name })),
+      group);
+  }
 
   /** A certificate to download once, with its password and what to do with it. */
   private certificateBlock(c: CertificateHandover): Child[] {

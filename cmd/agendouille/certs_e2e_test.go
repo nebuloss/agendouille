@@ -123,4 +123,34 @@ func TestDeviceCertificates(t *testing.T) {
 	if a := A.call("PUT", "/dav-auth", map[string]any{"mode": "nonsense"}); a.status != http.StatusBadRequest {
 		t.Errorf("a bad mode: %d", a.status)
 	}
+
+	// A user's own policy wins over the server's (DECISIONS: a sign-in
+	// policy per user): the server says password, Léa's devices need keys.
+	nc2, _ := L.json("POST", "/api/devices/"+fmtID(d["id"])+"/certificate", nil, 201)
+	file2 := L.call("GET", nc2["certificate_url"].(string), nil)
+	_, cert2, err := pkcs12.Decode([]byte(file2.body), nc2["certificate_password"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	header = url.QueryEscape(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert2.Raw})))
+	u := A.json("PUT", "/users/lea/dav-auth", map[string]any{"mode": "keys"}, 200)
+	if u["dav_auth"] != "keys" || u["effective"] != "keys" {
+		t.Errorf("lea's policy: %v", u)
+	}
+	if s := propfind(&dev, false); s != 401 {
+		t.Errorf("lea's password under her keys policy: %d", s)
+	}
+	if s := propfind(nil, true); s != 207 {
+		t.Errorf("lea's certificate under her keys policy: %d", s)
+	}
+	if devs, _ := L.json("GET", "/api/devices", nil, 200); devs["dav_auth"] != "keys" {
+		t.Errorf("the app does not see lea's own policy: %v", devs["dav_auth"])
+	}
+	A.json("PUT", "/users/lea/dav-auth", map[string]any{"mode": ""}, 200)
+	if s := propfind(&dev, false); s != 207 {
+		t.Errorf("lea back to the server's password: %d", s)
+	}
+	if a := A.call("PUT", "/users/lea/dav-auth", map[string]any{"mode": "nope"}); a.status != http.StatusBadRequest {
+		t.Errorf("a bad user policy: %d", a.status)
+	}
 }
