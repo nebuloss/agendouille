@@ -423,7 +423,7 @@ Next:
   3. Users: add the family, put them in groups, and give each a sign-in QR.
 
 Behind a reverse proxy, and for the admin UI on the LAN only, see
-deploy/README.md in the repository.
+docs/deployment.md in the repository.
 EOF
 else
 	say "Upgraded. $CONFIG, $data_dir and the admin password were left alone."

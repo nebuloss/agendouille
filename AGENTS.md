@@ -189,6 +189,10 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **A restore restarts the server** (`ErrRestart`, exit 75): the service
   must run under `Restart=on-failure` or a supervisor, which `deploy/`
   sets up (systemd, and OpenRC's `supervise-daemon`).
+- **Documentation lives in `docs/`** (install, deployment, configuration,
+  clients, the Android app, the command line, development, i18n), linked
+  from the README's table; the README stays short. A user-visible change
+  updates its page there.
 - **Scripts keep no data:** a setting goes in `scripts/conf` (KEY=value,
   read by `load_conf`, the environment winning), a seed or a template in
   `scripts/fixtures`. A deploy target is a file of `scripts/conf/targets`;

@@ -889,7 +889,7 @@ cafard's `install.sh`, hardened systemd unit, OpenRC, LXC drop-in, renamed;
   `MKCOL`, `OPTIONS` and the `Depth`, `If-Match`, `If-None-Match`,
   `Authorization` headers; do not buffer `/api/live`; answer
   `/.well-known/caldav` and `/.well-known/assetlinks.json` on the bare host.
-- `deploy/README.md`: DMZ and LAN layout, DNS, certificates, first start,
+- `docs/deployment.md` (was `deploy/README.md`): DMZ and LAN layout, DNS, certificates, first start,
   backups, upgrading, the per-milestone client checklist.
 
 ### 13.5 The Android build (Decided: no Gradle, no Kotlin, no Android Studio)
@@ -1091,7 +1091,7 @@ checklist.
 
 ### By hand
 
-The client checklist in `deploy/README.md` (M2, M4, M7): our app, DAVx5,
+The client checklist in `docs/clients.md` (M2, M4, M7): our app, DAVx5,
 iOS, Thunderbird, each step seen on the others.
 
 ---

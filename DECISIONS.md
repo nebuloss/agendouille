@@ -3,6 +3,16 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the README points to docs/
+
+The user: "reorganize the README to split correctly with docs; add the
+missing docs and link them from the README". The README keeps the pitch,
+the one-line install and a table of the guides; `docs/` holds install,
+deployment (was `deploy/README.md`), configuration (every setting, from
+`deploy/agendouille.yaml.example`), clients (signing in, each client,
+device keys, the by-hand checklist), the Android app, the command line,
+development, and i18n. `deploy/README.md` is a short pointer.
+
 ## 2026-11-24: « Transférer »; the app's calendar pages; updates inside the app
 
 The user: "rename donner to transférer; the search should not be focused
