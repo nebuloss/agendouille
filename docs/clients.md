@@ -63,6 +63,14 @@ Appareils, « Liens d'abonnement »: an `https://…/ics/…` address that any
 calendar application can subscribe to, for one or more calendars, read
 only. Removing the link stops it at once.
 
+## Signing browsers out
+
+Appareils lists the browsers signed in, each with « Déconnecter »; with
+several, « Déconnecter les autres » (web app) or « Déconnecter tous les
+navigateurs » (the Android app) signs them all out at once, the one asking
+and the Android app staying signed in. The admin has « Tout déconnecter »
+on a user's Appareils page. A browser signed out has to be approved again.
+
 ## Device passwords
 
 Each synced device has its own password, made by the server (long and

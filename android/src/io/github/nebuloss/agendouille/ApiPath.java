@@ -26,7 +26,8 @@ public final class ApiPath {
         if (bare.startsWith("/api/approvals/")) {
             return (method.equals("GET") || method.equals("POST") || method.equals("DELETE")) && bare.substring("/api/approvals/".length()).matches("[A-Za-z0-9-]+");
         }
-        if (bare.equals("/api/devices") || bare.equals("/api/sessions")) return method.equals("GET");
+        if (bare.equals("/api/devices")) return method.equals("GET");
+        if (bare.equals("/api/sessions")) return method.equals("GET") || method.equals("DELETE");
         if (bare.matches("/api/(devices|sessions)/[0-9]+")) return method.equals("DELETE");
         if (bare.equals("/api/calendars")) return method.equals("GET") || method.equals("POST");
         if (bare.startsWith("/api/calendars/")) {

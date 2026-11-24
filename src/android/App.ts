@@ -240,7 +240,18 @@ class PhoneDevices extends ApiPage {
       list(devices, t('noDevices')),
       h('h2', { class: 'px-4 pt-3 text-sm font-medium text-primary' }, t('signedInBrowsers')),
       list(browsers, t('noBrowsers')),
+      browsers.length > 1 ? this.allOff(browsers.length) : null,
     ];
+  }
+
+  /** « Déconnecter tous les navigateurs »: every browser of mine at once (not the app). */
+  private allOff(count: number): HTMLElement {
+    const b = h('button', { type: 'button', class: `${ui.btn('danger-text')} self-start` }, icon('logout'), t('disconnectAllBrowsers'));
+    b.addEventListener('click', () => void (async () => {
+      if (!(await confirmDialog(this.doc, t('disconnectAllTitle'), t('disconnectAllText', { count }), t('disconnectAllButton'), true))) return;
+      await this.act(() => this.api.delete('/sessions'), t('allBrowsersDisconnected'));
+    })());
+    return b;
   }
 }
 

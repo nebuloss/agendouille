@@ -2,6 +2,11 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    disconnectAllBrowsers: 'Déconnecter tous les navigateurs',
+    disconnectAllTitle: 'Déconnecter tous les navigateurs ?',
+    disconnectAllText: { one: 'Le navigateur connecté devra être approuvé à nouveau. Ce téléphone reste connecté.', other: 'Les {count} navigateurs connectés devront être approuvés à nouveau. Ce téléphone reste connecté.' },
+    disconnectAllButton: 'Tout déconnecter',
+    allBrowsersDisconnected: 'Tous les navigateurs sont déconnectés.',
     checkUpdate: 'Rechercher une mise à jour',
     updateFound: 'La version {version} est disponible.',
     upToDateApp: 'L’application est à jour ({version}).',
@@ -134,6 +139,11 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    disconnectAllBrowsers: 'Sign out all browsers',
+    disconnectAllTitle: 'Sign out all browsers?',
+    disconnectAllText: { one: 'The signed-in browser will have to be approved again. This phone stays signed in.', other: 'The {count} signed-in browsers will have to be approved again. This phone stays signed in.' },
+    disconnectAllButton: 'Sign them all out',
+    allBrowsersDisconnected: 'All browsers are signed out.',
     checkUpdate: 'Check for updates',
     updateFound: 'Version {version} is available.',
     upToDateApp: 'The app is up to date ({version}).',

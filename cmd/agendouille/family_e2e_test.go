@@ -62,6 +62,36 @@ func (x *e2e) browser(user string) webClient {
 	return webClient{x: x, session: cookieOf(a, auth.AppCookie)}
 }
 
+// « Déconnecter tous les navigateurs »: from a browser (or the app), all the
+// others; from the admin, all of them.
+func TestSignOutAllBrowsers(t *testing.T) {
+	x := startServer(t)
+	x.publicOn()
+	x.svc.dir.AddUser(context.Background(), "cli", "lea", "Léa", "", nil)
+	one, two, three := x.browser("lea"), x.browser("lea"), x.browser("lea")
+	out, _ := one.json("DELETE", "/api/sessions", nil, 200)
+	if out["signed_out"] != float64(2) {
+		t.Errorf("signed out: %v, want 2", out)
+	}
+	if a := two.call("GET", "/api/me", nil); a.status != http.StatusUnauthorized {
+		t.Errorf("another browser after: %d", a.status)
+	}
+	if a := three.call("GET", "/api/me", nil); a.status != http.StatusUnauthorized {
+		t.Errorf("a third browser after: %d", a.status)
+	}
+	if a := one.call("GET", "/api/me", nil); a.status != 200 {
+		t.Errorf("the browser asking was signed out too: %d", a.status)
+	}
+	A := signInAdmin(t, x)
+	all := A.json("DELETE", "/users/lea/sessions", nil, 200)
+	if all["signed_out"] != float64(1) {
+		t.Errorf("the admin signed out: %v, want 1", all)
+	}
+	if a := one.call("GET", "/api/me", nil); a.status != http.StatusUnauthorized {
+		t.Errorf("after the admin: %d", a.status)
+	}
+}
+
 func summaries(occ map[string]any) string {
 	var out []string
 	for _, o := range occ["occurrences"].([]any) {

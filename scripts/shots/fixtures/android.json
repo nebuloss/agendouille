@@ -143,6 +143,15 @@
           "current": false
         },
         {
+          "id": 3,
+          "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+          "app": false,
+          "seen_at": {
+            "minutes_ago": 2880
+          },
+          "current": false
+        },
+        {
           "id": 2,
           "user_agent": "agendouille-android",
           "app": true,

@@ -47,6 +47,7 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("POST /api/admin/users/{name}/devices", h.addDevice)
 	api("DELETE /api/admin/users/{name}/devices/{id}", h.revokeDevice)
 	api("DELETE /api/admin/users/{name}/sessions/{id}", h.revokeSession)
+	api("DELETE /api/admin/users/{name}/sessions", h.revokeBrowsers)
 	api("GET /api/admin/groups", h.groups)
 	api("POST /api/admin/groups", h.addGroup)
 	api("PATCH /api/admin/groups/{name}", h.patchGroup)
@@ -618,6 +619,20 @@ func (h *handlers) revokeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// revokeBrowsers signs all of a user's browsers out (not the app).
+func (h *handlers) revokeBrowsers(w http.ResponseWriter, r *http.Request) {
+	u, ok := h.lookupUser(w, r)
+	if !ok {
+		return
+	}
+	n, err := h.d.Auth.RevokeBrowsers(r.Context(), "admin", u.ID, 0)
+	if err != nil {
+		h.failIn(w, r, err)
+		return
+	}
+	webx.JSON(w, http.StatusOK, map[string]int{"signed_out": n})
 }
 
 // --- groups

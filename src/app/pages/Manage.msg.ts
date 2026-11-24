@@ -3,6 +3,11 @@ import { messages } from '@/shared/i18n/i18n.ts';
 // Calendriers, Appareils and Moi.
 export const t = messages({
   fr: {
+    signOutOthers: 'Déconnecter les autres',
+    signOutOthersTitle: 'Déconnecter les autres navigateurs ?',
+    signOutOthersText: 'Tous les navigateurs sauf celui-ci devront être approuvés à nouveau. L’application Android reste connectée.',
+    signOutOthersButton: 'Tout déconnecter',
+    othersSignedOut: 'Les autres navigateurs sont déconnectés.',
     groupsSection: 'Groupes',
     peopleSection: 'Personnes',
     groupSub: 'Groupe',
@@ -151,6 +156,11 @@ export const t = messages({
     otherPhone: 'Connecter un autre téléphone',
   },
   en: {
+    signOutOthers: 'Sign out the others',
+    signOutOthersTitle: 'Sign out the other browsers?',
+    signOutOthersText: 'Every browser but this one will have to be approved again. The Android app stays signed in.',
+    signOutOthersButton: 'Sign them all out',
+    othersSignedOut: 'The other browsers are signed out.',
     groupsSection: 'Groups',
     peopleSection: 'People',
     groupSub: 'Group',

@@ -315,7 +315,12 @@ export class DevicesPage extends AppPage {
           action(t('removeLink'), () => this.confirmed(t('removeLinkTitle', { name: l.label }), t('removeLinkText'), t('removeLinkButton'),
             () => this.api.delete(`/links/${l.id}`), t('linkRemoved')), 'danger-text', 'trash', 'sm'),
         ]), t('noLink'))),
-      section(t('browsers'),
+      card(t('browsers'),
+        // Every other browser at once (this one, and the Android app, stay).
+        sessions.sessions.filter((s) => !s.current && !s.app).length > 1
+          ? [action(t('signOutOthers'), () => this.confirmed(t('signOutOthersTitle'), t('signOutOthersText'), t('signOutOthersButton'),
+            () => this.api.delete('/sessions'), t('othersSignedOut')), 'danger-text', 'logout', 'sm')]
+          : [],
         table([t('browser'), t('lastSeen'), ''], sessions.sessions.map((s) => {
           const label = s.app ? t('kindApp') : browserName(s.user_agent);
           return [

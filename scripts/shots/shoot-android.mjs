@@ -88,6 +88,11 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
         await new Promise((r) => setTimeout(r, 300));
       }
     }
+    // The bottom of Appareils: the browsers, and « Déconnecter tous les navigateurs ».
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await new Promise((r) => setTimeout(r, 300));
+    await page.screenshot({ path: `${out}/android-${lang}-devices-bottom.png` });
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.type('input[aria-label]', 'PKW-6VY');
     await (await page.$('form button[type="submit"]')).click();
     await new Promise((r) => setTimeout(r, 500));

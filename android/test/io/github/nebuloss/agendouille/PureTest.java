@@ -73,6 +73,8 @@ public class PureTest {
         assertTrue(ApiPath.allowed("DELETE", "/api/devices/12"));
         assertTrue(ApiPath.allowed("GET", "/api/sessions"));
         assertTrue(ApiPath.allowed("DELETE", "/api/sessions/7"));
+        assertTrue(ApiPath.allowed("DELETE", "/api/sessions"));
+        assertFalse(ApiPath.allowed("DELETE", "/api/devices"));
         assertFalse(ApiPath.allowed("POST", "/api/devices"));
         assertFalse(ApiPath.allowed("DELETE", "/api/devices/12/certificate"));
         // Never events, exports, devices, the admin, or a way out of /api.

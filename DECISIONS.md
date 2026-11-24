@@ -3,6 +3,17 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: signing all browsers out at once
+
+The user: "add disconnect all in admin for browsers, and in the app to
+disconnect all browsers". `RevokeBrowsers` ends a user's browser sessions
+on the family's side, never the Android app's (they belong to its device,
+revoked with it) nor the session asking, and logs it. `DELETE
+/api/sessions` (the web app's « Déconnecter les autres », the app's
+« Déconnecter tous les navigateurs », through `ApiPath`) and `DELETE
+/api/admin/users/{name}/sessions` (« Tout déconnecter »). The button shows
+from two browsers on; one has its own « Déconnecter ».
+
 ## 2026-11-24: client certificates removed; a device's password is enough
 
 The user asked whether certificate sign-in was worth keeping, given that a

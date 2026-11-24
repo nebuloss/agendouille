@@ -66,6 +66,7 @@ func (h *handlers) registerFamily(mux *http.ServeMux, guard func(http.Handler) h
 	api("DELETE /api/links/{id}", h.revokeLink)
 	api("GET /api/sessions", h.sessions)
 	api("DELETE /api/sessions/{id}", h.revokeSession)
+	api("DELETE /api/sessions", h.revokeBrowsers)
 	api("GET /api/live", h.live)
 }
 
@@ -1135,6 +1136,17 @@ func (h *handlers) sessions(w http.ResponseWriter, r *http.Request, p *auth.Prin
 		out = append(out, view{Session: s, Current: s.ID == p.SessionID})
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"sessions": out})
+}
+
+// revokeBrowsers signs out all my browsers but the one asking (from the
+// app, its WebView's session, which is not a browser anyway).
+func (h *handlers) revokeBrowsers(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+	n, err := h.d.Auth.RevokeBrowsers(r.Context(), p.User.Name, p.User.ID, p.SessionID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	webx.JSON(w, http.StatusOK, map[string]int{"signed_out": n})
 }
 
 func (h *handlers) revokeSession(w http.ResponseWriter, r *http.Request, p *auth.Principal) {

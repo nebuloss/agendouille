@@ -2,6 +2,11 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    signOutAll: 'Tout déconnecter',
+    signOutAllTitle: 'Déconnecter tous les navigateurs de {name} ?',
+    signOutAllText: 'Chaque navigateur devra être approuvé à nouveau depuis un appareil connecté. L’application Android et les appareils synchronisés restent connectés.',
+    signOutAllButton: 'Tout déconnecter',
+    allSignedOut: 'Tous les navigateurs sont déconnectés.',
     addDevice: 'Ajouter un appareil',
     addDeviceTitle: 'Nouvel appareil pour {name}',
     deviceKind: 'Type',
@@ -154,6 +159,11 @@ export const t = messages({
     browser: 'Navigateur',
   },
   en: {
+    signOutAll: 'Sign out all',
+    signOutAllTitle: 'Sign out all of {name}’s browsers?',
+    signOutAllText: 'Each browser will have to be approved again from a signed-in device. The Android app and synced devices stay signed in.',
+    signOutAllButton: 'Sign them all out',
+    allSignedOut: 'All browsers are signed out.',
     addDevice: 'Add device',
     addDeviceTitle: 'New device for {name}',
     deviceKind: 'Type',

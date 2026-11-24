@@ -256,6 +256,7 @@ serve it, it is `404` with an empty body. `/healthz` is on every listener.
 | POST | `/api/approvals/{code}` | `agd_app`, same-origin: approves (empty body) |
 | DELETE | `/api/approvals/{code}` | `agd_app`, same-origin: refuses; the browser starts over |
 | GET, POST | `/api/devices` ; DELETE `/api/devices/{id}` | `agd_app` (writes same-origin); own devices |
+| DELETE | `/api/sessions` | `agd_app`, same-origin: every browser of mine but the one asking (not the app's); `{"signed_out": n}` |
 | GET | `/api/devices/{id}/mobileconfig?t=` | own device: `agd_app` and the one-time token the POST answered, within 10 minutes |
 | GET, DELETE | `/api/sessions[/{id}]` | `agd_app`; own sessions |
 | GET, POST, DELETE | `/api/links[/{id}]` | `agd_app`; own subscription links |

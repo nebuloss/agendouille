@@ -201,7 +201,11 @@ export class UserPage extends AdminPage {
                 action(t('revoke'), () => this.act(() => this.api.delete(`${this.path()}/devices/${x.id}`), t('deviceRevoked')), 'danger-text', 'trash', 'sm'),
               ],
             })), t('noDevices'))),
-          card(t('browsers', { count: d.sessions.length }), [],
+          card(t('browsers', { count: d.sessions.length }),
+            // Every browser of theirs at once; the Android app's sessions stay (they are its device's).
+            d.sessions.filter((x) => !x.app).length > 1
+              ? [action(t('signOutAll'), () => this.signOutAll(u), 'danger-text', 'logout', 'sm')]
+              : [],
             entries(d.sessions.map((x) => ({
               lead: iconMark(x.app ? 'phone' : 'laptop'),
               title: x.app ? t('theApp') : browserOf(x.user_agent),
@@ -390,6 +394,12 @@ export class UserPage extends AdminPage {
     ], [{ label: t('done'), value: 'ok', kind: 'filled' }]);
     this.doc.dispatchEvent(new Event('agd:changed'));
     await this.refresh();
+  }
+
+  /** All of this user's browsers signed out, after a confirmation. */
+  private async signOutAll(u: User): Promise<void> {
+    if (!(await confirmDialog(this.doc, t('signOutAllTitle', { name: u.display_name }), t('signOutAllText'), t('signOutAllButton'), true))) return;
+    await this.act(() => this.api.delete(`${this.path()}/sessions`), t('allSignedOut'));
   }
 
   /** Removing asks, calendar by calendar, whom to give it to or to delete it (PLAN.md 6). */

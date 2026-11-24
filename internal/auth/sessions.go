@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -126,6 +127,23 @@ func (s *Service) RevokeSession(ctx context.Context, userID, sessionID int64) er
 		return ErrInvalid
 	}
 	return nil
+}
+
+// RevokeBrowsers signs all of a user's browsers out at once: their
+// sessions on the family's side, but not the Android app's (those belong to
+// a device, revoked with it) nor keep, the session asking (0: none). It
+// answers how many ended, and leaves a line in the activity log.
+func (s *Service) RevokeBrowsers(ctx context.Context, actor string, userID, keep int64) (int, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND surface = 'app' AND device_id IS NULL AND id <> ?`, userID, keep)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		_, _ = s.db.ExecContext(ctx, `INSERT INTO audit(at, actor, kind, action, detail) VALUES (?, ?, 'session', 'all browsers signed out', ?)`,
+			store.Time(s.now()), actor, fmt.Sprintf("user %d: %d", userID, n))
+	}
+	return int(n), nil
 }
 
 // SetCookie gives the browser its session for surface. HttpOnly: no

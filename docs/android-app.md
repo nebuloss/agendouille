@@ -43,7 +43,8 @@ which opens a session for the person.
   and « Masquer ».
 - **Appareils**: « Connecter un navigateur » (scan a browser's sign-in QR
   code, or type its code, then « Se connecter »), the synced devices and
-  the signed-in browsers, each with « Déconnecter ».
+  the signed-in browsers, each with « Déconnecter », and « Déconnecter tous
+  les navigateurs » (this phone stays signed in).
 - **Réglages**: language, appearance (light, dark, as the phone), version,
   and « Rechercher une mise à jour ».
 
