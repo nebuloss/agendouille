@@ -32,6 +32,17 @@ func TestDAVx5PageAndAppPieces(t *testing.T) {
 		t.Errorf("an unknown token: %d", a.status)
 	}
 
+	// The agendouille app scans the same code: it asks for the link the page holds.
+	token := path[len("/davx5/"):]
+	hdr := func(r *http.Request) { r.Header.Set("Content-Type", "application/json") }
+	if a := x.do("POST", x.public+"/api/app/davx5", strings.NewReader(`{"token":"`+token+`"}`), hdr); a.status != 200 ||
+		!strings.Contains(a.body, `"link":"davx5://lea:`) || a.header.Get("Cache-Control") != "no-store" {
+		t.Errorf("the link for the app: %d %s", a.status, a.body)
+	}
+	if a := x.do("POST", x.public+"/api/app/davx5", strings.NewReader(`{"token":"nope"}`), hdr); a.status != http.StatusGone {
+		t.Errorf("the app, an unknown token: %d %s", a.status, a.body)
+	}
+
 	// No APK in a test build: no download, no App Links, nothing offered.
 	for _, p := range []string{"/app/agendouille.apk", "/.well-known/assetlinks.json"} {
 		if a := x.do("GET", x.public+p, nil, nil); a.status != http.StatusNotFound {

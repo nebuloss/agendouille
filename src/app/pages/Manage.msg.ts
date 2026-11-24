@@ -168,6 +168,10 @@ export const t = messages({
     signOut: 'Se déconnecter',
     signinQrAlt: 'QR code de connexion',
     signinCode: 'Code de connexion',
+    androidApp: 'agendouille',
+    appCodeTitle: 'Application agendouille',
+    appCodeHint: 'Dans l’application agendouille, touchez « Scanner le QR code » et visez ce code. Il est valable dix minutes et ne sert qu’une fois.',
+    getApp: 'Télécharger l’application',
     signinCodeHint: 'Scannez ce code avec l’appareil photo du nouveau téléphone. Chaque code ne sert qu’une fois.',
   },
   en: {
@@ -333,6 +337,10 @@ export const t = messages({
     signOut: 'Sign out',
     signinQrAlt: 'Sign-in QR code',
     signinCode: 'Sign-in code',
+    androidApp: 'agendouille',
+    appCodeTitle: 'agendouille app',
+    appCodeHint: 'In the agendouille app, tap “Scan the QR code” and aim at this code. It is valid for ten minutes and works once.',
+    getApp: 'Download the app',
     signinCodeHint: 'Scan this code with the new phone’s camera. Each code works only once.',
   },
 });

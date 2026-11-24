@@ -418,6 +418,17 @@ public final class MainActivity extends Activity {
         Credentials have = Credentials.load(this);
         if (have != null) return getString(R.string.enroll_other, have.username, Uri.parse(have.server).getHost());
         try {
+            if (EnrollLink.PASSWORD.equals(link.kind)) return checkAndSave(link.server, link.username, link.password, "qr");
+            if (EnrollLink.HANDOFF.equals(link.kind)) {
+                // A DAVx5 device's QR code: the link its page holds.
+                Http.Answer a = Http.call("POST", link.server + "/api/app/davx5", null, null, null,
+                        new JSONObject().put("token", link.token).toString(), userAgent());
+                if (a.status == 410) return getString(R.string.enroll_expired);
+                if (a.status != 200) return getString(R.string.enroll_failed, "HTTP " + a.status);
+                EnrollLink inner = EnrollLink.parse(new JSONObject(a.body).optString("link"));
+                if (inner == null || !EnrollLink.PASSWORD.equals(inner.kind)) return getString(R.string.bad_link);
+                return checkAndSave(link.server, inner.username, inner.password, "qr");
+            }
             JSONObject body = new JSONObject().put("token", link.token).put("model", Build.MANUFACTURER + " " + Build.MODEL)
                     .put("android", Build.VERSION.SDK_INT).put("app_version", version());
             Http.Answer a = Http.call("POST", link.server + "/api/app/enroll", null, null, null, body.toString(), userAgent());
@@ -438,6 +449,20 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * A device's password, checked on CalDAV, then the account: null, or the
+     * reason it failed, for a person. mode is "manual" or "qr" (a DAVx5 code).
+     */
+    private String checkAndSave(String server, String username, String password, String mode) throws IOException {
+        Http.Answer a = Http.dav("PROPFIND", server + "/dav/", username, password, "0", "application/xml; charset=utf-8",
+                "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:current-user-principal/></d:prop></d:propfind>", null, userAgent());
+        if (a.status == 401) return getString(R.string.manual_refused);
+        if (a.status != 207) return getString(R.string.manual_not_caldav, a.status);
+        Credentials.save(this, server, username, password, 0, mode);
+        syncNow();
+        return null;
+    }
+
     /** By hand: the server, the user and a device's password, checked on CalDAV. */
     private void manual(long id, String serverText, String username, String password) {
         io.execute(() -> {
@@ -455,19 +480,9 @@ public final class MainActivity extends Activity {
                 return;
             }
             try {
-                Http.Answer a = Http.dav("PROPFIND", server + "/dav/", username, password, "0", "application/xml; charset=utf-8",
-                        "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:current-user-principal/></d:prop></d:propfind>", null, userAgent());
-                if (a.status == 401) {
-                    send(BridgeCodec.error(id, "refused", getString(R.string.manual_refused)));
-                    return;
-                }
-                if (a.status != 207) {
-                    send(BridgeCodec.error(id, "not_caldav", getString(R.string.manual_not_caldav, a.status)));
-                    return;
-                }
-                Credentials.save(this, server, username, password, 0, "manual");
-                syncNow();
-                send(BridgeCodec.ok(id, state()));
+                String err = checkAndSave(server, username, password, "manual");
+                if (err != null) send(BridgeCodec.error(id, "refused", err));
+                else send(BridgeCodec.ok(id, state()));
             } catch (IOException e) {
                 send(BridgeCodec.error(id, "offline", getString(R.string.offline)));
             } catch (Exception e) {

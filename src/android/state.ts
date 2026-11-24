@@ -9,7 +9,7 @@ export interface AccountState {
   host: string;
   username: string;
   /** How the phone was signed in: an enrollment link, or by hand. */
-  mode: 'enrolled' | 'manual';
+  mode: 'enrolled' | 'manual' | 'qr';
 }
 
 export interface CalendarState {
@@ -56,7 +56,7 @@ export function parseState(v: unknown): AppState {
   const str = (x: unknown): string => (typeof x === 'string' ? x : '');
   return {
     account: a !== null && a !== undefined && typeof a['server'] === 'string'
-      ? { server: str(a['server']), host: str(a['host']), username: str(a['username']), mode: a['mode'] === 'manual' ? 'manual' : 'enrolled' }
+      ? { server: str(a['server']), host: str(a['host']), username: str(a['username']), mode: a['mode'] === 'manual' ? 'manual' : a['mode'] === 'qr' ? 'qr' : 'enrolled' }
       : null,
     permissions: { calendar: p['calendar'] === true, camera: p['camera'] === true },
     sync: {

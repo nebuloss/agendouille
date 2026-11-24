@@ -65,6 +65,7 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 
 	mux.HandleFunc("POST /api/app/enroll", h.appEnroll)
 	mux.HandleFunc("POST /api/app/crash", h.appCrash)
+	mux.HandleFunc("POST /api/app/davx5", h.appDavx5)
 	mux.HandleFunc("GET /app/agendouille.apk", h.apkFile)
 	mux.HandleFunc("GET /davx5/{token}", h.davx5Page)
 	mux.HandleFunc("GET /.well-known/assetlinks.json", h.assetLinks)
@@ -245,6 +246,26 @@ func (h *handlers) davx5Page(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, "app/davx5.html", "app.title.davx5", map[string]any{
 		"Link": template.URL(link), "Server": h.d.PublicURL() + "/dav/", "Username": u.User.Username(), "Password": pass,
 	})
+}
+
+// appDavx5 gives the agendouille app what the page of a DAVx5 device's QR
+// code holds (davx5Page): the davx5:// link, so that code signs the app in
+// too. The token is the secret, as for the page: ten minutes, then gone.
+func (h *handlers) appDavx5(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token string `json:"token"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if !webx.DecodeJSON(w, r, &body) {
+		return
+	}
+	link, ok := pending.peek(body.Token, "davx5", h.d.Clock())
+	if !ok {
+		webx.JSON(w, http.StatusGone, map[string]any{"error": "expired"})
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	webx.JSON(w, http.StatusOK, map[string]any{"link": string(link)})
 }
 
 // apkFile is the Android app of this server's version (PLAN.md 7.6).

@@ -57,8 +57,15 @@ for (const scheme of ['light', 'dark']) {
 }
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
 await page.setViewport({ width: 390, height: 844, isMobile: true });
-// On a phone: a DAVx5 device added, its password in the dialog.
+// On a phone: the devices page, and the agendouille app's code.
 await page.goto(base + '/devices', { waitUntil: 'networkidle2' });
+await page.screenshot({ path: `${out}/phone-devices.png` });
+await (await page.$('xpath/.//button[contains(., "agendouille")]')).click();
+await wait(600);
+await page.screenshot({ path: `${out}/phone-app-code.png` });
+await page.keyboard.press('Escape');
+await wait(300);
+// A DAVx5 device added, its password in the dialog.
 await (await page.$('xpath/.//button[contains(., "DAVx5")]')).click();
 await wait(300);
 await (await page.$('xpath/.//dialog//button[@value="ok"]')).click();

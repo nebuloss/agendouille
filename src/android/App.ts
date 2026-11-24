@@ -189,7 +189,7 @@ export class App {
       h('dl', { class: ui.kv },
         h('dt', {}, t('server')), h('dd', {}, h('code', {}, a.server)),
         h('dt', {}, t('username')), h('dd', {}, h('code', {}, a.username)),
-        h('dt', {}, t('signedInBy')), h('dd', {}, a.mode === 'manual' ? t('byHand') : t('byLink'))),
+        h('dt', {}, t('signedInBy')), h('dd', {}, a.mode === 'manual' ? t('byHand') : a.mode === 'qr' ? t('byDavx5') : t('byLink'))),
       h('div', { class: 'flex flex-wrap gap-2' }, open, remove));
   }
 }

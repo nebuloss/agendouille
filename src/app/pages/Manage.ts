@@ -22,6 +22,46 @@ abstract class AppPage extends ApiPage {
     if (!(await confirmDialog(this.doc, title, text, button, true))) return;
     await this.act(run, done);
   }
+
+  /**
+   * "Connecter un autre téléphone": a QR code that lives ten minutes, with
+   * a bar that drains, and a fresh code in its place at zero while the
+   * dialog stays open. The same code signs in the agendouille app
+   * (forApp: its own words, and the app to download).
+   */
+  protected async enroll(forApp = false): Promise<void> {
+    const img = h('img', { class: 'qr mx-auto rounded-md3-l p-2', alt: t('signinQrAlt'), width: 240, height: 240 });
+    const timer = h('div', {});
+    let countdown: Countdown | null = null;
+    let open = true;
+    let apk = false;
+    const refresh = async (): Promise<void> => {
+      const e = await this.api.post<{ qr_svg: string; expires_in_ms: number; ttl_ms: number; apk?: boolean }>('/me/enrollment');
+      apk = e.apk === true;
+      setAttributes(img, { src: svgDataUrl(e.qr_svg) });
+      countdown?.dispose();
+      countdown = new Countdown(timer, e.expires_in_ms, e.ttl_ms, () => {
+        if (open) refresh().catch((err: unknown) => this.toasts.error(err));
+      });
+    };
+    try {
+      await refresh();
+    } catch (e) {
+      this.toasts.error(e);
+      return;
+    }
+    await dialog(this.doc, forApp ? t('appCodeTitle') : t('signinCode'), [
+      img,
+      timer,
+      h('p', { class: 'text-center text-sm' }, forApp ? t('appCodeHint') : t('signinCodeHint')),
+      forApp && apk
+        ? h('div', { class: 'flex justify-center' },
+          h('a', { href: '/app/agendouille.apk', download: '', class: `${ui.btn('tonal', 'sm')} no-underline` }, icon('download'), t('getApp')))
+        : null,
+    ], [{ label: t('close'), value: '', kind: 'filled' }]);
+    open = false;
+    (countdown as Countdown | null)?.dispose();
+  }
 }
 
 const accessLabel = (access: string): string =>
@@ -261,7 +301,8 @@ export class DevicesPage extends AppPage {
       section(t('syncDevice'),
         h('p', { class: 'text-sm text-on-surface-variant' }, mode === 'password' ? t('modePassword') : mode === 'both' ? t('modeBoth') : t('modeKeys')),
         h('div', { class: 'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap' },
-          action('Android (DAVx5)', () => this.add('davx5', mode), 'filled', 'phone'),
+          action(t('androidApp'), () => this.enroll(true), 'filled', 'phone'),
+          action('Android (DAVx5)', () => this.add('davx5', mode), 'tonal', 'phone'),
           action(kindLabel('ios'), () => this.add('ios', mode), 'tonal', 'phone'),
           action(kindLabel('thunderbird'), () => this.add('thunderbird', mode), 'tonal', 'laptop'),
           action(kindLabel('other'), () => this.add('other', mode), 'outlined', 'devices')),
@@ -430,37 +471,5 @@ export class MePage extends AppPage {
     ];
   }
 
-  /**
-   * "Connecter un autre téléphone": a QR code that lives ten minutes, with
-   * a bar that drains, and a fresh code in its place at zero while the
-   * dialog stays open.
-   */
-  private async enroll(): Promise<void> {
-    const img = h('img', { class: 'qr mx-auto rounded-md3-l p-2', alt: t('signinQrAlt'), width: 240, height: 240 });
-    const timer = h('div', {});
-    let countdown: Countdown | null = null;
-    let open = true;
-    const refresh = async (): Promise<void> => {
-      const e = await this.api.post<{ qr_svg: string; expires_in_ms: number; ttl_ms: number }>('/me/enrollment');
-      setAttributes(img, { src: svgDataUrl(e.qr_svg) });
-      countdown?.dispose();
-      countdown = new Countdown(timer, e.expires_in_ms, e.ttl_ms, () => {
-        if (open) refresh().catch((err: unknown) => this.toasts.error(err));
-      });
-    };
-    try {
-      await refresh();
-    } catch (e) {
-      this.toasts.error(e);
-      return;
-    }
-    await dialog(this.doc, t('signinCode'), [
-      img,
-      timer,
-      h('p', { class: 'text-center text-sm' }, t('signinCodeHint')),
-    ], [{ label: t('close'), value: '', kind: 'filled' }]);
-    open = false;
-    (countdown as Countdown | null)?.dispose();
-  }
 
 }

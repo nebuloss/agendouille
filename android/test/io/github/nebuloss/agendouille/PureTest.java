@@ -31,6 +31,30 @@ public class PureTest {
     }
 
     @Test
+    public void davx5Links() {
+        // The QR code of a DAVx5 device: our handoff page.
+        EnrollLink l = EnrollLink.parse("https://agenda.example.org/davx5/" + TOKEN);
+        assertNotNull(l);
+        assertEquals(EnrollLink.HANDOFF, l.kind);
+        assertEquals("https://agenda.example.org", l.server);
+        assertEquals(TOKEN, l.token);
+        // The link the page holds, as the server writes it (QueryEscape).
+        l = EnrollLink.parse("davx5://lea-pixel:s3cr%2Bt%3Ax@agenda.example.org/dav/");
+        assertNotNull(l);
+        assertEquals(EnrollLink.PASSWORD, l.kind);
+        assertEquals("https://agenda.example.org", l.server);
+        assertEquals("lea-pixel", l.username);
+        assertEquals("s3cr+t:x", l.password);
+        l = EnrollLink.parse("caldavs://u:p@10.0.0.5:8791/dav/");
+        assertNotNull(l);
+        assertEquals("https://10.0.0.5:8791", l.server);
+        assertEquals(EnrollLink.ENROLL, EnrollLink.parse("https://agenda.example.org/enroll/" + TOKEN).kind);
+        assertNull(EnrollLink.parse("davx5://agenda.example.org/dav/"));
+        assertNull(EnrollLink.parse("davx5://u:@agenda.example.org/dav/"));
+        assertNull(EnrollLink.parse("https://agenda.example.org/davx5/short"));
+    }
+
+    @Test
     public void notEnrollLinks() {
         assertNull(EnrollLink.parse(null));
         assertNull(EnrollLink.parse(""));

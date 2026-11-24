@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nebuloss/agendouille/internal/web/assets"
 	"io"
 	"net/http"
 	"net/url"
@@ -222,7 +223,8 @@ func (h *handlers) selfEnrollment(w http.ResponseWriter, r *http.Request, p *aut
 		return
 	}
 	webx.JSON(w, http.StatusCreated, map[string]any{"url": link, "qr_svg": qr, "expires_at": e.ExpiresAt,
-		"expires_in_ms": e.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "ttl_ms": (10 * time.Minute).Milliseconds()})
+		"expires_in_ms": e.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "ttl_ms": (10 * time.Minute).Milliseconds(),
+		"apk": assets.AndroidApp() != nil})
 }
 
 type personView struct {
