@@ -18,6 +18,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/deps"
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
+	"github.com/nebuloss/agendouille/internal/live"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/sharing"
 	"github.com/nebuloss/agendouille/internal/store"
@@ -172,8 +173,15 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	var pubMu sync.Mutex
 	pubErr := ""
 	bk := backup.New(svc.store.DB(), cfg.DataDir, svc.settings, time.Now, log)
+	// What changed reaches the admin's open tabs (internal/live): every
+	// committed write by its tables, the settings when the file is read
+	// again, the backup files.
+	lv := live.New()
+	svc.store.OnChange(func(tables []string) { lv.Changed(live.ForTables(tables)...) })
+	svc.settings.Subscribe(func(settings.Change) { lv.Changed(live.Settings) })
+	bk.OnChange(func() { lv.Changed(live.Backups) })
 	d := &deps.Deps{Config: cfg, Settings: svc.settings, Log: log, Store: svc.store, Directory: svc.dir, Auth: svc.auth,
-		Calendar: svc.calendar, Backup: bk, Hub: svc.hub, Clock: time.Now, Version: version,
+		Calendar: svc.calendar, Backup: bk, Hub: svc.hub, Live: lv, Clock: time.Now, Version: version,
 		Restart: func(reason string) {
 			select {
 			case restart <- reason:
@@ -229,6 +237,7 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready func
 	go watchConfig(watchCtx, cfg, svc.settings, log)
 	go prune(watchCtx, svc.calendar, log)
 	go bk.Run(watchCtx)
+	go lv.Run(watchCtx.Done())
 
 	if ready != nil {
 		ready(srv)

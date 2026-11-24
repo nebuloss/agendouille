@@ -37,6 +37,7 @@ func ParseTime(s string) (time.Time, error) { return time.Parse(TimeFormat, s) }
 
 // Store is the database handle.
 type Store struct {
+	dsn  string // how it was opened: the key of its change listener (live.go)
 	db   *sql.DB
 	path string
 }
@@ -73,6 +74,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		"&_pragma=synchronous(NORMAL)" +
 		"&_pragma=busy_timeout(10000)" +
 		"&_txlock=immediate"
+	installHooks() // every write marks its topics (live.go)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -81,7 +83,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	s := &Store{db: db, path: path}
+	s := &Store{db: db, path: path, dsn: dsn}
 	if err := s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, err

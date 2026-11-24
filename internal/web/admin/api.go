@@ -73,7 +73,7 @@ func (h *handlers) registerAPI(mux *http.ServeMux, guard func(http.Handler) http
 	api("GET /api/admin/dav-auth", h.davAuth)
 	api("PUT /api/admin/dav-auth", h.setDavAuth)
 	api("GET /api/admin/notices", h.notices)
-	api("GET /api/admin/stamp", h.stamp)
+	api("GET /api/admin/events", h.events)
 	api("POST /api/admin/notices/read", h.readNotices)
 }
 
@@ -1125,15 +1125,4 @@ func (h *handlers) restore(w http.ResponseWriter, r *http.Request) {
 	if h.d.Restart != nil {
 		go h.d.Restart("restore " + name)
 	}
-}
-
-// stamp is what an open admin page polls to know it should reload
-// (calendar.AdminStamp).
-func (h *handlers) stamp(w http.ResponseWriter, r *http.Request) {
-	st, err := h.d.Calendar.AdminStamp(r.Context())
-	if err != nil {
-		h.failIn(w, r, err)
-		return
-	}
-	webx.JSON(w, http.StatusOK, map[string]string{"stamp": st})
 }

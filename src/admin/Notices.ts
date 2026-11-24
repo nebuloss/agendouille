@@ -5,6 +5,7 @@ import { icon, type IconName } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ago } from '@/shared/render/format.ts';
 import { t } from '@/admin/Notices.msg.ts';
+import { READS, liveStream } from '@/admin/live.ts';
 
 type Key = Parameters<typeof t>[0];
 
@@ -51,7 +52,7 @@ export class NoticeCenter implements Disposable {
   private filter: Severity | 'all' = 'all';
   private readonly bell: HTMLButtonElement;
   private sheet: HTMLDialogElement | null = null;
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private stop: (() => void) | null = null;
 
   constructor(
     private readonly doc: Document,
@@ -64,14 +65,14 @@ export class NoticeCenter implements Disposable {
     this.drawBell();
   }
 
-  /** Reads the notices now and every minute, so the bell counts what just happened. */
+  /** Reads the notices now, and again when what they are made of changes (the stream). */
   start(): void {
     void this.load();
-    this.timer = setInterval(() => void this.load(), 60_000);
+    this.stop = liveStream.on(READS.notices, () => void this.load());
   }
 
   dispose(): void {
-    if (this.timer !== null) clearInterval(this.timer);
+    this.stop?.();
   }
 
   unread(): Notice[] {

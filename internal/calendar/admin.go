@@ -2,9 +2,7 @@ package calendar
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"regexp"
 	"strings"
@@ -240,27 +238,4 @@ func (s *Service) IDOf(ctx context.Context, r Ref) (string, error) {
 		return "", ErrNotFound
 	}
 	return id, err
-}
-
-// AdminStamp is a fingerprint of everything the admin UI shows: it changes
-// when anything there does, so an open admin page reloads what it shows
-// when a change was made elsewhere (a phone, the family app, another
-// admin tab). Counts and newest ids and times only, never what an event says.
-func (s *Service) AdminStamp(ctx context.Context) (string, error) {
-	var raw string
-	err := s.db.QueryRowContext(ctx, `SELECT
-		(SELECT COALESCE(max(id), 0) FROM audit) || '/' ||
-		(SELECT COALESCE(max(seq), 0) FROM changes) || '/' ||
-		(SELECT count(*) || ':' || COALESCE(max(id), 0) || ':' || COALESCE(max(revoked_at), '') || ':' || COALESCE(max(last_used_at), '') || ':' || COALESCE(max(cert_expires_at), '') FROM devices) || '/' ||
-		(SELECT count(*) || ':' || COALESCE(max(id), 0) || ':' || COALESCE(max(used_at), '') || ':' || COALESCE(max(revoked_at), '') FROM enrollments) || '/' ||
-		(SELECT count(*) || ':' || COALESCE(max(id), 0) FROM sessions WHERE surface = 'app') || '/' ||
-		(SELECT count(*) || ':' || COALESCE(max(id), 0) || ':' || COALESCE(sum(disabled), 0) || ':' || count(removed_at) || ':' || COALESCE(max(last_seen_at), '') FROM users) || '/' ||
-		(SELECT count(*) FROM groups) || ':' || (SELECT count(*) FROM group_members) || '/' ||
-		(SELECT count(*) || ':' || COALESCE(max(id), 0) || ':' || count(deleted_at) FROM calendars) || '/' ||
-		(SELECT count(*) FROM shares)`).Scan(&raw)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:8]), nil
 }

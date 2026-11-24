@@ -13,6 +13,7 @@ import (
 	"github.com/nebuloss/agendouille/internal/config"
 	"github.com/nebuloss/agendouille/internal/directory"
 	"github.com/nebuloss/agendouille/internal/hub"
+	"github.com/nebuloss/agendouille/internal/live"
 	"github.com/nebuloss/agendouille/internal/settings"
 	"github.com/nebuloss/agendouille/internal/store"
 )
@@ -28,8 +29,10 @@ type Deps struct {
 	Calendar  *calendar.Service
 	Backup    *backup.Service
 	Hub       *hub.Hub
-	Clock     func() time.Time
-	Version   string
+	// Live tells the admin UI what changed (internal/live).
+	Live    *live.Hub
+	Clock   func() time.Time
+	Version string
 	// PublicStatus is the public listener's bound address ("" when down)
 	// and the error of its last start ("" when none).
 	PublicStatus func() (addr, err string)

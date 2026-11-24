@@ -49,6 +49,7 @@ type File struct {
 
 // Service makes and lists backups.
 type Service struct {
+	changed  func() // OnChange
 	db       *sql.DB
 	dataDir  string
 	settings *settings.Service
@@ -57,6 +58,16 @@ type Service struct {
 }
 
 // New wraps the open database of dataDir.
+// Changed, when set, is told the backup files changed (made, pruned): they
+// are files, which the store's hooks do not see (internal/live).
+func (s *Service) OnChange(fn func()) { s.changed = fn }
+
+func (s *Service) notify() {
+	if s.changed != nil {
+		s.changed()
+	}
+}
+
 func New(db *sql.DB, dataDir string, set *settings.Service, now func() time.Time, log *slog.Logger) *Service {
 	return &Service{db: db, dataDir: dataDir, settings: set, now: now, log: log}
 }
@@ -79,6 +90,7 @@ func (s *Service) Make(ctx context.Context) (File, error) {
 		return File{}, err
 	}
 	s.prune()
+	s.notify()
 	return File{Name: name, Size: info.Size(), Made: info.ModTime().UTC()}, nil
 }
 

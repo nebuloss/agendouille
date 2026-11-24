@@ -3,6 +3,30 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the admin UI stays current as claudication's does
+
+*Replaces* the five-second fingerprint polling of the same day (the user:
+"take a look at claudication"). claudication's design, its
+docs/data-architecture.md: every change marks a **topic** (people, devices,
+calendars, activity, settings, notices, backups; `internal/live`, its hub
+copied); each tab opens one server-sent event stream naming the topics its
+page shows (`GET /api/admin/events?topics=…`, `src/shared/core/Live.ts`,
+`src/admin/live.ts` with what each page reads); a notice carries no data,
+the page reads again through the API. An idle tab makes no requests.
+
+Where claudication's store marks topics function by function (a test
+reading its source), agendouille's is told by SQLite itself: a pre-update
+hook notes the tables a transaction writes and its commit hook marks their
+topics (`internal/store/live.go`, the map in `internal/live/tables.go`,
+`TestEveryTableHasATopic`). No write in any package can forget. Files are
+not tables: the backups mark theirs, and the settings file its reload.
+Not seen, as in claudication: a write by another process (the command
+line); it shows with the next change of the same topic.
+
+A page does not move under a hand: a notice while a dialog is open or a
+field has the focus waits for them to close. Cached reads with ETags are
+not taken: the admin's reads are small.
+
 ## 2026-11-24: a sign-in policy per user, and the page's own field errors
 
 - **Per user** (the user: "perhaps we should manage per user certificate

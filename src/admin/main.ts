@@ -7,7 +7,7 @@ import { CalendarPage, CalendarsPage } from '@/admin/pages/Calendar.ts';
 import { ActivityPage, BackupsPage, GroupPage, GroupsPage, SettingsPage } from '@/admin/pages/More.ts';
 import { OverviewPage } from '@/admin/pages/Overview.ts';
 import { UserPage, UsersPage } from '@/admin/pages/Users.ts';
-import { Pages, whenReady, type Page } from '@/shared/core/Pages.ts';
+import { Pages, whenReady } from '@/shared/core/Pages.ts';
 import { langMenu, themeButton } from '@/shared/components/Ui.ts';
 import { ownValidation } from '@/shared/components/Validation.ts';
 
@@ -31,8 +31,7 @@ export const pages = new Pages({
 
 whenReady(document, () => {
   document.documentElement.dataset['bundle'] = 'admin';
-  const page = pages.mount(document);
-  live(page);
+  pages.mount(document);
   // The rail folds to its icons (folded by default on a phone); the choice
   // is this browser's.
   const rail = document.querySelector<HTMLElement>('.rail');
@@ -99,38 +98,3 @@ function foldable(rail: HTMLElement): void {
   draw();
 }
 
-/**
- * Keeps the page in step with changes made elsewhere (a phone that syncs,
- * the family app, another admin tab): a short fingerprint of what the admin
- * shows (/api/admin/stamp), read every few seconds while the tab is seen
- * and when it comes back; when it changed, the page loads its data again,
- * unless a dialog is open or a field has the focus.
- */
-function live(page: Page | null): void {
-  const reloadable = page as (Page & { refresh?: () => Promise<void> }) | null;
-  if (reloadable === null || typeof reloadable.refresh !== 'function') return;
-  let last: string | null = null;
-  let busy = false;
-  const check = async (): Promise<void> => {
-    if (busy || document.visibilityState !== 'visible') return;
-    busy = true;
-    try {
-      const { stamp } = await api.get<{ stamp: string }>('/stamp');
-      const typing = document.activeElement instanceof HTMLElement && document.activeElement.matches('input, textarea, select, [contenteditable]');
-      if (last !== null && stamp !== last) {
-        if (document.querySelector('dialog[open]') !== null || typing) return; // next time: last stays the old one
-        await reloadable.refresh!();
-        document.dispatchEvent(new Event('agd:changed'));
-      }
-      last = stamp;
-    } catch {
-      // offline or signed out: the next check tells
-    } finally {
-      busy = false;
-    }
-  };
-  void check();
-  window.setInterval(() => void check(), 5000);
-  document.addEventListener('visibilitychange', () => void check());
-  window.addEventListener('focus', () => void check());
-}
