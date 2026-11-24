@@ -396,29 +396,34 @@ export class App {
     void this.bridge.call(call).catch((e: unknown) => this.toasts.error(new Error(reason(e))));
   }
 
-  /** Synchro, until the app is left out of battery optimisation: why, and the way. */
-  private backgroundCard(s: AppState): HTMLElement {
-    const allow = h('button', { type: 'button', class: ui.btn('filled', 'sm') }, icon('check'), t('allowBackground'));
-    allow.addEventListener('click', () => this.open('battery.request'));
-    const autostart = h('button', { type: 'button', class: ui.btn('tonal', 'sm') }, icon('repeat'), t('autostart'));
-    autostart.addEventListener('click', () => this.open('autostart.open'));
-    return h('section', { class: 'flex flex-col gap-3 rounded-md3-xl bg-warning-container p-5 text-on-warning-container' },
-      h('h2', { class: 'flex items-center gap-2 text-lg font-medium' }, icon('warn'), t('backgroundTitle')),
-      h('p', { class: 'text-sm' }, t('backgroundBody')),
-      s.xiaomi ? h('p', { class: 'text-sm' }, t('xiaomiBody')) : null,
-      h('div', { class: 'flex flex-wrap gap-2' }, allow, s.xiaomi ? autostart : null));
+  /** How many permissions are still to grant. */
+  private static missing(s: AppState): number {
+    const p = s.permissions;
+    return [p.calendar, p.notifications, p.camera, p.battery].filter((x) => !x).length;
+  }
+
+  /** The permissions' view, from anywhere: Réglages' tab, the view on top. */
+  private showPermissions(): void {
+    this.tab = 'settings';
+    this.settingsView = 'permissions';
+    this.draw();
+    this.doc.defaultView?.scrollTo(0, 0);
+  }
+
+  /** Synchro, while a permission is missing: a small link to them all. */
+  private permissionsLink(s: AppState): HTMLElement | null {
+    const n = App.missing(s);
+    if (n === 0) return null;
+    const b = h('button', { type: 'button', class: 'state-layer -ml-3 inline-flex h-10 items-center gap-2 self-start rounded-md3-full px-3 text-sm font-medium text-warning [&_.ic]:size-4' }, icon('warn'), t('someMissing', { count: n }), icon('right'));
+    b.addEventListener('click', () => this.showPermissions());
+    return b;
   }
 
   /** Réglages' card: how many permissions are missing, and the view of them all. */
   private permissionsCard(s: AppState): HTMLElement {
-    const p = s.permissions;
-    const missing = [p.calendar, p.notifications, p.camera, p.battery].filter((x) => !x).length;
+    const missing = App.missing(s);
     const go = h('button', { type: 'button', class: `${ui.btn('tonal')} self-start` }, icon('lock'), t('checkPermissions'));
-    go.addEventListener('click', () => {
-      this.settingsView = 'permissions';
-      this.draw();
-      this.doc.defaultView?.scrollTo(0, 0);
-    });
+    go.addEventListener('click', () => this.showPermissions());
     return card(t('permissions'), [],
       h('div', {}, missing === 0 ? chip(t('allGranted'), 'ok', 'check') : chip(t('someMissing', { count: missing }), 'warn', 'warn')),
       go);
@@ -702,7 +707,8 @@ export class App {
         h('div', {}, allow)));
     }
     out.push(this.syncCard(s));
-    if (!s.permissions.battery) out.push(this.backgroundCard(s));
+    const link = this.permissionsLink(s);
+    if (link) out.push(link);
     out.push(this.accountCard(s));
     return out;
   }

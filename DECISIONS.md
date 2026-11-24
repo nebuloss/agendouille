@@ -1142,7 +1142,7 @@ under battery optimisation to maintenance windows, hours apart on an idle
 phone; MIUI also blocks background starts without « Démarrage
 automatique ». A sync app is exactly the case Android's policy allows
 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` for, and DAVx5 asks the same. The app
-shows a card in Synchro until it is exempt, a permissions view in Réglages,
+links from Synchro to the permissions while one is missing, a permissions view in Réglages,
 and opens MIUI's autostart screen on Xiaomi phones (it cannot read that
 setting). It also follows the server's `app_sync_interval_minutes` instead of
 a fixed 30 minutes, and syncs when opened if the last sync is over five

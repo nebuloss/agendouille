@@ -38,9 +38,9 @@ which opens a session for the person.
 - **Synchro**: the last sync, « Synchroniser » now, how many events and
   calendars are on the phone, the account, « Se déconnecter » (removes the
   account and its calendars from the phone; an app sign-in also removes the
-  device on the server). Until the app is left out of battery
-  optimisation, a « Synchronisation en arrière-plan » card asks for it (and,
-  on a Xiaomi phone, for « Démarrage automatique »).
+  device on the server). While a permission is missing (battery
+  optimisation included), a small « N autorisations à accorder » link opens
+  Réglages' Autorisations.
 - **Calendriers**: mine and those shared with me. A calendar's page:
   « Synchroniser sur ce téléphone », its shares (each one's access in
   place; « Partager avec d'autres » picks groups and people), « Modifier »,
@@ -65,8 +65,8 @@ last sync is over five minutes old). There is no push yet: a change made
 elsewhere arrives at the next sync.
 
 Android holds back the background work of apps under battery optimisation,
-sometimes for hours on a phone left idle. Allow the app in Synchro or in
-Réglages, Autorisations. On Xiaomi phones (MIUI, Redmi, POCO), also turn on
+sometimes for hours on a phone left idle. Allow the app in Réglages,
+Autorisations (Synchro links there while one is missing). On Xiaomi phones (MIUI, Redmi, POCO), also turn on
 « Démarrage automatique » for agendouille, or it only syncs while open:
 Android cannot tell the app whether it is on, so the app only opens the
 setting.
