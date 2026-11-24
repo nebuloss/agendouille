@@ -696,13 +696,20 @@ public final class MainActivity extends Activity {
     private void installStatus(Intent intent) {
         int status = intent.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, Integer.MIN_VALUE);
         if (status == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            Intent confirm = intentExtra(intent);
             if (confirm != null) startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } else if (status != android.content.pm.PackageInstaller.STATUS_SUCCESS && status != android.content.pm.PackageInstaller.STATUS_FAILURE_ABORTED) {
             String msg = intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE);
             updateFailed(status == android.content.pm.PackageInstaller.STATUS_FAILURE_CONFLICT || status == android.content.pm.PackageInstaller.STATUS_FAILURE_INCOMPATIBLE
                     ? getString(R.string.update_other_key) : String.valueOf(msg));
         }
+    }
+
+    /** The installer's confirmation: typed from Android 13, the older call before it. */
+    @SuppressWarnings("deprecation")
+    private static Intent intentExtra(Intent intent) {
+        if (Build.VERSION.SDK_INT >= 33) return intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);
+        return intent.getParcelableExtra(Intent.EXTRA_INTENT);
     }
 
     private void updateFailed(String why) {
