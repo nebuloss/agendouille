@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/nebuloss/agendouille/internal/web/assets"
 )
 
 // A DAVx5 device's QR code leads to a page of ours that opens DAVx5 (DAVx5
@@ -43,10 +45,16 @@ func TestDAVx5PageAndAppPieces(t *testing.T) {
 		t.Errorf("the app, an unknown token: %d %s", a.status, a.body)
 	}
 
-	// No APK in a test build: no download, no App Links, nothing offered.
+	// The download and the App Links exist exactly when the build embeds
+	// the APK: not in a plain test build, yes in a release (release.yml
+	// embeds it before the tests run).
+	want := http.StatusNotFound
+	if assets.AndroidApp() != nil {
+		want = http.StatusOK
+	}
 	for _, p := range []string{"/app/agendouille.apk", "/.well-known/assetlinks.json"} {
-		if a := x.do("GET", x.public+p, nil, nil); a.status != http.StatusNotFound {
-			t.Errorf("%s without an APK: %d", p, a.status)
+		if a := x.do("GET", x.public+p, nil, nil); a.status != want {
+			t.Errorf("%s: %d, want %d (APK embedded: %v)", p, a.status, want, want == http.StatusOK)
 		}
 	}
 }
