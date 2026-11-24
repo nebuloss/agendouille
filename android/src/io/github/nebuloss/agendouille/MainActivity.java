@@ -453,7 +453,7 @@ public final class MainActivity extends Activity {
      * A device's password, checked on CalDAV, then the account: null, or the
      * reason it failed, for a person. mode is "manual" or "qr" (a DAVx5 code).
      */
-    private String checkAndSave(String server, String username, String password, String mode) throws IOException {
+    private String checkAndSave(String server, String username, String password, String mode) throws Exception {
         Http.Answer a = Http.dav("PROPFIND", server + "/dav/", username, password, "0", "application/xml; charset=utf-8",
                 "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:current-user-principal/></d:prop></d:propfind>", null, userAgent());
         if (a.status == 401) return getString(R.string.manual_refused);
