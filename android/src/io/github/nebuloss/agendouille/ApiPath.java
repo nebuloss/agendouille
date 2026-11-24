@@ -2,8 +2,9 @@ package io.github.nebuloss.agendouille;
 
 /**
  * What the screens may ask of the family API through the bridge ("api"):
- * managing calendars (create, edit, share, give, remove, hide) and
- * approving a browser's sign-in, nothing else. The app is a sync app: no
+ * managing calendars (create, edit, share, give, remove, hide), approving
+ * a browser's sign-in, and listing and disconnecting devices and browsers,
+ * nothing else. The app is a sync app: no
  * event is read through here (DECISIONS). Pure Java: tested on the JVM.
  */
 public final class ApiPath {
@@ -25,6 +26,8 @@ public final class ApiPath {
         if (bare.startsWith("/api/approvals/")) {
             return (method.equals("GET") || method.equals("POST")) && bare.substring("/api/approvals/".length()).matches("[A-Za-z0-9-]+");
         }
+        if (bare.equals("/api/devices") || bare.equals("/api/sessions")) return method.equals("GET");
+        if (bare.matches("/api/(devices|sessions)/[0-9]+")) return method.equals("DELETE");
         if (bare.equals("/api/calendars")) return method.equals("GET") || method.equals("POST");
         if (bare.startsWith("/api/calendars/")) {
             String rest = bare.substring("/api/calendars/".length());

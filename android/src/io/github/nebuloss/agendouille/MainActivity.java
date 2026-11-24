@@ -337,7 +337,7 @@ public final class MainActivity extends Activity {
             Credentials c = Credentials.load(this);
             if (c != null) {
                 o.put("account", new JSONObject().put("server", c.server).put("host", Uri.parse(c.server).getHost())
-                        .put("username", c.username).put("mode", c.mode));
+                        .put("username", c.username).put("mode", c.mode).put("device_id", c.deviceId));
             } else {
                 o.put("account", JSONObject.NULL);
             }
@@ -354,13 +354,15 @@ public final class MainActivity extends Activity {
             JSONArray cals = new JSONArray();
             if (c != null && cal) {
                 try (Cursor q = getContentResolver().query(Calendars.CONTENT_URI,
-                        new String[]{Calendars._ID, Calendars.CALENDAR_DISPLAY_NAME, Calendars.CALENDAR_COLOR, Calendars.SYNC_EVENTS, Calendars.CALENDAR_ACCESS_LEVEL},
+                        new String[]{Calendars._ID, Calendars.CALENDAR_DISPLAY_NAME, Calendars.CALENDAR_COLOR, Calendars.SYNC_EVENTS, Calendars.CALENDAR_ACCESS_LEVEL, Calendars._SYNC_ID},
                         Calendars.ACCOUNT_NAME + "=? AND " + Calendars.ACCOUNT_TYPE + "=?", new String[]{c.account.name, c.account.type},
                         Calendars.CALENDAR_DISPLAY_NAME)) {
                     while (q != null && q.moveToNext()) {
                         cals.put(new JSONObject().put("id", q.getLong(0)).put("name", q.getString(1))
                                 .put("color", String.format("#%06x", q.getInt(2) & 0xffffff)).put("sync", q.getInt(3) == 1)
-                                .put("read_only", q.getInt(4) < Calendars.CAL_ACCESS_CONTRIBUTOR));
+                                .put("read_only", q.getInt(4) < Calendars.CAL_ACCESS_CONTRIBUTOR)
+                                // .../dav/calendars/<user>/<owner~slug>/: the server's reference, the API's "ref".
+                                .put("ref", q.getString(5) == null ? "" : String.valueOf(Uri.parse(q.getString(5)).getLastPathSegment())));
                     }
                 }
             }

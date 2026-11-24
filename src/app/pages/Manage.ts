@@ -68,7 +68,7 @@ const accessLabel = (access: string): string =>
   access === 'owner' ? t('accessOwner') : access === 'readwrite' ? t('accessReadwrite') : access === 'read' ? t('accessRead') : access;
 const COLORS = ['#1e88e5', '#43a047', '#e53935', '#fb8c00', '#8e24aa', '#00897b', '#6d4c41', '#3949ab'];
 
-interface People {
+export interface People {
   users: Person[];
   groups: Person[];
 }
@@ -102,7 +102,7 @@ export class CalendarsPage extends AppPage {
     return kind === 'g' ? t('groupInline', { name: shown }) : shown;
   }
 
-  private ownedCard(c: Calendar, people: People): HTMLElement {
+  protected ownedCard(c: Calendar, people: People): HTMLElement {
     const shares = c.shares ?? [];
     const path = `/calendars/${seg(c.ref)}`;
     const shareRows = shares.map((s: Share) => {
@@ -131,7 +131,7 @@ export class CalendarsPage extends AppPage {
         action(t('delete'), () => this.remove(c), 'danger-text', 'trash', 'sm')));
   }
 
-  private sharedCard(c: Calendar): HTMLElement {
+  protected sharedCard(c: Calendar): HTMLElement {
     const path = `/calendars/${seg(c.ref)}`;
     return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
       h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
@@ -149,7 +149,7 @@ export class CalendarsPage extends AppPage {
     return h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(current) ? current : COLORS[0]! });
   }
 
-  private async create(): Promise<void> {
+  protected async create(): Promise<void> {
     const name = h('input', { required: true, placeholder: t('namePlaceholder') });
     const color = this.colorPicker(COLORS[Math.floor(Math.random() * COLORS.length)]!);
     const v = await dialog(this.doc, t('newCalendar'), [field(t('name'), name), field(t('color'), color)],
@@ -227,7 +227,7 @@ export class CalendarsPage extends AppPage {
   }
 }
 
-interface Device {
+export interface Device {
   id: number;
   kind: string;
   label: string;
@@ -265,7 +265,7 @@ interface Link {
   url?: string;
 }
 
-interface Session {
+export interface Session {
   id: number;
   user_agent: string;
   app: boolean;
@@ -274,7 +274,7 @@ interface Session {
 }
 
 /** A kind of device, as the person reads it (product names stay as they are). */
-function kindLabel(kind: string): string {
+export function kindLabel(kind: string): string {
   switch (kind) {
     case 'davx5':
       return 'DAVx5 (Android)';

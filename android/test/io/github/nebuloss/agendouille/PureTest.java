@@ -68,13 +68,18 @@ public class PureTest {
         assertTrue(ApiPath.allowed("POST", "/api/calendars/x/transfer"));
         assertTrue(ApiPath.allowed("GET", "/api/approvals/PKW-6VY"));
         assertTrue(ApiPath.allowed("POST", "/api/approvals/PKW-6VY"));
+        assertTrue(ApiPath.allowed("GET", "/api/devices"));
+        assertTrue(ApiPath.allowed("DELETE", "/api/devices/12"));
+        assertTrue(ApiPath.allowed("GET", "/api/sessions"));
+        assertTrue(ApiPath.allowed("DELETE", "/api/sessions/7"));
+        assertFalse(ApiPath.allowed("POST", "/api/devices"));
+        assertFalse(ApiPath.allowed("DELETE", "/api/devices/12/certificate"));
         // Never events, exports, devices, the admin, or a way out of /api.
         assertFalse(ApiPath.allowed("GET", "/api/calendars/x/events/a.ics"));
         assertFalse(ApiPath.allowed("POST", "/api/calendars/x/events"));
         assertFalse(ApiPath.allowed("GET", "/api/calendars/x/export"));
         assertFalse(ApiPath.allowed("GET", "/api/calendars/x"));
         assertFalse(ApiPath.allowed("GET", "/api/events"));
-        assertFalse(ApiPath.allowed("DELETE", "/api/devices/3"));
         assertFalse(ApiPath.allowed("GET", "/api/admin/users"));
         assertFalse(ApiPath.allowed("GET", "/api/calendars/../admin"));
         assertFalse(ApiPath.allowed("GET", "//evil.example/api/me"));

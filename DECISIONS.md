@@ -3,6 +3,31 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the Android app's four tabs, and nothing opens the website
+
+The user: "on the sync page don't show calendars, just sync information,
+account info and logout; on the calendar page, show calendar names, and a
+click opens the calendar's details; replace Navigateur by devices, to
+disconnect them; add a settings view with language and theme", then "we
+don't need open browser or browser link generation, nor open in browser in
+the app, since it should support all web operations".
+
+- Synchro: the sync, how many calendars sync on the phone, the account,
+  « Se déconnecter » (removes the account from the phone).
+- Calendriers: the names (mine, shared with me), then a calendar's page:
+  the web app's own card (`CalendarsPage.ownedCard`/`sharedCard`, made
+  protected for this) and « Synchroniser sur ce téléphone », matched by the
+  calendar's reference, which the phone's calendar carries as the last
+  segment of its CalDAV address. Signed in with a device's password, the
+  tab lists the phone's calendars with that switch only.
+- Appareils: approving a browser (its QR code or its code), then the
+  devices (this phone marked, not removable) and the browsers, each with
+  « Déconnecter ». `ApiPath` allows `GET`/`DELETE` on devices and sessions.
+- Réglages: language and theme, kept in the WebView's storage and applied
+  by `main.ts` before the phone's; the version.
+- « Ouvrir agendouille dans le navigateur » is gone: the app does what the
+  person needs itself.
+
 ## 2026-11-24: releases on GitHub, and the app updates itself from them
 
 The user: "a ci that builds the server binaries like claudication or

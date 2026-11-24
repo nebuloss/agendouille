@@ -34,13 +34,13 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   await page.evaluateOnNewDocument((lang, signedIn, crashed) => {
     Object.defineProperty(navigator, 'language', { get: () => lang });
     const state = {
-      account: signedIn ? { server: 'https://agendouille.patapouf.club', host: 'agendouille.patapouf.club', username: 'lea', mode: 'enrolled' } : null,
+      account: signedIn ? { server: 'https://agendouille.patapouf.club', host: 'agendouille.patapouf.club', username: 'lea', mode: 'enrolled', device_id: 5 } : null,
       permissions: { calendar: signedIn, camera: false },
       sync: { state: 'idle', last_sync: new Date(Date.now() - 4 * 60000).toISOString(), error: null, events: 42 },
       calendars: signedIn ? [
-        { id: 1, name: 'Famille', color: '#3b6ea5', sync: true, read_only: false },
-        { id: 2, name: 'École', color: '#e8710a', sync: true, read_only: true },
-        { id: 3, name: 'Perso de Léa', color: '#7b1fa2', sync: false, read_only: false },
+        { id: 1, name: 'Famille', color: '#3b6ea5', sync: true, read_only: false, ref: 'lea~famille' },
+        { id: 2, name: 'École', color: '#e8710a', sync: true, read_only: true, ref: 'maman~ecole' },
+        { id: 3, name: 'Perso de Léa', color: '#7b1fa2', sync: false, read_only: false, ref: 'lea~perso' },
       ] : [],
       crash: crashed ? 'agendouille dev on Google Pixel 8, Android 15 (35)\nthe page\'s renderer stopped: it crashed, priority 2' : null,
     };
@@ -51,12 +51,21 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
         // The family API the tabs call (MainActivity "api"), as the server answers.
         const api = {
           'GET /api/calendars': { calendars: [
-            { ref: 'lea/famille', name: 'Famille', color: '#3b6ea5', owner: 'lea', access: 'owner', hidden: false, description: 'Les rendez-vous de toute la maison',
+            { ref: 'lea~famille', name: 'Famille', color: '#3b6ea5', owner: 'lea', access: 'owner', hidden: false, description: 'Les rendez-vous de toute la maison',
               shares: [{ target: 'g:famille', access: 'readwrite' }] },
-            { ref: 'lea/perso', name: 'Perso de Léa', color: '#7b1fa2', owner: 'lea', access: 'owner', hidden: false, description: '', shares: [] },
-            { ref: 'maman/ecole', name: 'École', color: '#e8710a', owner: 'maman', access: 'read', hidden: false, description: '' },
+            { ref: 'lea~perso', name: 'Perso de Léa', color: '#7b1fa2', owner: 'lea', access: 'owner', hidden: false, description: '', shares: [] },
+            { ref: 'maman~ecole', name: 'École', color: '#e8710a', owner: 'maman', access: 'read', hidden: false, description: '' },
           ] },
           'GET /api/people': { users: [{ name: 'maman', display_name: 'Maman', color: '#e53935' }], groups: [{ name: 'famille', display_name: 'Famille', color: '' }] },
+          'GET /api/devices': { devices: [
+            { id: 5, kind: 'app', label: 'Xiaomi M2101K6G', cap: 'readwrite', last_used_at: new Date(Date.now() - 60000).toISOString() },
+            { id: 6, kind: 'davx5', label: 'Tablette', cap: 'readwrite', last_used_at: new Date(Date.now() - 3 * 86400000).toISOString() },
+            { id: 7, kind: 'thunderbird', label: 'Thunderbird du bureau', cap: 'read', last_used_at: null },
+          ] },
+          'GET /api/sessions': { sessions: [
+            { id: 1, user_agent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome/131.0', app: false, seen_at: new Date(Date.now() - 600000).toISOString(), current: false },
+            { id: 2, user_agent: 'agendouille-android', app: true, seen_at: new Date().toISOString(), current: true },
+          ] },
           'GET /api/approvals/PKW-6VY': { user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36', ip: '192.168.1.24', numbers: [30, 72, 15], expires_at: new Date(Date.now() + 120000).toISOString() },
         };
         const result = r.call === 'hello' ? { app_bridge: 2, app_version: 'dev', android: 34 }
@@ -72,10 +81,16 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });
   if (name === 'account') {
     // The other tabs: Calendriers (the web app's page), Navigateur, and approving one.
-    for (const [i, shot] of [[1, 'calendars'], [2, 'browser']]) {
+    for (const [i, shot] of [[1, 'calendars'], [3, 'settings'], [2, 'devices']]) {
       await (await page.$$('nav button'))[i].click();
       await new Promise((r) => setTimeout(r, 500));
-      await page.screenshot({ path: `${out}/android-${lang}-${shot}.png`, fullPage: true });
+      await page.screenshot({ path: `${out}/android-${lang}-${shot}.png` });
+      if (shot === 'calendars') {
+        // One calendar's page.
+        await (await page.$$('#app-content button.min-h-16'))[0].click();
+        await new Promise((r) => setTimeout(r, 500));
+        await page.screenshot({ path: `${out}/android-${lang}-calendar.png` });
+      }
     }
     await page.type('input[aria-label]', 'PKW-6VY');
     await (await page.$('form button[type="submit"]')).click();

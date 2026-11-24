@@ -10,6 +10,8 @@ export interface AccountState {
   username: string;
   /** How the phone was signed in: an enrollment link, or by hand. */
   mode: 'enrolled' | 'manual' | 'qr';
+  /** The device's id on the server (0 when signed in with a device's password). */
+  device_id: number;
 }
 
 export interface CalendarState {
@@ -19,6 +21,8 @@ export interface CalendarState {
   color: string;
   sync: boolean;
   read_only: boolean;
+  /** The server's reference ("lea~famille"), as the API names it. */
+  ref: string;
 }
 
 export interface SyncState {
@@ -56,7 +60,8 @@ export function parseState(v: unknown): AppState {
   const str = (x: unknown): string => (typeof x === 'string' ? x : '');
   return {
     account: a !== null && a !== undefined && typeof a['server'] === 'string'
-      ? { server: str(a['server']), host: str(a['host']), username: str(a['username']), mode: a['mode'] === 'manual' ? 'manual' : a['mode'] === 'qr' ? 'qr' : 'enrolled' }
+      ? { server: str(a['server']), host: str(a['host']), username: str(a['username']), mode: a['mode'] === 'manual' ? 'manual' : a['mode'] === 'qr' ? 'qr' : 'enrolled',
+        device_id: typeof a['device_id'] === 'number' ? a['device_id'] : 0 }
       : null,
     permissions: { calendar: p['calendar'] === true, camera: p['camera'] === true },
     sync: {
@@ -72,6 +77,7 @@ export function parseState(v: unknown): AppState {
       color: str(c['color']),
       sync: c['sync'] !== false,
       read_only: c['read_only'] === true,
+      ref: str(c['ref']),
     })),
   };
 }

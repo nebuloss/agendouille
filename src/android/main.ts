@@ -10,9 +10,20 @@ import { DEFAULT_LANG, LANGS } from '@/shared/i18n/i18n.ts';
 // Field errors in our words and design, not the browser's bubbles.
 ownValidation(document);
 
-// The phone's language, when we speak it: the server is not there to say.
-const wanted = (navigator.language || DEFAULT_LANG).slice(0, 2).toLowerCase();
+// The language and theme chosen in Réglages, else the phone's: the server
+// is not there to say.
+const saved = (key: string): string | null => {
+  try {
+    return globalThis.localStorage?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+};
+const cookie = (/(?:^|; )agd_lang=([a-z]{2})/.exec(document.cookie) ?? [])[1];
+const wanted = (saved('agd_lang') ?? cookie ?? navigator.language ?? DEFAULT_LANG).slice(0, 2).toLowerCase();
 document.documentElement.lang = wanted in LANGS ? wanted : 'en';
+const theme = saved('agd_theme');
+if (theme === 'light' || theme === 'dark') document.documentElement.dataset['theme'] = theme;
 
 const root = document.getElementById('app')!;
 void bridge().then(async (b) => {
