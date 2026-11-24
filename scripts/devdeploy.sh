@@ -61,13 +61,14 @@ ssh "$BUILD_HOST" "cd $REMOTE_DIR && set -e
 		# Signed with the release key when the build host has it: the app then
 		# installs over a release's (and a release over it), its version code
 		# deciding. Without it, the debug key.
-		sign=''
+		# (Positional arguments: the build host's shell may be zsh, which does not split a variable.)
+		set --
 		if [ -f \$HOME/android-build/agendouille-release.keystore ]; then
-			sign=\"KEYSTORE=\$HOME/android-build/agendouille-release.keystore KS_PASS=\$(cat \$HOME/android-build/agendouille-release.password) KEY_ALIAS=agendouille\"
+			set -- KEYSTORE=\$HOME/android-build/agendouille-release.keystore KS_PASS=\$(cat \$HOME/android-build/agendouille-release.password) KEY_ALIAS=agendouille
 		fi
-		make -s -C android apk VERSION=$version VERSION_CODE=$code APP_HOST=$APP_HOST \$sign >/dev/null
+		make -s -C android apk VERSION=$version VERSION_CODE=$code APP_HOST=$APP_HOST \"\$@\" >/dev/null
 		cp android/build/agendouille.apk internal/web/assets/apk/agendouille.apk
-		make -s -C android cert \$sign >internal/web/assets/apk/cert.txt
+		make -s -C android cert \"\$@\" >internal/web/assets/apk/cert.txt
 		echo $version >internal/web/assets/apk/version.txt
 		echo '> Android app embedded'
 	else
