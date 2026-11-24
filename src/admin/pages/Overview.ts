@@ -1,4 +1,5 @@
 import { ui } from '@/shared/components/recipes.ts';
+import { icon } from '@/shared/components/icons.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { section, table } from '@/shared/components/Ui.ts';
 import { locale } from '@/shared/i18n/i18n.ts';
@@ -27,6 +28,13 @@ export function tile(n: number | string, label: string, href?: string): HTMLElem
 }
 
 /** "Vue d’ensemble": counts, warnings, devices that stopped syncing. */
+/** The family's address, opening their side in a new tab (http and https only). */
+function publicLink(url: string): HTMLElement {
+  if (!/^https?:\/\//i.test(url)) return h('code', {}, url);
+  return h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', title: t('openPublic'),
+    class: 'inline-flex items-center gap-1 font-mono text-primary underline-offset-4 hover:underline [&_.ic]:size-4' }, url, icon('link'));
+}
+
 export class OverviewPage extends AdminPage {
   protected async render(): Promise<Child[]> {
     const o = await this.api.get<Overview>('/overview');
@@ -40,7 +48,7 @@ export class OverviewPage extends AdminPage {
         tile(o.devices, t('devices', { count: o.devices })),
       ),
       section(t('server'),
-        h('p', {}, t('publicUrl'), ' ', o.public_url !== '' ? h('code', {}, o.public_url) : h('span', { class: 'text-sm text-on-surface-variant' }, t('notConfigured'))),
+        h('p', {}, t('publicUrl'), ' ', o.public_url !== '' ? publicLink(o.public_url) : h('span', { class: 'text-sm text-on-surface-variant' }, t('notConfigured'))),
         h('p', {}, t('storage', { database: bytes(o.storage.database), backups: bytes(o.storage.backups) })),
         h('p', {}, o.last_backup === null ? t('noBackup') : t('lastBackup', { when: when(o.last_backup), ago: ago(o.last_backup) })),
         h('p', { class: 'text-sm text-on-surface-variant' }, t('version', { version: o.version })),

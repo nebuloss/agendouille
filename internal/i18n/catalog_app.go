@@ -61,19 +61,19 @@ func init() {
 			EN: "Or continue in this browser:",
 		},
 		// Titles, in the header and the browser's tab.
-		"app.title.calendar":  {FR: "Calendrier", EN: "Calendar"},
+		"app.title.calendar":  {FR: "Agenda", EN: "Agenda"},
 		"app.title.calendars": {FR: "Calendriers", EN: "Calendars"},
 		"app.title.devices":   {FR: "Appareils", EN: "Devices"},
-		"app.title.me":        {FR: "Moi", EN: "Me"},
+		"app.title.me":        {FR: "Profil", EN: "Profile"},
 		"app.title.signin":    {FR: "Se connecter", EN: "Sign in"},
 		"app.title.welcome":   {FR: "Bienvenue", EN: "Welcome"},
 		"app.title.approve":   {FR: "Approuver une connexion", EN: "Approve a sign-in"},
 
 		// The shell.
-		"app.nav.calendar":  {FR: "Calendrier", EN: "Calendar"},
+		"app.nav.calendar":  {FR: "Agenda", EN: "Agenda"},
 		"app.nav.calendars": {FR: "Calendriers", EN: "Calendars"},
 		"app.nav.devices":   {FR: "Appareils", EN: "Devices"},
-		"app.nav.me":        {FR: "Moi", EN: "Me"},
+		"app.nav.me":        {FR: "Profil", EN: "Profile"},
 		"app.signout":       {FR: "Se déconnecter", EN: "Sign out"},
 		"app.noscript": {
 			FR: "agendouille a besoin de JavaScript pour afficher le calendrier.",

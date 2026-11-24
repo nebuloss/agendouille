@@ -3,7 +3,7 @@ import { messages } from '@/shared/i18n/i18n.ts';
 export const t = messages({
   fr: {
     view: 'Vue',
-    agenda: 'Agenda',
+    agenda: 'Liste',
     week: 'Semaine',
     month: 'Mois',
     newEvent: 'Événement',
@@ -29,7 +29,7 @@ export const t = messages({
   },
   en: {
     view: 'View',
-    agenda: 'Agenda',
+    agenda: 'List',
     week: 'Week',
     month: 'Month',
     newEvent: 'Event',

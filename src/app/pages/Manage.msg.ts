@@ -171,8 +171,6 @@ export const t = messages({
     groupsHint: 'Vous voyez les membres de vos groupes et pouvez partager vos calendriers avec eux.',
     otherPhoneByAdmin: 'Pour connecter un autre téléphone avec l’application agendouille, demandez un QR code de connexion à l’administrateur. Un navigateur, lui, se connecte en scannant le QR code de sa page de connexion depuis l’application.',
     otherPhone: 'Connecter un autre téléphone',
-    signOutHint: 'La déconnexion de ce navigateur n’affecte pas les appareils qui se synchronisent avec leur propre mot de passe (page Appareils).',
-    signOut: 'Se déconnecter',
   },
   en: {
     groupsSection: 'Groups',
@@ -340,7 +338,5 @@ export const t = messages({
     groupsHint: 'You see the members of your groups and can share your calendars with them.',
     otherPhoneByAdmin: 'To sign another phone in with the agendouille app, ask the administrator for a sign-in QR code. A browser signs in by scanning its sign-in page’s QR code from the app.',
     otherPhone: 'Sign in on another phone',
-    signOutHint: 'Signing out of this browser does not affect devices that sync with their own password (Devices page).',
-    signOut: 'Sign out',
   },
 });

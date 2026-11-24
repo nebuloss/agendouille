@@ -47,7 +47,7 @@ await page.click('[aria-haspopup="menu"]');
 await wait(300);
 await page.screenshot({ path: `${out}/menu-over-fab.png`, clip: { x: 640, y: 0, width: 640, height: 260 } });
 await page.keyboard.press('Escape');
-// The language menu, open, and the theme choice on Moi, light and dark.
+// The language menu, open, and the theme choice on Profil (a phone), light and dark.
 for (const scheme of ['light', 'dark']) {
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
   await page.goto(base + '/me', { waitUntil: 'networkidle2' });

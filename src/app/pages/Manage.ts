@@ -444,7 +444,13 @@ export function browserName(ua: string): string {
   return os === '' ? b : `${b}, ${os}`;
 }
 
-/** Moi (PLAN.md 9.3): my name and colour, my groups, enroll another phone. */
+/** Hidden from the sm breakpoint up, where the shell's header shows the same. */
+function phoneOnly(el: HTMLElement): HTMLElement {
+  el.classList.add('sm:hidden');
+  return el;
+}
+
+/** Profil (PLAN.md 9.3): my name and colour, my groups, enroll another phone. */
 export class MePage extends AppPage {
   protected async render(): Promise<Child[]> {
     const me = await this.api.get<Me>('/me');
@@ -452,18 +458,16 @@ export class MePage extends AppPage {
     const color = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(me.color) ? me.color : '#1e88e5' });
     const language = langChoice(this.doc);
     language.classList.add('self-start'); // as wide as its choices, not the field
-    const browserSection = section(t('thisBrowser'),
-      h('p', { class: 'text-sm text-on-surface-variant' }, t('signOutHint')),
-      h('form', { method: 'post', action: '/signout' },
-        h('button', { type: 'submit', class: ui.btn('danger-text') }, icon('logout'), t('signOut'))));
     return [
       section(t('profile'),
         field(t('displayName'), name), field(t('color'), color),
         h('div', { class: 'flex justify-end' }, action(t('save'), () => this.act(() => this.api.patch('/me', { display_name: name.value.trim(), color: color.value }), t('saved')), 'filled'))),
-      section(t('appearance'),
+      // On a wider screen the header holds them: here only on a phone.
+      phoneOnly(section(t('appearance'),
         h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')),
         h('div', {}, themeToggle(this.doc)),
-        field(t('language'), language)),
+        // Not a <label>: a tap on the word would press the first language.
+        h('div', { class: ui.field }, h('span', { class: ui.label }, t('language')), language))),
       section(t('myGroups'),
         me.groups.length === 0 ? h('p', { class: ui.empty }, t('noGroup'))
           : h('div', { class: 'flex flex-wrap gap-2' }, ...me.groups.map((g) => h('span', { class: ui.chip }, icon('group'), g.display_name || g.name))),
@@ -472,7 +476,6 @@ export class MePage extends AppPage {
       // the app approved, cannot mint the app's own access (DECISIONS).
       section(t('otherPhone'),
         h('p', {}, t('otherPhoneByAdmin'))),
-      browserSection,
     ];
   }
 

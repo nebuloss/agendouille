@@ -3,6 +3,19 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the web app's sections: Agenda, Calendriers, Appareils, Profil
+
+The user: "« Calendrier » and « Calendriers » are ambiguous; theme and
+language are duplicated on Moi". Chosen among two layouts (the other put
+the calendar list in a side panel of the agenda, as Google Calendar):
+
+- « Agenda »: the events (the view buttons are now Liste, Semaine, Mois).
+- « Calendriers »: creating, sharing, hiding, transferring them.
+- « Appareils », unchanged.
+- « Profil » (was « Moi »): name, colour, groups, sign out; language and
+  theme only on a phone, where the header has no room for them, so each
+  appears once whatever the screen.
+
 ## 2026-11-24: signing a browser in is scan and confirm, no number
 
 The user: "simplify QR code scanning for the web view; look at what
