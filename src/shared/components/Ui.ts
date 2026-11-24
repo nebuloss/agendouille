@@ -5,6 +5,7 @@ import { flag } from '@/shared/components/flags.ts';
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { icon, type IconName } from '@/shared/components/icons.ts';
 import { ui, type ButtonVariant } from '@/shared/components/recipes.ts';
+import { toneContainer, toneInk, type Tone } from '@/shared/components/tone.ts';
 
 /** Snackbars in #toasts; at most three; each goes after five seconds. */
 export class Toasts {
@@ -166,6 +167,23 @@ export function table(head: string[], rows: Child[][], empty = t('empty')): HTML
 }
 
 /** A round swatch of a colour; the colour goes through CSSOM, never markup. */
+/**
+ * A state in a word, coloured by what it means (claudication's Chip): up to
+ * date, never synced, shared, read only. The colour never stands alone:
+ * the word says it too.
+ */
+export function chip(label: string, tone: Tone = 'neutral', ic?: IconName, doc: Document = document): HTMLElement {
+  return h('span', { class: `inline-flex h-7 max-w-full shrink-0 items-center gap-1.5 rounded-md3-s px-2.5 text-xs font-medium whitespace-nowrap ${toneContainer[tone]} [&_.ic]:size-4` },
+    ic !== undefined ? icon(ic, doc) : null, h('span', { class: 'truncate' }, label));
+}
+
+/** A figure and what it counts (claudication's Stat): the figure in the tone, accent by default. */
+export function stat(value: string | number, label: string, tone: Tone = 'accent'): HTMLElement {
+  return h('div', { class: 'flex min-w-0 flex-col rounded-md3-l bg-surface-lowest px-4 py-3' },
+    h('span', { class: `text-2xl leading-8 font-normal tabular-nums ${toneInk[tone]}` }, String(value)),
+    h('span', { class: 'text-xs leading-tight text-on-surface-variant' }, label));
+}
+
 export function swatch(color: string, size: 'sm' | 'md' = 'sm'): HTMLElement {
   const s = h('span', { class: size === 'sm' ? 'mr-1.5 inline-block size-3.5 shrink-0 rounded-full bg-outline align-[-2px]' : 'inline-block size-6 shrink-0 rounded-full bg-outline', 'aria-hidden': 'true' });
   if (/^#[0-9a-f]{6}$/i.test(color)) s.style.setProperty('background-color', color);

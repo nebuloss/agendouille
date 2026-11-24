@@ -23,7 +23,7 @@ export interface Overview {
 }
 
 export function tile(n: number | string, label: string, href?: string): HTMLElement {
-  const inner: Child[] = [h('span', { class: 'text-[32px] leading-10 font-semibold' }, typeof n === 'number' ? n.toLocaleString(locale()) : n), h('span', { class: 'text-sm text-on-surface-variant' }, label)];
+  const inner: Child[] = [h('span', { class: 'text-[32px] leading-10 font-semibold text-primary' }, typeof n === 'number' ? n.toLocaleString(locale()) : n), h('span', { class: 'text-sm text-on-surface-variant' }, label)];
   return href === undefined ? h('div', { class: 'state-layer flex flex-col gap-1 rounded-md3-xl bg-surface-container p-4 text-on-surface no-underline' }, ...inner) : h('a', { class: 'state-layer flex flex-col gap-1 rounded-md3-xl bg-surface-container p-4 text-on-surface no-underline', href }, ...inner);
 }
 

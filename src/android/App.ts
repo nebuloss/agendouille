@@ -12,7 +12,8 @@
 import { append, h, type Child } from '@/shared/core/Dom.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
-import { Toasts, card, confirmDialog, dialog, field, formDialog, segmented, swatch, themeToggle } from '@/shared/components/Ui.ts';
+import { Toasts, card, chip, confirmDialog, dialog, field, formDialog, segmented, stat, swatch, themeToggle } from '@/shared/components/Ui.ts';
+import { recencyTone } from '@/shared/components/tone.ts';
 import { flag } from '@/shared/components/flags.ts';
 import { LANGS, lang, setLang, type Lang } from '@/shared/i18n/i18n.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
@@ -80,16 +81,12 @@ class PhoneCalendars extends CalendarsPage {
   private list(all: Calendar[], me: string): Child[] {
     const row = (c: Calendar): HTMLElement => {
       const shares = c.shares ?? [];
-      const sub = c.owner === me
-        ? (shares.length > 0 ? t('sharedWith', { count: shares.length }) : t('notShared'))
-        : t('ownedBy', { name: c.owner });
       const b = h('button', { type: 'button', class: ROW },
         swatch(c.color, 'md'),
-        h('span', { class: 'flex min-w-0 flex-1 flex-col' },
-          h('span', { class: 'truncate text-base' }, c.name),
-          h('span', { class: 'truncate text-sm text-on-surface-variant' }, sub)),
-        c.hidden ? h('span', { class: ui.pill.muted }, t('hiddenPill')) : null,
-        icon('right'));
+        h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1' },
+          h('span', { class: 'truncate text-base font-medium' }, c.name),
+          h('span', { class: 'flex flex-wrap items-center gap-1.5' }, ...calendarChips(c, me, shares.length))),
+        h('span', { class: 'text-on-surface-variant' }, icon('right')));
       b.addEventListener('click', () => this.open(c.ref));
       return b;
     };
@@ -114,9 +111,7 @@ class PhoneCalendars extends CalendarsPage {
     const head = h('div', { class: 'flex items-center gap-3' }, swatch(c.color, 'md'),
       h('div', { class: 'flex min-w-0 flex-col' },
         h('h1', { class: 'truncate text-[22px] leading-7 font-normal' }, c.name),
-        h('span', { class: 'truncate text-sm text-on-surface-variant' },
-          owned ? (shares.length > 0 ? t('sharedWith', { count: shares.length }) : t('notShared'))
-            : `${t('ownedBy', { name: c.owner })} · ${c.access === 'read' ? t('readOnly') : t('canWrite')}`)));
+        h('span', { class: 'flex flex-wrap items-center gap-1.5 pt-1' }, ...calendarChips(c, me, shares.length))));
 
     // Sur ce téléphone: whether it syncs here.
     const phone = this.phone()?.calendars.find((x) => x.ref === c.ref);
@@ -148,7 +143,8 @@ class PhoneCalendars extends CalendarsPage {
         h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1.5' }, h('span', { class: 'truncate text-base' }, who), access.el), off);
     });
     const action = (ic: Parameters<typeof icon>[0], label: string, run: () => void, danger = false): HTMLElement => {
-      const b = h('button', { type: 'button', class: `${ROW} ${danger ? 'text-error' : ''}` }, icon(ic), h('span', { class: 'flex-1 text-base' }, label));
+      const b = h('button', { type: 'button', class: `${ROW} ${danger ? 'text-error' : ''}` },
+        h('span', { class: danger ? 'text-error' : 'text-primary' }, icon(ic)), h('span', { class: 'flex-1 text-base' }, label));
       b.addEventListener('click', run);
       return b;
     };
@@ -177,6 +173,16 @@ class PhoneCalendars extends CalendarsPage {
       ]),
     ];
   }
+}
+
+/** A calendar's state in chips: shared or private for mine; whose and what access for another's; hidden. */
+function calendarChips(c: Calendar, me: string, shares: number): HTMLElement[] {
+  const out = c.owner === me
+    ? [shares > 0 ? chip(t('sharedChip', { count: shares }), 'accent', 'share') : chip(t('privateChip'), 'neutral', 'lock')]
+    : [chip(c.access === 'read' ? t('readOnly') : t('canWrite'), c.access === 'read' ? 'neutral' : 'accent', c.access === 'read' ? 'show' : 'edit'),
+      h('span', { class: 'text-xs text-on-surface-variant' }, t('ownedBy', { name: c.owner }))];
+  if (c.hidden) out.push(chip(t('hiddenPill'), 'warn', 'hide'));
+  return out;
 }
 
 /** A row of a grouped list: full width, 56 px at least, Material's list item. */
@@ -209,29 +215,30 @@ class PhoneDevices extends ApiPage {
       })());
       return b;
     };
-    const row = (main: string, sub: string, side: Child): HTMLElement =>
+    const row = (main: string, sub: Child, seenAt: string | null | undefined, side: Child): HTMLElement =>
       h('div', { class: 'flex min-h-16 items-center gap-3 px-4 py-2' },
-        h('span', { class: 'flex min-w-0 flex-1 flex-col' }, h('span', { class: 'truncate font-medium' }, main), h('span', { class: 'text-xs text-on-surface-variant' }, sub)),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1' }, h('span', { class: 'truncate font-medium' }, main),
+          h('span', { class: 'flex flex-wrap items-center gap-1.5' }, sub,
+            chip(seenAt ? t('lastSeen', { ago: ago(seenAt) }) : t('neverSeen'), recencyTone(seenAt), 'clock'))),
         side);
-    const seen = (iso: string | null | undefined): string => (iso ? t('lastSeen', { ago: ago(iso) }) : t('neverSeen'));
     const list = (rows: HTMLElement[], empty: string): HTMLElement => rows.length === 0
       ? h('p', { class: ui.empty }, empty)
       : h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...rows);
-    const devices = d.devices.map((x) => row(x.label, `${kindLabel(x.kind)} · ${seen(x.last_used_at)}`,
-      x.id === own ? h('span', { class: ui.pill.ok }, t('thisPhone'))
+    const devices = d.devices.map((x) => row(x.label, h('span', { class: 'text-xs text-on-surface-variant' }, kindLabel(x.kind)), x.last_used_at,
+      x.id === own ? chip(t('thisPhone'), 'accent', 'phone')
         : off(x.label, t('disconnectDeviceTitle', { name: x.label }), t('disconnectDeviceText'), () => this.api.delete(`/devices/${x.id}`), t('deviceDisconnected'))));
     // The app's own sessions are its devices, listed above.
     const browsers = s.sessions.filter((x) => !x.app).map((x) => {
       const name = browserName(x.user_agent);
-      return row(name, seen(x.seen_at),
+      return row(name, null, x.seen_at,
         off(name, t('disconnectBrowserTitle', { name }), t('disconnectBrowserText'), () => this.api.delete(`/sessions/${x.id}`), t('browserDisconnected')));
     });
     return [
       heading(t('tabDevices')),
       this.connect,
-      h('h2', { class: 'px-1 pt-2 text-sm font-semibold text-on-surface-variant' }, t('syncedDevices')),
+      h('h2', { class: 'px-4 pt-3 text-sm font-medium text-primary' }, t('syncedDevices')),
       list(devices, t('noDevices')),
-      h('h2', { class: 'px-1 pt-2 text-sm font-semibold text-on-surface-variant' }, t('signedInBrowsers')),
+      h('h2', { class: 'px-4 pt-3 text-sm font-medium text-primary' }, t('signedInBrowsers')),
       list(browsers, t('noBrowsers')),
     ];
   }
@@ -580,15 +587,18 @@ export class App {
 
   private syncCard(s: AppState): HTMLElement {
     const st = s.sync;
-    const line = st.state === 'syncing' ? t('syncing')
-      : st.state === 'error' ? t('syncError', { error: st.error ?? '' })
-        : st.last_sync !== null ? t('lastSync', { ago: ago(st.last_sync) }) : t('neverSynced');
+    const state = st.state === 'syncing' ? chip(t('syncing'), 'accent', 'repeat')
+      : st.state === 'error' ? chip(t('syncFailed'), 'error', 'warn')
+        : st.last_sync !== null ? chip(t('upToDate'), 'ok', 'check') : chip(t('neverSeen'), 'warn', 'clock');
     const now = h('button', { type: 'button', class: ui.btn('tonal', 'sm'), disabled: st.state === 'syncing' || !s.permissions.calendar }, icon('repeat'), t('syncNow'));
     now.addEventListener('click', () => void this.act('sync.now'));
     return card(t('sync'), [now],
-      h('p', { class: st.state === 'error' ? 'text-sm font-semibold text-error' : 'text-sm text-on-surface-variant', role: 'status' }, line),
-      s.calendars.length > 0 ? h('p', { class: 'text-sm text-on-surface-variant' }, t('eventsOnPhone', { count: st.events })) : null,
-      s.calendars.length > 0 ? h('p', { class: 'text-sm text-on-surface-variant' }, t('calendarsOnPhone', { count: s.calendars.filter((c) => c.sync).length })) : null);
+      h('div', { class: 'flex flex-wrap items-center gap-2', role: 'status' }, state,
+        st.last_sync !== null ? h('span', { class: 'text-sm text-on-surface-variant' }, ago(st.last_sync)) : null),
+      st.state === 'error' && st.error ? h('p', { class: 'text-sm text-error' }, st.error) : null,
+      s.calendars.length > 0
+        ? h('div', { class: 'grid grid-cols-2 gap-2' }, stat(st.events, t('eventsStat')), stat(s.calendars.filter((c) => c.sync).length, t('calendarsStat')))
+        : null);
   }
 
   private accountCard(s: AppState): HTMLElement {
@@ -602,7 +612,8 @@ export class App {
       h('dl', { class: ui.kv },
         h('dt', {}, t('server')), h('dd', {}, h('code', {}, a.server)),
         h('dt', {}, t('username')), h('dd', {}, h('code', {}, a.username)),
-        h('dt', {}, t('signedInBy')), h('dd', {}, a.mode === 'manual' ? t('byHand') : a.mode === 'qr' ? t('byDavx5') : t('byLink'))),
+        h('dt', {}, t('signedInBy')), h('dd', {}, a.mode === 'enrolled' ? chip(t('byLink'), 'ok', 'check')
+          : chip(`${a.mode === 'manual' ? t('byHand') : t('byDavx5')} · ${t('syncOnly')}`, 'warn', 'lock'))),
       h('div', {}, remove));
   }
 }

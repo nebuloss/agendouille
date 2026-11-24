@@ -4,10 +4,11 @@ import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
 import {
-  action, card, check, confirmDialog, dialog, field, langChoice, secretField, section, segmented, styleControl, swatch, table, themeToggle,
+  action, card, check, chip, confirmDialog, dialog, field, langChoice, secretField, section, segmented, styleControl, swatch, table, themeToggle,
 } from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
 import { pick, type PickItem } from '@/shared/components/Picker.ts';
+import { recencyTone } from '@/shared/components/tone.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
 import { t } from '@/app/pages/Manage.msg.ts';
 
@@ -83,9 +84,10 @@ export class CalendarsPage extends AppPage {
     });
     return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
       h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
-        h('div', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate text-base' }, c.name),
-          h('span', { class: 'text-xs text-on-surface-variant' }, t('sharedCount', { count: shares.length }))),
-        c.hidden ? h('span', { class: ui.pill.muted }, t('hidden')) : null),
+        h('div', { class: 'flex min-w-0 flex-1 flex-col gap-1' }, h('strong', { class: 'truncate text-base' }, c.name),
+          h('span', { class: 'flex flex-wrap items-center gap-1.5' },
+            chip(t('sharedCount', { count: shares.length }), shares.length > 0 ? 'accent' : 'neutral', shares.length > 0 ? 'share' : 'lock', this.doc),
+            c.hidden ? chip(t('hidden'), 'warn', 'hide', this.doc) : null))),
       c.description !== '' ? h('p', { class: 'text-sm text-on-surface-variant' }, c.description) : null,
       shares.length > 0
         ? h('div', { class: 'flex flex-col gap-1' }, h('span', { class: 'text-xs font-semibold text-on-surface-variant' }, t('sharedWith')),
@@ -107,7 +109,7 @@ export class CalendarsPage extends AppPage {
       h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
         h('div', { class: 'flex min-w-0 flex-1 flex-col' }, h('strong', { class: 'truncate text-base' }, c.name),
           h('span', { class: 'text-xs text-on-surface-variant' }, t('ownerIs', { name: c.owner }))),
-        h('span', { class: c.access === 'read' ? ui.pill.muted : ui.pill.ok }, accessLabel(c.access))),
+        chip(accessLabel(c.access), c.access === 'read' ? 'neutral' : 'accent', c.access === 'read' ? 'show' : 'edit', this.doc)),
       h('div', { class: 'flex flex-wrap items-center gap-1' },
         c.hidden
           ? action(t('showAgain'), () => this.act(() => this.api.patch(path, { hidden: false }), t('shownAgain')), 'tonal', 'show', 'sm')
@@ -316,8 +318,8 @@ export class DevicesPage extends AppPage {
           h('span', { class: 'flex flex-col' }, h('strong', {}, d.label), h('span', { class: 'text-xs text-on-surface-variant' },
             mode === 'password' ? kindLabel(d.kind)
               : d.has_certificate ? t('kindWithCertificate', { kind: kindLabel(d.kind) }) : t('kindWithoutCertificate', { kind: kindLabel(d.kind) }))),
-          d.cap === 'read' ? t('accessRead') : t('accessReadwrite'),
-          ago(d.last_used_at),
+          chip(d.cap === 'read' ? t('accessRead') : t('accessReadwrite'), d.cap === 'read' ? 'neutral' : 'accent', undefined, this.doc),
+          chip(ago(d.last_used_at), recencyTone(d.last_used_at), 'clock', this.doc),
           h('span', { class: 'flex flex-wrap justify-end gap-1' },
             mode !== 'password' ? action(t('certificate'), () => this.newCertificate(d), d.has_certificate ? 'text' : 'tonal', 'lock', 'sm') : null,
             action(t('removeDevice'), () => this.confirmed(t('removeDeviceTitle', { name: d.label }), t('removeDeviceText'), t('removeDeviceButton'),
@@ -334,8 +336,8 @@ export class DevicesPage extends AppPage {
         table([t('browser'), t('lastSeen'), ''], sessions.sessions.map((s) => {
           const label = s.app ? t('kindApp') : browserName(s.user_agent);
           return [
-            h('span', {}, label, s.current ? h('span', { class: `${ui.pill.ok} ml-2` }, t('thisBrowser')) : null),
-            ago(s.seen_at),
+            h('span', { class: 'inline-flex flex-wrap items-center gap-2' }, label, s.current ? chip(t('thisBrowser'), 'accent', 'laptop', this.doc) : null),
+            chip(ago(s.seen_at), recencyTone(s.seen_at), 'clock', this.doc),
             s.current ? null : action(t('signOutBrowser'), () => this.confirmed(t('signOutBrowserTitle', { name: label }), t('signOutBrowserText'),
               t('signOutBrowserButton'), () => this.api.delete(`/sessions/${s.id}`), t('browserSignedOut')), 'danger-text', 'logout', 'sm'),
           ];
@@ -470,7 +472,7 @@ export class MePage extends AppPage {
         h('div', { class: ui.field }, h('span', { class: ui.label }, t('language')), language))),
       section(t('myGroups'),
         me.groups.length === 0 ? h('p', { class: ui.empty }, t('noGroup'))
-          : h('div', { class: 'flex flex-wrap gap-2' }, ...me.groups.map((g) => h('span', { class: ui.chip }, icon('group'), g.display_name || g.name))),
+          : h('div', { class: 'flex flex-wrap gap-2' }, ...me.groups.map((g) => chip(g.display_name || g.name, 'accent', 'group', this.doc))),
         h('p', { class: 'text-sm text-on-surface-variant' }, t('groupsHint'))),
       // The app's sign-in codes come from the admin only: a browser, which
       // the app approved, cannot mint the app's own access (DECISIONS).

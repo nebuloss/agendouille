@@ -3,6 +3,32 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: colour that means something, as claudication
+
+The user: "more colour and contrast in the app and the website (look at
+claudication): all the text is the same colour". claudication's colour
+comes from meaning: tones (`src/shared/components/tone.ts`, after its
+`styles/tone.ts`) painted on chips and figures, the same everywhere.
+
+- `chip(label, tone, icon)` and `stat(value, label, tone)` in Ui.ts; tones
+  ok (green), warn (amber), error (red), accent (the primary), neutral.
+- `recencyTone`: seen in the last two days ok, a fortnight neutral, longer
+  or never warn.
+- Android: Synchro's state (« À jour », « Échec », « Jamais synchronisé »)
+  and its figures; how the phone signed in; a calendar's « Partagé · n » /
+  « Privé », « Lecture seule » / « Lecture et écriture », « Masqué »; last
+  seen of devices and browsers; accent icons and headings.
+- Web app: the same chips on Calendriers, Appareils (access, last sync)
+  and Profil (groups). Admin: the home page's counts in the accent.
+
+The colour never stands alone: each chip says its state in words too.
+
+## 2026-11-24: the admin's rail starts level with the page
+
+Its sticky top was 7.5rem against a 6.75rem header, so it sat 12 px below
+the page from the start. The comment in the shell says how the height is
+made.
+
 ## 2026-11-24: the sign-in page offers the app on Android only
 
 The user: "detect the browser platform to show the download app button on
