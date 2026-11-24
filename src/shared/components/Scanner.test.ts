@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { approvalTarget } from '@/shared/components/Scanner.ts';
 
@@ -14,5 +15,14 @@ describe('approvalTarget', () => {
     expect(approvalTarget('https://agenda.example.org/approve#c=a<b>', origin)).toBeNull();
     expect(approvalTarget('javascript:alert(1)', origin)).toBeNull();
     expect(approvalTarget('not a url', origin)).toBeNull();
+  });
+});
+
+describe('the scanner', () => {
+  // In Android's WebView, BarcodeDetector binds Google Play services and
+  // kills the app (a Xiaomi, Android 17): the scanner decodes with jsQR only.
+  it('never touches BarcodeDetector', () => {
+    const code = readFileSync('src/shared/components/Scanner.ts', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(code).not.toContain('BarcodeDetector');
   });
 });

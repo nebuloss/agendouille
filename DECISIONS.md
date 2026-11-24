@@ -64,8 +64,9 @@ the phone's calendars.
   `calendar.toggle`, `account.remove`, `open`) and gets the new state, or
   an error with a sentence for a person; the app pushes `state` events.
 - **Signing in**: the QR code of an enrollment link, scanned in the page
-  (the camera through `getUserMedia`, `jsqr` when the WebView has no
-  `BarcodeDetector`), or an App Link / `agendouille://` link, or by hand:
+  (the camera through `getUserMedia`, decoded with `jsqr` only: in the
+  WebView, `BarcodeDetector` binds Google Play services and kills the app,
+  as a crash report from a Xiaomi with Android 17 showed), or an App Link / `agendouille://` link, or by hand:
   the server, the user and a device's password (one the person made on
   the Appareils page, or the admin), checked with a CalDAV `PROPFIND`.
 - **CalDAV in Java** goes through `RawHttp`, a small HTTP/1.1 client on

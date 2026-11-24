@@ -1,17 +1,14 @@
 /**
  * A QR code scanner in a dialog (PLAN.md 7.4: the scanner is in the page,
- * the app only grants the camera). The browser's BarcodeDetector when it
- * has one (Chromium with Google Play services); jsQR otherwise, loaded only
- * then, so a phone without Google's services scans too.
+ * the app only grants the camera), decoding with jsQR, loaded only when a
+ * scan starts. Never the browser's BarcodeDetector: in Android's WebView it
+ * binds Google Play services, which kills an app not built against them
+ * (GooglePlayServicesMissingManifestValueException, on a Xiaomi with
+ * Android 17), and agendouille has no Google Play services, on purpose.
  */
 import { h } from '@/shared/core/Dom.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { t } from '@/shared/components/Scanner.msg.ts';
-
-interface Detector {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
-}
-type DetectorCtor = new (o: { formats: string[] }) => Detector;
 
 /** The approval code a sign-in QR carries: https://<our host>/approve#c=<code>. */
 export function approvalTarget(text: string, origin: string): string | null {
@@ -63,26 +60,14 @@ export function scanQR(doc: Document): Promise<string | null> {
       video.srcObject = stream;
       await video.play();
       status.textContent = t('aim');
-      const Native = (doc.defaultView as unknown as { BarcodeDetector?: DetectorCtor }).BarcodeDetector;
-      let native: Detector | null = null;
-      if (Native !== undefined) {
-        try {
-          native = new Native({ formats: ['qr_code'] });
-        } catch {
-          native = null;
-        }
-      }
-      const jsQR = native === null ? (await import('jsqr')).default : null;
+      const jsQR = (await import('jsqr')).default;
       const canvas = doc.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const frame = async (): Promise<void> => {
         if (stopped) return;
         let text: string | null = null;
         if (video.videoWidth > 0) {
-          if (native !== null) {
-            const found = await native.detect(video).catch(() => []);
-            text = found[0]?.rawValue ?? null;
-          } else if (jsQR !== null && ctx !== null) {
+          if (ctx !== null) {
             // A smaller copy of the frame: faster, and enough for a QR code.
             const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
             canvas.width = Math.round(video.videoWidth * scale);
