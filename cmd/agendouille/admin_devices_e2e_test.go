@@ -19,7 +19,12 @@ func TestAdminDevicesAndCertificates(t *testing.T) {
 	x.svc.dir.AddUser(context.Background(), "cli", "lea", "Léa", "", nil)
 	A := signInAdmin(t, x)
 
+	// The stamp an open admin page polls changes with what it shows.
+	before := A.json("GET", "/stamp", nil, 200)["stamp"]
 	d := A.json("POST", "/users/lea/devices", map[string]any{"kind": "thunderbird", "label": "Portable de Léa"}, 201)
+	if after := A.json("GET", "/stamp", nil, 200)["stamp"]; after == before || after == "" {
+		t.Errorf("the stamp did not change with a new device: %v %v", before, after)
+	}
 	if d["username"] != "lea" || d["secret"] == "" || !strings.HasSuffix(d["server"].(string), "/dav/") || d["certificate_url"] != nil {
 		t.Fatalf("a device added by the admin: %v", d)
 	}
