@@ -328,3 +328,44 @@ func (s *Service) Audit(ctx context.Context, actor, kind, action, detail string)
 
 // RandomToken is a random string for a one-time link.
 func RandomToken() string { return newToken(24) }
+
+// CertState says what became of a request's client certificate, for the
+// log of a refused CalDAV sign-in: never the certificate, only its fate.
+func (s *Service) CertState(r *http.Request, fromProxy bool) string {
+	raw := r.Header.Get(ClientCertHeader)
+	switch {
+	case raw == "" && !fromProxy:
+		return "none (not through the proxy)"
+	case raw == "":
+		return "none (the client sent no certificate)"
+	case !fromProxy:
+		return "ignored (the header came from an untrusted peer)"
+	case s.ca == nil:
+		return "ignored (no certificate authority)"
+	}
+	text, err := url.QueryUnescape(raw)
+	if err != nil {
+		return "unreadable (bad escaping)"
+	}
+	b, _ := pem.Decode([]byte(text))
+	if b == nil {
+		return "unreadable (not PEM)"
+	}
+	cert, err := x509.ParseCertificate(b.Bytes)
+	if err != nil {
+		return "unreadable (" + err.Error() + ")"
+	}
+	if _, err := cert.Verify(x509.VerifyOptions{Roots: s.ca.pool, CurrentTime: s.now(), KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
+		return "not ours (" + err.Error() + "), subject " + cert.Subject.CommonName
+	}
+	fp := Fingerprint(cert)
+	var id int64
+	var revoked sql.NullString
+	if err := s.db.QueryRowContext(r.Context(), `SELECT id, revoked_at FROM devices WHERE cert_fingerprint = ?`, fp).Scan(&id, &revoked); err != nil {
+		return "valid but held by no device (replaced by a newer one?), subject " + cert.Subject.CommonName
+	}
+	if revoked.Valid {
+		return fmt.Sprintf("valid, of device %d, which is revoked", id)
+	}
+	return fmt.Sprintf("valid, of device %d", id)
+}
