@@ -8,7 +8,7 @@
 import { h, type Child } from '@/shared/core/Dom.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
-import { t } from '@/admin/Picker.msg.ts';
+import { t } from '@/shared/components/Picker.msg.ts';
 
 export interface PickItem {
   readonly value: string;
@@ -30,6 +30,8 @@ export interface PickOptions {
   readonly empty?: string;
   /** Chosen when it opens. */
   readonly selected?: readonly string[];
+  /** For several choices: confirming none is a choice too (taking everyone off). */
+  readonly allowNone?: boolean;
 }
 
 /** Folds case and accents, so "lea" finds "Léa". */
@@ -106,7 +108,7 @@ export function pick(doc: Document, o: PickOptions): Promise<string[] | null> {
   };
   const update = (): void => {
     count.textContent = o.multiple ? t('selected', { count: chosen.size }) : '';
-    ok.disabled = o.multiple === true && chosen.size === 0;
+    ok.disabled = o.multiple === true && chosen.size === 0 && o.allowNone !== true;
   };
 
   search.addEventListener('input', render);

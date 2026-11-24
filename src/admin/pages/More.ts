@@ -8,7 +8,7 @@ import { action, card, confirmDialog, field, formDialog, section, swatch, table 
 import { bytes, when } from '@/shared/render/format.ts';
 import { AdminPage } from '@/admin/pages/base.ts';
 import { t } from '@/admin/pages/More.msg.ts';
-import { pick } from '@/admin/Picker.ts';
+import { pick } from '@/shared/components/Picker.ts';
 
 type Key = Parameters<typeof t>[0];
 

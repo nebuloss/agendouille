@@ -77,6 +77,12 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
         await (await page.$$('#app-content button.min-h-16'))[0].click();
         await new Promise((r) => setTimeout(r, 500));
         await page.screenshot({ path: `${out}/android-${lang}-calendar.png` });
+        // Sharing it: the groups and the people, in one picker.
+        await (await page.$('xpath/.//button[contains(., "Partager")]')).click();
+        await new Promise((r) => setTimeout(r, 400));
+        await page.screenshot({ path: `${out}/android-${lang}-share.png` });
+        await page.keyboard.press('Escape');
+        await new Promise((r) => setTimeout(r, 300));
       }
     }
     await page.type('input[aria-label]', 'PKW-6VY');

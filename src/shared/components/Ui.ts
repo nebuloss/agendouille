@@ -272,14 +272,56 @@ export function themeToggle(doc: Document = document, size: 'sm' | 'md' = 'md'):
 }
 
 
-/** The language, as a select; choosing one reloads the page in it. */
+export interface Segment<T extends string> {
+  readonly value: T;
+  readonly label: string;
+  /** Before the label: an icon, a flag. */
+  readonly lead?: Node;
+  readonly lang?: string;
+}
+
+/** A segmented control: its element, and the value chosen. */
+export interface Segmented<T extends string> {
+  readonly el: HTMLElement;
+  value: T;
+}
+
+/**
+ * A few choices side by side, one of them on (Material's segmented
+ * buttons), in place of a <select>: the WebView of Android draws a select
+ * in the system's old style, and two or three choices read better shown.
+ */
+export function segmented<T extends string>(doc: Document, label: string, options: readonly Segment<T>[], value: T,
+  onChange?: (v: T) => void): Segmented<T> {
+  const el = h('div', { role: 'radiogroup', 'aria-label': label, class: 'inline-flex max-w-full shrink-0 overflow-hidden rounded-md3-full border border-outline' });
+  const state = { value };
+  const draw = (): void => {
+    el.replaceChildren(...options.map((o, i) => {
+      const on = state.value === o.value;
+      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), ...(o.lang !== undefined ? { lang: o.lang } : {}),
+        class: `state-layer inline-flex h-10 min-w-0 items-center justify-center gap-1.5 px-4 text-sm font-medium whitespace-nowrap ${i > 0 ? 'border-l border-outline' : ''} ${on ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface'} [&_.ic]:size-4` },
+      on ? icon('check', doc) : (o.lead?.cloneNode(true) ?? null), o.label);
+      b.addEventListener('click', () => {
+        if (state.value === o.value) return;
+        state.value = o.value;
+        draw();
+        onChange?.(o.value);
+      });
+      return b;
+    }));
+  };
+  draw();
+  return {
+    el,
+    get value() { return state.value; },
+    set value(v: T) { state.value = v; draw(); },
+  };
+}
+
+/** The language, side by side with their flags; choosing one reloads the page in it. */
 export function langChoice(doc: Document = document): HTMLElement {
-  const current = lang(doc);
-  const select = h('select', { 'aria-label': t('language'), class: ui.input },
-    ...(Object.keys(LANGS) as Lang[]).map((l) => h('option', { value: l, selected: l === current, lang: l }, LANGS[l])));
-  select.addEventListener('change', () => setLang(select.value as Lang, doc));
-  select.classList.add('!w-auto');
-  return select;
+  const options = (Object.keys(LANGS) as Lang[]).map((l) => ({ value: l, label: LANGS[l], lead: flag(l, 16, doc), lang: l }));
+  return segmented(doc, t('language'), options, lang(doc), (l) => setLang(l, doc)).el;
 }
 
 /**

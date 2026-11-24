@@ -10,7 +10,7 @@ import { tileLink } from '@/admin/pages/More.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { barList, dailyChart, type DayCount } from '@/admin/charts.ts';
 import { t } from '@/admin/pages/Calendar.msg.ts';
-import { pick } from '@/admin/Picker.ts';
+import { pick } from '@/shared/components/Picker.ts';
 
 /**
  * One calendar, as the admin sees it (PLAN.md 10: metadata, never an

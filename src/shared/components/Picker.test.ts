@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fold, pick } from '@/admin/Picker.ts';
+import { fold, pick } from '@/shared/components/Picker.ts';
 
 const items = [
   { value: 'lea', label: 'Léa', sub: 'lea' },
@@ -47,5 +47,15 @@ describe('pick', () => {
     const q = pick(document, { title: 'x', items, multiple: true });
     Array.from(document.querySelectorAll<HTMLButtonElement>('dialog button')).find((b) => b.textContent === 'Annuler')!.click();
     expect(await q).toBeNull();
+  });
+
+  it('opens with the current choices ticked, and may confirm none when allowed', async () => {
+    const p = pick(document, { title: 'Partager', items, multiple: true, allowNone: true, selected: ['maman'], confirm: 'Enregistrer' });
+    const confirm = Array.from(document.querySelectorAll<HTMLButtonElement>('dialog button')).find((b) => b.textContent === 'Enregistrer')!;
+    expect(rows()[1]!.getAttribute('aria-selected')).toBe('true');
+    rows()[1]!.click();
+    expect(confirm.disabled).toBe(false);
+    confirm.click();
+    expect(await p).toEqual([]);
   });
 });

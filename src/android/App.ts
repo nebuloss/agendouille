@@ -12,7 +12,9 @@
 import { append, h, type Child } from '@/shared/core/Dom.ts';
 import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
-import { Toasts, card, confirmDialog, dialog, field, formDialog, langChoice, swatch, themeToggle } from '@/shared/components/Ui.ts';
+import { Toasts, card, confirmDialog, dialog, field, formDialog, segmented, swatch, themeToggle } from '@/shared/components/Ui.ts';
+import { flag } from '@/shared/components/flags.ts';
+import { LANGS, lang, setLang, type Lang } from '@/shared/i18n/i18n.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
 import { currentTheme } from '@/shared/core/Theme.ts';
 import type { Calendar, Calendars } from '@/app/api.ts';
@@ -313,8 +315,13 @@ export class App {
   // --- Réglages
 
   private settingsTab(): Child[] {
-    const language = langChoice(this.doc);
-    language.addEventListener('change', () => remember('agd_lang', language instanceof HTMLSelectElement ? language.value : ''));
+    // The language: kept for the next start (main.ts), then the page again in it.
+    const language = segmented(this.doc, t('language'),
+      (Object.keys(LANGS) as Lang[]).map((l) => ({ value: l, label: LANGS[l], lead: flag(l, 16, this.doc), lang: l })), lang(this.doc),
+      (l) => {
+        remember('agd_lang', l);
+        setLang(l, this.doc);
+      }).el;
     const theme = themeToggle(this.doc);
     theme.addEventListener('click', () => remember('agd_theme', currentTheme(this.doc)));
     return [

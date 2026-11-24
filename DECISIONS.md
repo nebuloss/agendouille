@@ -3,6 +3,24 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: sharing in one picker; no native dropdowns in the app
+
+The user: "the dropdown in the app uses the legacy Android style; rework
+the share mechanism: a clean modal to choose between a group and/or
+people".
+
+- The admin's picker moved to `src/shared/components/Picker.ts`: the
+  web app and the Android app share with it. « Partager » opens it with
+  « Groupes » then « Personnes », searchable, several at once; the current
+  shares are ticked, so ticking adds and unticking stops sharing (after a
+  confirmation). The access for the additions is chosen under the list;
+  each share's access is changed in place on the calendar's card.
+- « Donner » chooses the person in the same picker, then confirms.
+- `segmented()` (Ui.ts) replaces a `<select>` of two or three choices
+  (access, language, a device's access): Android's WebView draws a select
+  in the system's old style. The event editor's selects (web app only)
+  stay for now.
+
 ## 2026-11-24: modular scripts, their data in files
 
 The user: "write clean and modular scripts and avoid resources directly in

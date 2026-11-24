@@ -5,9 +5,10 @@ import { icon } from '@/shared/components/icons.ts';
 import { ui } from '@/shared/components/recipes.ts';
 import { ApiPage } from '@/shared/components/ApiPage.ts';
 import {
-  action, card, check, confirmDialog, dialog, field, langChoice, secretField, section, styleControl, swatch, table, themeToggle,
+  action, card, check, confirmDialog, dialog, field, langChoice, secretField, section, segmented, styleControl, swatch, table, themeToggle,
 } from '@/shared/components/Ui.ts';
 import { ago } from '@/shared/render/format.ts';
+import { pick, type PickItem } from '@/shared/components/Picker.ts';
 import { appApi, type Calendar, type Calendars, type Me, type Person, type Share } from '@/app/api.ts';
 import { t } from '@/app/pages/Manage.msg.ts';
 
@@ -105,14 +106,21 @@ export class CalendarsPage extends AppPage {
   protected ownedCard(c: Calendar, people: People): HTMLElement {
     const shares = c.shares ?? [];
     const path = `/calendars/${seg(c.ref)}`;
+    // Each share: who, a button to take it off, and its access, changed in place.
     const shareRows = shares.map((s: Share) => {
       const who = this.nameOf(people, s.target);
-      return [
-        who,
-        accessLabel(s.access),
-        action(t('removeShare'), () => this.confirmed(t('removeShareTitle', { calendar: c.name, name: who }), t('removeShareText', { name: who }),
-          t('removeShareButton'), () => this.api.delete(`${path}/shares/${seg(s.target)}`), t('shareRemoved')), 'text', 'close', 'sm'),
-      ];
+      const access = segmented(this.doc, t('access'), [{ value: 'read', label: t('accessReadShort') }, { value: 'readwrite', label: t('accessReadwriteShort') }],
+        s.access === 'readwrite' ? 'readwrite' : 'read',
+        (v) => void this.act(() => this.api.put(`${path}/shares/${seg(s.target)}`, { access: v }), t('accessChanged', { name: who })));
+      access.el.classList.add('self-start');
+      const off = h('button', { type: 'button', class: 'state-layer grid size-9 shrink-0 place-items-center rounded-full text-on-surface-variant',
+        title: t('removeShare'), 'aria-label': `${t('removeShare')} ${who}` }, icon('close'));
+      off.addEventListener('click', () => void this.confirmed(t('removeShareTitle', { calendar: c.name, name: who }), t('removeShareText', { name: who }),
+        t('removeShareButton'), () => this.api.delete(`${path}/shares/${seg(s.target)}`), t('shareRemoved')));
+      return h('div', { class: 'flex flex-col gap-2 px-3 py-3' },
+        h('div', { class: 'flex items-center gap-3' }, this.mark(s.target.startsWith('g:') ? 'group' : 'person'),
+          h('span', { class: 'min-w-0 flex-1 truncate font-medium' }, who), off),
+        access.el);
     });
     return h('div', { class: 'flex flex-col gap-3 rounded-md3-l bg-surface-lowest p-4' },
       h('div', { class: 'flex flex-wrap items-center gap-3' }, swatch(c.color, 'md'),
@@ -120,7 +128,10 @@ export class CalendarsPage extends AppPage {
           h('span', { class: 'text-xs text-on-surface-variant' }, t('sharedCount', { count: shares.length }))),
         c.hidden ? h('span', { class: ui.pill.muted }, t('hidden')) : null),
       c.description !== '' ? h('p', { class: 'text-sm text-on-surface-variant' }, c.description) : null,
-      shares.length > 0 ? table([t('sharedWith'), t('access'), ''], shareRows) : null,
+      shares.length > 0
+        ? h('div', { class: 'flex flex-col gap-1' }, h('span', { class: 'text-xs font-semibold text-on-surface-variant' }, t('sharedWith')),
+          h('div', { class: 'flex flex-col divide-y divide-outline-variant rounded-md3-l border border-outline-variant' }, ...shareRows))
+        : null,
       h('div', { class: 'flex flex-wrap items-center gap-1' },
         action(t('share'), () => this.share(c, people), 'tonal', 'share', 'sm'),
         action(t('edit'), () => this.editProps(c), 'text', 'edit', 'sm'),
@@ -173,32 +184,63 @@ export class CalendarsPage extends AppPage {
     await this.act(() => this.api.patch(`/calendars/${seg(c.ref)}`, body), t('saved'));
   }
 
-  private async share(c: Calendar, people: People): Promise<void> {
-    const options = [
-      ...people.groups.map((g) => h('option', { value: `g:${g.name}` }, t('groupOption', { name: g.display_name || g.name }))),
-      ...people.users.map((u) => h('option', { value: `u:${u.name}` }, u.display_name || u.name)),
+  /** The people and groups to choose from, groups first. */
+  private shareItems(people: People): PickItem[] {
+    return [
+      ...people.groups.map((g) => ({ value: `g:${g.name}`, label: g.display_name || g.name, sub: t('groupSub'), section: t('groupsSection'), lead: this.mark('group') })),
+      ...people.users.map((u) => ({ value: `u:${u.name}`, label: u.display_name || u.name, sub: u.name, section: t('peopleSection'), lead: this.mark('person') })),
     ];
-    if (options.length === 0) {
+  }
+
+  private mark(name: 'group' | 'person'): HTMLElement {
+    return h('span', { class: 'grid size-9 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container' }, icon(name));
+  }
+
+  /**
+   * Sharing, in one picker: the groups and the people, those it is shared
+   * with already ticked. Ticking adds (with the access chosen under the
+   * list), unticking takes off, after a confirmation.
+   */
+  private async share(c: Calendar, people: People): Promise<void> {
+    const items = this.shareItems(people);
+    if (items.length === 0) {
       this.toasts.show(t('nobodyToShare'), 'error');
       return;
     }
-    const who = h('select', {}, ...options);
-    const access = h('select', {}, h('option', { value: 'read' }, t('accessRead')), h('option', { value: 'readwrite' }, t('accessReadwrite')));
-    const v = await dialog(this.doc, t('shareTitle', { name: c.name }), [field(t('shareWith'), who), field(t('access'), access)],
-      [{ label: t('cancel'), value: '' }, { label: t('shareButton'), value: 'ok', kind: 'filled' }]);
-    if (v !== 'ok') return;
-    await this.act(() => this.api.put(`/calendars/${seg(c.ref)}/shares/${seg(who.value)}`, { access: access.value }), t('shared'));
+    const current = new Map((c.shares ?? []).map((s) => [s.target, s.access]));
+    const access = segmented(this.doc, t('access'), [{ value: 'read', label: t('accessRead') }, { value: 'readwrite', label: t('accessReadwrite') }], 'read');
+    const picked = await pick(this.doc, {
+      title: t('shareTitle', { name: c.name }), items, multiple: true, allowNone: true,
+      selected: [...current.keys()], confirm: t('shareSave'),
+      extra: [h('div', { class: 'flex flex-col gap-2' }, h('span', { class: 'text-xs font-semibold text-on-surface-variant' }, t('accessForAdded')), access.el)],
+    });
+    if (picked === null) return;
+    const added = picked.filter((v) => !current.has(v));
+    const removed = [...current.keys()].filter((v) => !picked.includes(v));
+    if (added.length === 0 && removed.length === 0) return;
+    if (removed.length > 0) {
+      const names = removed.map((v) => this.nameOf(people, v)).join(', ');
+      if (!(await confirmDialog(this.doc, t('unshareTitle'), t('unshareText', { calendar: c.name, names }), t('unshareButton'), true))) return;
+    }
+    const path = `/calendars/${seg(c.ref)}/shares`;
+    await this.act(async () => {
+      for (const v of added) await this.api.put(`${path}/${seg(v)}`, { access: access.value });
+      for (const v of removed) await this.api.delete(`${path}/${seg(v)}`);
+    }, t('sharesSaved'));
   }
 
+  /** Giving it away: one person, chosen in the picker. */
   private async transfer(c: Calendar, people: People): Promise<void> {
     if (people.users.length === 0) return;
-    const who = h('select', {}, ...people.users.map((u) => h('option', { value: u.name }, u.display_name || u.name)));
-    const v = await dialog(this.doc, t('giveTitle', { name: c.name }), [
-      h('p', {}, t('giveText')),
-      field(t('giveTo'), who),
-    ], [{ label: t('cancel'), value: '' }, { label: t('giveButton'), value: 'ok', kind: 'filled' }]);
-    if (v !== 'ok') return;
-    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: who.value }), t('given'));
+    const picked = await pick(this.doc, {
+      title: t('giveTitle', { name: c.name }),
+      items: people.users.map((u) => ({ value: u.name, label: u.display_name || u.name, sub: u.name, lead: this.mark('person') })),
+      extra: [h('p', { class: 'text-sm text-on-surface-variant' }, t('giveText'))],
+    });
+    if (picked === null || picked.length === 0) return;
+    const to = people.users.find((u) => u.name === picked[0]);
+    if (!(await confirmDialog(this.doc, t('giveTitle', { name: c.name }), t('giveConfirm', { calendar: c.name, name: to?.display_name || picked[0]! }), t('giveButton'), false))) return;
+    await this.act(() => this.api.post(`/calendars/${seg(c.ref)}/transfer`, { to: picked[0] }), t('given'));
   }
 
   private async importInto(c: Calendar): Promise<void> {
@@ -380,8 +422,9 @@ export class DevicesPage extends AppPage {
 
   private async add(kind: string, mode: DavAuth = 'password'): Promise<void> {
     const label = h('input', { required: true, value: kind === 'ios' ? 'iPhone' : kind === 'davx5' ? t('defaultPhone') : t('defaultComputer') });
-    const cap = h('select', {}, h('option', { value: 'readwrite' }, t('accessReadwrite')), h('option', { value: 'read' }, t('accessRead')));
-    const v = await dialog(this.doc, t('addDeviceTitle', { kind: kindLabel(kind) }), [field(t('name'), label), field(t('access'), cap)],
+    const cap = segmented(this.doc, t('access'), [{ value: 'readwrite', label: t('accessReadwriteShort') }, { value: 'read', label: t('accessReadShort') }], 'readwrite');
+    const v = await dialog(this.doc, t('addDeviceTitle', { kind: kindLabel(kind) }), [field(t('name'), label),
+      h('div', { class: 'flex flex-col gap-1.5' }, h('span', { class: 'text-xs font-semibold text-on-surface-variant' }, t('access')), cap.el)],
       [{ label: t('cancel'), value: '' }, { label: t('addDeviceButton'), value: 'ok', kind: 'filled' }]);
     if (v !== 'ok') return;
     let d: NewDevice;

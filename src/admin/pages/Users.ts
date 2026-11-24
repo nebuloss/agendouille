@@ -9,7 +9,7 @@ import { AdminPage } from '@/admin/pages/base.ts';
 import { accessLabel, tileLink } from '@/admin/pages/More.ts';
 import { ActivityLog } from '@/admin/ActivityLog.ts';
 import { t } from '@/admin/pages/Users.msg.ts';
-import { pick } from '@/admin/Picker.ts';
+import { pick } from '@/shared/components/Picker.ts';
 
 export interface User {
   name: string;
