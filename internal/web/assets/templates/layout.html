@@ -10,7 +10,8 @@
 <meta name="darkreader-lock">
 <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141312" media="(prefers-color-scheme: dark)">
-<title>{{.Title}} · agendouille</title>
+<!-- The tab's title: the page, short; the favicon says it is agendouille. -->
+<title>{{if .Title}}{{.Title}}{{else}}agendouille{{end}}</title>
 <link rel="icon" type="image/svg+xml" href="/static/shared/icon.svg">
 <link rel="apple-touch-icon" href="/static/shared/icon.svg">
 {{with .Stylesheet}}<link rel="stylesheet" href="{{.}}">{{end}}

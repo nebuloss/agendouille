@@ -201,7 +201,7 @@ export class GroupPage extends AdminPage {
 /** A count that opens its page. */
 export function tileLink(n: string, label: string, href: string): HTMLElement {
   return h('a', { href, class: 'state-layer flex flex-col gap-1 rounded-md3-xl bg-surface-container p-4 text-on-surface no-underline' },
-    h('span', { class: 'text-[32px] leading-10 font-semibold' }, n), h('span', { class: 'text-sm text-on-surface-variant' }, label));
+    h('span', { class: 'text-[32px] leading-10 font-semibold text-primary' }, n), h('span', { class: 'text-sm text-on-surface-variant' }, label));
 }
 
 const ACCESS: Record<string, Key> = { read: 'accessRead', readwrite: 'accessReadwrite', owner: 'accessOwner' };

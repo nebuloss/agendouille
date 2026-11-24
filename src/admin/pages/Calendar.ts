@@ -75,7 +75,7 @@ export class CalendarPage extends AdminPage {
   protected async render(): Promise<Child[]> {
     const st = await this.api.get<CalendarStats>(`/calendars/${seg(this.ref)}/stats`);
     for (const el of this.doc.querySelectorAll<HTMLElement>('[data-item-name] span')) el.textContent = st.name;
-    this.doc.title = `${st.name} · agendouille`;
+    this.doc.title = st.name;
     switch (this.sub) {
       case 'shares':
         return [await this.members(st)];
@@ -243,7 +243,7 @@ export class CalendarPage extends AdminPage {
 /** A stat tile with a line under it. */
 function tile(n: string, label: string, sub: string): HTMLElement {
   return h('div', { class: 'flex flex-col gap-1 rounded-md3-xl bg-surface-container p-4' },
-    h('span', { class: n.length > 8 ? 'text-xl leading-9 font-semibold' : 'text-[28px] leading-9 font-semibold' }, n), h('span', { class: 'text-sm' }, label),
+    h('span', { class: n.length > 8 ? 'text-xl leading-9 font-semibold text-primary' : 'text-[28px] leading-9 font-semibold text-primary' }, n), h('span', { class: 'text-sm' }, label),
     sub !== '' ? h('span', { class: 'text-xs text-on-surface-variant' }, sub) : null);
 }
 

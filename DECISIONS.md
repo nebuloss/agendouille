@@ -23,11 +23,19 @@ comes from meaning: tones (`src/shared/components/tone.ts`, after its
 
 The colour never stands alone: each chip says its state in words too.
 
-## 2026-11-24: the admin's rail starts level with the page
+## 2026-11-24: the admin's layout lines up; short tab titles
 
-Its sticky top was 7.5rem against a 6.75rem header, so it sat 12 px below
-the page from the start. The comment in the shell says how the height is
-made.
+- The rail starts level with the page (its sticky top is the header's
+  height, 6.75rem) and on the same line as the path bar at every width:
+  the grid is built as the header, the padding outside and the 110rem
+  column inside (they differed on phones by 4 px and past 1792 px by
+  16 px). `scripts/shots/shoot.mjs` measures it at 390, 800, 1280, 1920
+  and 2560 px and fails otherwise.
+- Cards side by side are as tall as each other (`ui.cards` stretches), so
+  a row of two ends on one line.
+- The tab's title is the page, short, the name first (« Léa · Appareils »),
+  without « · agendouille »: the favicon says which site; a tab shows only
+  its first words.
 
 ## 2026-11-24: the sign-in page offers the app on Android only
 

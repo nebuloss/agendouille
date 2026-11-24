@@ -40,8 +40,8 @@ export const ui = {
   cardHead: 'flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2',
   cardTitle: 'mr-auto text-lg leading-7 font-normal text-on-surface',
   cardAside: 'flex flex-wrap items-center gap-2',
-  /** Cards side by side, as many as the width takes. */
-  cards: 'grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(26rem,100%),1fr))]',
+  /** Cards side by side, as many as the width takes, a row's cards as tall as each other. */
+  cards: 'grid items-stretch gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(26rem,100%),1fr))]',
   /** The ground inside a card where rows sit. */
   well: 'overflow-hidden rounded-md3-m bg-surface-lowest',
 

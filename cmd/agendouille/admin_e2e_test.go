@@ -178,7 +178,7 @@ func TestM3AdminUI(t *testing.T) {
 	}
 	if a := x.do("GET", x.admin+"/users/lea/devices", nil, english); !strings.Contains(a.body, `>Devices</span></a>`) ||
 		!strings.Contains(a.body, `<span>Users</span>`) || !strings.Contains(a.body, `aria-label="Overview"`) ||
-		!strings.Contains(a.body, "Sign out") || !strings.Contains(a.body, "Devices · lea") {
+		!strings.Contains(a.body, "Sign out") || !strings.Contains(a.body, "<title>lea · Devices</title>") {
 		t.Errorf("a user's page in English: %s", a.body)
 	}
 	// The activity log's CSV: the table's filter, a header, the rows.

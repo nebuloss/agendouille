@@ -24,6 +24,23 @@ await page.setExtraHTTPHeaders({ 'Accept-Language': process.env.SHOTS_LANG ?? 'f
     const name = path.replaceAll('/', '_').replace(/^_/, '') || 'overview';
     await page.screenshot({ path: `${out}/${label}-${name}.png`, fullPage: label === 'desktop' });
   }
+  // The path bar and the rail start on the same line, and the rail level
+  // with the page, at every width (the header and the grid are built alike).
+  await page.goto(base + '/users', { waitUntil: 'networkidle2' });
+  for (const width of label === 'desktop' ? [800, 1280, 1920, 2560] : [390]) {
+    await page.setViewport({ ...viewport, width });
+    await new Promise((r) => setTimeout(r, 200));
+    const m = await page.evaluate(() => {
+      const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+      const trail = box('nav.trail'), rail = box('nav.rail'), content = box('#admin-content');
+      return trail && rail && content ? { trailLeft: trail.left, railLeft: rail.left, trailRight: trail.right, contentRight: content.right, railTop: rail.top, contentTop: content.top } : null;
+    });
+    if (m === null) errors.push(`${label} ${width}: no trail, rail or content`);
+    else if (Math.abs(m.trailLeft - m.railLeft) > 1 || Math.abs(m.trailRight - m.contentRight) > 1 || Math.abs(m.railTop - m.contentTop) > 1) {
+      errors.push(`${label} ${width}: misaligned ${JSON.stringify(m)}`);
+    }
+  }
+  await page.setViewport(viewport);
   // The notification centre, open.
   await page.goto(base + '/', { waitUntil: 'networkidle2' });
   await page.click('#bell-slot button');

@@ -49,8 +49,8 @@ func init() {
 		},
 		// An item's page title: the page, then the item ("Appareils · Léa").
 		"admin.nav.pageOf": {
-			FR: "{page} · {name}",
-			EN: "{page} · {name}",
+			FR: "{name} · {page}",
+			EN: "{name} · {page}",
 		},
 
 		// The shell (templates/admin/shell.html).
