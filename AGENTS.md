@@ -70,7 +70,8 @@ M0 and M1 are done. What exists:
   Deployed to CT 408 `dmz-agendouille`, public at
   https://agendouille.patapouf.club (DMZ NPM, proxy host 7), admin UI at
   https://agendouille.dmz.patapouf.club (LAN NPM `srv-npm`, host 26):
-  `PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh` upgrades it.
+  `scripts/devdeploy.sh home` upgrades it to a build of the tree,
+  `scripts/deploy.sh home vX.Y.Z` to a release (`scripts/conf/targets/home.conf`).
 
 - **M6, the Android app** (a sync app, DECISIONS): its screens in
   `src/android` (built into `android/assets/web`), and `android/` (plain
@@ -92,7 +93,14 @@ M0 and M1 are done. What exists:
   updates from GitHub's releases (`Updater`, `Checksums`, PackageInstaller).
   The launcher label is « Guémené ».
 - **Releases:** `release.yml` on a `v*` tag (server binaries, the signed
-  APK, `SHA256SUMS`); `scripts/deploy.sh [tag]` installs one on a server.
+  APK, `SHA256SUMS`); `scripts/deploy.sh <target> [tag]` installs one on a server.
+- **Scripts:** the entry points in `scripts/` are thin; `scripts/lib`
+  (shared functions: configuration, version, sync, targets, seeding),
+  `scripts/conf` (the build host, the targets, the rsync excludes),
+  `scripts/build` (what runs on dev-build: checks, the APK, the package),
+  `scripts/fixtures` and `scripts/shots/fixtures` (seeds, iCalendar
+  templates, the fake bridge's data). Data and settings go in files there,
+  not in a script.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.
@@ -181,6 +189,10 @@ install'`, and copy `package-lock.json` back with `scp`.
 - **A restore restarts the server** (`ErrRestart`, exit 75): the service
   must run under `Restart=on-failure` or a supervisor, which `deploy/`
   sets up (systemd, and OpenRC's `supervise-daemon`).
+- **Scripts keep no data:** a setting goes in `scripts/conf` (KEY=value,
+  read by `load_conf`, the environment winning), a seed or a template in
+  `scripts/fixtures`. A deploy target is a file of `scripts/conf/targets`;
+  there is no default target, on purpose.
 - **The rsync in `remote.sh` deletes `scripts/shots/node_modules`** (the
   link to puppeteer): `ln -sfn $HOME/shots/node_modules scripts/shots/node_modules`
   in the same remote command before any `node scripts/shots/*.mjs`.

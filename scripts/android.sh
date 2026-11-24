@@ -6,16 +6,11 @@
 #   scripts/android.sh cert           # the signing key's SHA-256 (assetlinks.json)
 #   APP_HOST=agenda.example.org scripts/android.sh apk   # with App Links
 #
-# The tree is synced by scripts/remote.sh; the APK stays on dev-build
-# (scripts/devdeploy.sh embeds it in the server it builds there).
+# The tree is synced by scripts/remote.sh, and scripts/build/apk.sh builds
+# there; the APK stays on dev-build (scripts/devdeploy.sh embeds it in the
+# server it builds there).
 set -euo pipefail
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$repo_root"
+# shellcheck source=SCRIPTDIR/lib/common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
-target=${1:-apk}
-version="dev-$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo '-dirty')"
-code=$(git rev-list --count HEAD)
-# The screens (src/android) go into the APK: built first.
-prep=""
-[ "$target" = apk ] && prep="npm run build --silent >/dev/null && "
-exec scripts/remote.sh "${prep}rtk make -C android $target VERSION=$version VERSION_CODE=$code APP_HOST=${APP_HOST:-} CLEARTEXT=${CLEARTEXT:-false}"
+exec "$AGD_ROOT/scripts/remote.sh" bash scripts/build/apk.sh "${1:-apk}" "$(agd_version)" "$(agd_version_code)" "'${APP_HOST:-}'" "${CLEARTEXT:-false}"

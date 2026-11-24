@@ -1,0 +1,16 @@
+# The family of the screenshots (scripts/shots/run.sh), as arguments of the
+# agendouille binary, one command a line (lib/common.sh agd_seed). $D is the
+# data directory, where run.sh writes this week's .ics files.
+group add famille --display-name Famille
+group add enfants --display-name Enfants
+user add maman --display-name Maman --group famille
+user add papa --display-name Papa --group famille
+user add lea --display-name Léa --group famille --group enfants
+calendar add maman ecole --name École --color "#e8710a"
+calendar add lea perso --name "Perso de Léa" --color "#7b1fa2"
+calendar share maman~ecole g:famille readwrite
+calendar share maman~ecole g:enfants read
+device add lea --label "Pixel de Léa"
+device add maman --kind ios --label "iPhone de Maman"
+import maman~ecole "$D/ecole.ics"
+import lea~perso "$D/perso.ics"

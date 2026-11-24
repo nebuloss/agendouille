@@ -61,10 +61,14 @@ which wins over the file.
 
 From a checkout, `sudo deploy/install.sh` builds from source instead.
 From the editing machine, `scripts/devdeploy.sh` builds on dev-build and
-installs that build:
+installs that build, on a target of `scripts/conf/targets` (a Proxmox
+container: `PVE` and `CT`; a host: `TARGET`), or one given in the
+environment:
 
 ```sh
-PVE=root@10.0.0.2 CT=408 scripts/devdeploy.sh
+scripts/devdeploy.sh home             # scripts/conf/targets/home.conf
+TARGET=root@host scripts/devdeploy.sh
+scripts/deploy.sh home v0.2.0         # a GitHub release instead
 ```
 
 Run either again to **upgrade**: the configuration, the data and the admin

@@ -1,4 +1,4 @@
-# What scripts/remote.sh never syncs to dev-build. The database holds the
+# What the scripts never sync to dev-build (lib/common.sh agd_sync). The database holds the
 # family's calendars and agendouille.yaml may hold addresses: neither leaves
 # the machine it lives on. node_modules is installed on dev-build itself,
 # and the worktrees are other checkouts. A leading / anchors a pattern to

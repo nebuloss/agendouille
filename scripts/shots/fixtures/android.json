@@ -1,0 +1,169 @@
+{
+  "_comment": "The Android screens' fake bridge (scripts/shots/shoot-android.mjs): the app's state when signed in, and the family API's answers. A time is {\"minutes_ago\": N} or {\"in_minutes\": N}.",
+  "hello": {
+    "app_bridge": 2,
+    "app_version": "dev",
+    "android": 34
+  },
+  "account": {
+    "server": "https://agendouille.patapouf.club",
+    "host": "agendouille.patapouf.club",
+    "username": "lea",
+    "mode": "enrolled",
+    "device_id": 5
+  },
+  "sync": {
+    "state": "idle",
+    "last_sync": {
+      "minutes_ago": 4
+    },
+    "error": null,
+    "events": 42
+  },
+  "calendars": [
+    {
+      "id": 1,
+      "name": "Famille",
+      "color": "#3b6ea5",
+      "sync": true,
+      "read_only": false,
+      "ref": "lea~famille"
+    },
+    {
+      "id": 2,
+      "name": "École",
+      "color": "#e8710a",
+      "sync": true,
+      "read_only": true,
+      "ref": "maman~ecole"
+    },
+    {
+      "id": 3,
+      "name": "Perso de Léa",
+      "color": "#7b1fa2",
+      "sync": false,
+      "read_only": false,
+      "ref": "lea~perso"
+    }
+  ],
+  "crash": "agendouille dev on Google Pixel 8, Android 15 (35)\nthe page's renderer stopped: it crashed, priority 2",
+  "api": {
+    "GET /api/calendars": {
+      "calendars": [
+        {
+          "ref": "lea~famille",
+          "name": "Famille",
+          "color": "#3b6ea5",
+          "owner": "lea",
+          "access": "owner",
+          "hidden": false,
+          "description": "Les rendez-vous de toute la maison",
+          "shares": [
+            {
+              "target": "g:famille",
+              "access": "readwrite"
+            }
+          ]
+        },
+        {
+          "ref": "lea~perso",
+          "name": "Perso de Léa",
+          "color": "#7b1fa2",
+          "owner": "lea",
+          "access": "owner",
+          "hidden": false,
+          "description": "",
+          "shares": []
+        },
+        {
+          "ref": "maman~ecole",
+          "name": "École",
+          "color": "#e8710a",
+          "owner": "maman",
+          "access": "read",
+          "hidden": false,
+          "description": ""
+        }
+      ]
+    },
+    "GET /api/people": {
+      "users": [
+        {
+          "name": "maman",
+          "display_name": "Maman",
+          "color": "#e53935"
+        }
+      ],
+      "groups": [
+        {
+          "name": "famille",
+          "display_name": "Famille",
+          "color": ""
+        }
+      ]
+    },
+    "GET /api/devices": {
+      "devices": [
+        {
+          "id": 5,
+          "kind": "app",
+          "label": "Xiaomi M2101K6G",
+          "cap": "readwrite",
+          "last_used_at": {
+            "minutes_ago": 1
+          }
+        },
+        {
+          "id": 6,
+          "kind": "davx5",
+          "label": "Tablette",
+          "cap": "readwrite",
+          "last_used_at": {
+            "minutes_ago": 4320
+          }
+        },
+        {
+          "id": 7,
+          "kind": "thunderbird",
+          "label": "Thunderbird du bureau",
+          "cap": "read",
+          "last_used_at": null
+        }
+      ]
+    },
+    "GET /api/sessions": {
+      "sessions": [
+        {
+          "id": 1,
+          "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/131.0",
+          "app": false,
+          "seen_at": {
+            "minutes_ago": 10
+          },
+          "current": false
+        },
+        {
+          "id": 2,
+          "user_agent": "agendouille-android",
+          "app": true,
+          "seen_at": {
+            "minutes_ago": 0
+          },
+          "current": true
+        }
+      ]
+    },
+    "GET /api/approvals/PKW-6VY": {
+      "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+      "ip": "192.168.1.24",
+      "numbers": [
+        30,
+        72,
+        15
+      ],
+      "expires_at": {
+        "in_minutes": 2
+      }
+    }
+  }
+}

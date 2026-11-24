@@ -1,10 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Install a GitHub release of agendouille on a server: the same install.sh
 # as the one-line install, from the release's tag, which downloads that
 # release's binary and checks it against its SHA256SUMS.
 #
-#   PVE=root@10.0.0.2 CT=408 scripts/deploy.sh v0.7.0   # a Proxmox container, via pct
-#   TARGET=root@host scripts/deploy.sh                  # any host, via ssh; the latest release
+#   scripts/deploy.sh home v0.2.0                  # scripts/conf/targets/home.conf
+#   scripts/deploy.sh home                         # the latest release
+#   PVE=root@host CT=408 scripts/deploy.sh '' v0.2.0
+#   TARGET=root@host scripts/deploy.sh
 #
 # A release is what CI built and signed (.github/workflows/release.yml):
 # the server, and the Android app embedded in it and published beside it,
@@ -13,44 +15,24 @@
 #
 # install.sh is idempotent: a first install prints the admin password here,
 # once; an upgrade never touches /etc/agendouille.yaml, the data or the
-# password. Knobs for a first install are passed on:
-# AGENDOUILLE_INSTALL_ADMIN_LISTEN, AGENDOUILLE_INSTALL_PUBLIC_URL.
-set -eu
+# password. AGENDOUILLE_INSTALL_* in the environment are passed on.
+set -euo pipefail
+# shellcheck source=SCRIPTDIR/lib/common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+# shellcheck source=SCRIPTDIR/lib/target.sh
+. "$AGD_ROOT/scripts/lib/target.sh"
+resolve_target "${1:-}"
 
-PVE=${PVE:-}
-CT=${CT:-}
-TARGET=${TARGET:-}
-
-die() { printf 'deploy: %s\n' "$*" >&2; exit 1; }
-
-# No default target on purpose, as devdeploy.sh: guessing which box to
-# restart is how the wrong one gets restarted.
-if [ -n "$PVE" ] || [ -n "$CT" ]; then
-	[ -n "$PVE" ] && [ -n "$CT" ] || die "PVE and CT go together: PVE=root@host CT=<id>"
-	[ -z "$TARGET" ] || die "set PVE and CT, or TARGET, not both"
-elif [ -z "$TARGET" ]; then
-	die "say where to deploy: PVE=root@host CT=<id> (Proxmox container) or TARGET=user@host"
-fi
-
-version=${1:-latest}
-root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+version=${2:-latest}
 if [ "$version" = latest ]; then
-	installer=$(cat "$root/deploy/install.sh")
+	installer="$AGD_ROOT/deploy/install.sh"
 else
 	case $version in v*) ;; *) version="v$version" ;; esac
-	git -C "$root" fetch -q --tags origin 2>/dev/null || true
-	installer=$(git -C "$root" show "$version:deploy/install.sh") || die "no tag $version here: git fetch --tags, or check the name"
+	git -C "$AGD_ROOT" fetch -q --tags origin 2>/dev/null || true
+	installer=$(mktemp)
+	trap 'rm -f "$installer"' EXIT
+	git -C "$AGD_ROOT" show "$version:deploy/install.sh" >"$installer" || die "no tag $version: git fetch --tags, or check the name"
 fi
 
-env="AGENDOUILLE_INSTALL_VERSION=$version"
-[ -z "${AGENDOUILLE_INSTALL_ADMIN_LISTEN:-}" ] || env="$env AGENDOUILLE_INSTALL_ADMIN_LISTEN=$AGENDOUILLE_INSTALL_ADMIN_LISTEN"
-[ -z "${AGENDOUILLE_INSTALL_PUBLIC_URL:-}" ] || env="$env AGENDOUILLE_INSTALL_PUBLIC_URL=$AGENDOUILLE_INSTALL_PUBLIC_URL"
-
-echo "> installing agendouille $version on ${TARGET:-$PVE (container $CT)}"
-if [ -n "$CT" ]; then
-	# shellcheck disable=SC2029  # expanded here on purpose
-	printf '%s\n' "$installer" | ssh "$PVE" "pct exec $CT -- env $env sh -s"
-else
-	# shellcheck disable=SC2029
-	printf '%s\n' "$installer" | ssh "$TARGET" "env $env sh -s"
-fi
+say "installing agendouille $version on $(target_label)"
+on_target "env AGENDOUILLE_INSTALL_VERSION=$version$(install_knobs) sh -s" <"$installer"

@@ -1,6 +1,7 @@
 // The Android app's screens (src/android, built into android/assets/web),
-// in Chromium at a phone's size, with a fake bridge in place of Java: the
-// welcome, the manual setup, then the account with its calendars.
+// in Chromium at a phone's size, with a fake bridge in place of Java (its
+// data: fixtures/android.json): the welcome, the manual setup, then the
+// four tabs, a calendar's page and an approval.
 // Usage: node shoot-android.mjs <android/assets/web> <out dir> [lang]
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'node:http';
@@ -22,6 +23,16 @@ const server = createServer((req, res) => {
 }).listen(0);
 const base = `http://127.0.0.1:${server.address().port}`;
 
+// The fake bridge's data (fixtures/android.json), its relative times made absolute.
+const absolute = (v) => {
+  if (Array.isArray(v)) return v.map(absolute);
+  if (v === null || typeof v !== 'object') return v;
+  if ('minutes_ago' in v) return new Date(Date.now() - v.minutes_ago * 60000).toISOString();
+  if ('in_minutes' in v) return new Date(Date.now() + v.in_minutes * 60000).toISOString();
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, absolute(x)]));
+};
+const fixture = absolute(JSON.parse(readFileSync(new URL('./fixtures/android.json', import.meta.url), 'utf8')));
+
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox', `--lang=${lang}`], headless: true });
 const errors = [];
 for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-dark', 'dark', false], ['account', 'light', true], ['account-dark', 'dark', true]]) {
@@ -31,51 +42,27 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   page.on('requestfailed', (r) => errors.push(`${name} failed: ${r.url()}`));
   await page.setViewport({ width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
-  await page.evaluateOnNewDocument((lang, signedIn, crashed) => {
+  await page.evaluateOnNewDocument((lang, signedIn, crashed, data) => {
     Object.defineProperty(navigator, 'language', { get: () => lang });
     const state = {
-      account: signedIn ? { server: 'https://agendouille.patapouf.club', host: 'agendouille.patapouf.club', username: 'lea', mode: 'enrolled', device_id: 5 } : null,
+      account: signedIn ? data.account : null,
       permissions: { calendar: signedIn, camera: false },
-      sync: { state: 'idle', last_sync: new Date(Date.now() - 4 * 60000).toISOString(), error: null, events: 42 },
-      calendars: signedIn ? [
-        { id: 1, name: 'Famille', color: '#3b6ea5', sync: true, read_only: false, ref: 'lea~famille' },
-        { id: 2, name: 'École', color: '#e8710a', sync: true, read_only: true, ref: 'maman~ecole' },
-        { id: 3, name: 'Perso de Léa', color: '#7b1fa2', sync: false, read_only: false, ref: 'lea~perso' },
-      ] : [],
-      crash: crashed ? 'agendouille dev on Google Pixel 8, Android 15 (35)\nthe page\'s renderer stopped: it crashed, priority 2' : null,
+      sync: data.sync,
+      calendars: signedIn ? data.calendars : [],
+      crash: crashed ? data.crash : null,
     };
     window.addEventListener('load', () => setTimeout(() => {
       const ch = new MessageChannel();
       ch.port2.onmessage = (e) => {
         const r = JSON.parse(e.data);
-        // The family API the tabs call (MainActivity "api"), as the server answers.
-        const api = {
-          'GET /api/calendars': { calendars: [
-            { ref: 'lea~famille', name: 'Famille', color: '#3b6ea5', owner: 'lea', access: 'owner', hidden: false, description: 'Les rendez-vous de toute la maison',
-              shares: [{ target: 'g:famille', access: 'readwrite' }] },
-            { ref: 'lea~perso', name: 'Perso de Léa', color: '#7b1fa2', owner: 'lea', access: 'owner', hidden: false, description: '', shares: [] },
-            { ref: 'maman~ecole', name: 'École', color: '#e8710a', owner: 'maman', access: 'read', hidden: false, description: '' },
-          ] },
-          'GET /api/people': { users: [{ name: 'maman', display_name: 'Maman', color: '#e53935' }], groups: [{ name: 'famille', display_name: 'Famille', color: '' }] },
-          'GET /api/devices': { devices: [
-            { id: 5, kind: 'app', label: 'Xiaomi M2101K6G', cap: 'readwrite', last_used_at: new Date(Date.now() - 60000).toISOString() },
-            { id: 6, kind: 'davx5', label: 'Tablette', cap: 'readwrite', last_used_at: new Date(Date.now() - 3 * 86400000).toISOString() },
-            { id: 7, kind: 'thunderbird', label: 'Thunderbird du bureau', cap: 'read', last_used_at: null },
-          ] },
-          'GET /api/sessions': { sessions: [
-            { id: 1, user_agent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome/131.0', app: false, seen_at: new Date(Date.now() - 600000).toISOString(), current: false },
-            { id: 2, user_agent: 'agendouille-android', app: true, seen_at: new Date().toISOString(), current: true },
-          ] },
-          'GET /api/approvals/PKW-6VY': { user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36', ip: '192.168.1.24', numbers: [30, 72, 15], expires_at: new Date(Date.now() + 120000).toISOString() },
-        };
-        const result = r.call === 'hello' ? { app_bridge: 2, app_version: 'dev', android: 34 }
-          : r.call === 'api' ? { status: 200, body: JSON.stringify(api[`${r.args.method} ${r.args.path}`] ?? {}) }
+        const result = r.call === 'hello' ? data.hello
+          : r.call === 'api' ? { status: 200, body: JSON.stringify(data.api[`${r.args.method} ${r.args.path}`] ?? {}) }
             : state;
         ch.port2.postMessage(JSON.stringify({ id: r.id, ok: true, result }));
       };
       window.postMessage('agendouille-bridge', '*', [ch.port1]);
     }, 50));
-  }, lang, signedIn, name === 'welcome-dark');
+  }, lang, signedIn, name === 'welcome-dark', fixture);
   await page.goto(base + '/index.html', { waitUntil: 'networkidle0' });
   await new Promise((r) => setTimeout(r, 500));
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });

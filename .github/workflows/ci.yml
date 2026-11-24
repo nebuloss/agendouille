@@ -180,4 +180,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Shellcheck
-        run: shellcheck scripts/*.sh
+        run: shellcheck -x scripts/*.sh scripts/lib/*.sh scripts/build/*.sh scripts/shots/*.sh deploy/install.sh

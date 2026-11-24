@@ -3,6 +3,28 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: modular scripts, their data in files
+
+The user: "write clean and modular scripts and avoid resources directly in
+scripts; we can write conf / res files and include them from scripts".
+
+- `scripts/lib/common.sh` (configuration, version, sync, seeding, the
+  week's iCalendar templates) and `scripts/lib/target.sh` (a Proxmox
+  container or a host, named by a file or given in the environment).
+- `scripts/conf`: `build.conf` (the build host, its trees, the release
+  key's place, the architecture), `targets/*.conf` (`home`), the rsync
+  excludes. KEY=value, taken literally; the environment wins.
+- `scripts/build`: what runs on dev-build, as files rather than programs
+  quoted into ssh: `checks.sh`, `apk.sh` (signed with the release key when
+  the host has it), `package.sh` (the deployable .tgz).
+- `scripts/fixtures`: the screenshots' family (`family.seed`) and week
+  (`ecole.ics.in`, `perso.ics.in`), the live check's server
+  (`live.seed`); `scripts/shots/fixtures/android.json`, the fake bridge.
+- `deploy/install.sh` stays one file: it is fetched alone by the one-line
+  install.
+- CI's shellcheck covers every script folder (`-x`, following the sourced
+  libraries).
+
 ## 2026-11-24: the Android app's four tabs, and nothing opens the website
 
 The user: "on the sync page don't show calendars, just sync information,

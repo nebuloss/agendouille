@@ -1,0 +1,10 @@
+# The server of scripts/android-live.sh, as arguments of the agendouille
+# binary (lib/common.sh agd_seed): a user whose calendars hold the shared
+# iCalendar fixtures (testdata/ical), and a calendar shared with her.
+group add famille
+user add lea --group famille
+user add maman --group famille
+calendar add lea perso --name "Perso de Léa" --color "#7b1fa2"
+calendar add maman ecole --name "École" --color "#e8710a"
+calendar share maman~ecole g:famille read
+import maman~ecole testdata/ical/allday.ics

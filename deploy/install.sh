@@ -59,7 +59,7 @@ die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 # usable path when the script arrives on a pipe.
 repo_root=""
 case "$0" in
-	*/*) candidate=$(cd "$(dirname "$0")/.." 2>/dev/null && pwd || true) ;;
+	*/*) candidate=$(cd "$(dirname "$0")/.." 2>/dev/null && pwd) || true ;;
 	*) candidate=$(pwd) ;;
 esac
 if [ -n "$candidate" ] && [ -f "$candidate/go.mod" ] && [ -d "$candidate/cmd/agendouille" ]; then
@@ -99,7 +99,7 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 
 # deploy_file NAME DEST copies deploy/NAME from beside this script, or
 # downloads it from the release tag (falling back to main).
-script_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)
+script_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || true
 deploy_file() {
 	if [ -n "$script_dir" ] && [ -f "$script_dir/$1" ]; then
 		cp "$script_dir/$1" "$2"

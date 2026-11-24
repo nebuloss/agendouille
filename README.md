@@ -50,9 +50,9 @@ install turns it on).
 The Android app comes with every release: the server offers it on its
 sign-in page, and the app updates itself from GitHub's releases.
 
-To install a release on a server from here: `PVE=root@pve CT=<id>
-scripts/deploy.sh v0.7.0` (a Proxmox container) or `TARGET=root@host
-scripts/deploy.sh` (the latest).
+To install a release on a server from here: `scripts/deploy.sh <target>
+v0.7.0`, a target being a file of `scripts/conf/targets` (or
+`PVE=root@pve CT=<id>`, or `TARGET=root@host`, in the environment).
 
 ## Build
 
