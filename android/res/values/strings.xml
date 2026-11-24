@@ -14,7 +14,6 @@
   <string name="revoked">This phone was removed from agendouille. Ask your administrator for a new sign-in link to use it again.</string>
   <string name="update_title">An update is available</string>
   <string name="update_body">Version %1$s of agendouille is available on your server (this phone has %2$s).</string>
-  <string name="update_install">Download</string>
   <string name="update_later">Later</string>
   <string name="camera_needed">The camera is needed to scan a QR code.</string>
   <string name="calendar_needed">Calendar access is needed to sync your calendars to this phone.</string>

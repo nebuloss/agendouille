@@ -638,20 +638,31 @@ public final class MainActivity extends Activity {
                 if (a.status != 200) return;
                 JSONObject o = new JSONObject(a.body);
                 String theirs = o.optString("apk_version");
-                if (!release && Versions.updateAvailable(version(), theirs, !o.optString("apk_sha256").isEmpty())) ui.post(() -> offerUpdate(c.server, theirs));
+                String sha = o.optString("apk_sha256");
+                if (!release && Versions.updateAvailable(version(), theirs, !sha.isEmpty())) ui.post(() -> offerUpdate(c.server, theirs, sha));
             } catch (Exception ignored) {
                 // Offline: the next start will tell.
             }
         });
     }
 
-    private void offerUpdate(String server, String theirs) {
+    /** A dev build: the server's own APK, downloaded and installed here, as a release's. */
+    private void offerUpdate(String server, String theirs, String sha256) {
         SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
         if (theirs.equals(p.getString("update_dismissed", ""))) return;
         new AlertDialog.Builder(this)
                 .setTitle(R.string.update_title)
                 .setMessage(getString(R.string.update_body, theirs, version()))
-                .setPositiveButton(R.string.update_install, (d, w) -> openOutside(Uri.parse(server + "/app/agendouille.apk")))
+                .setPositiveButton(R.string.update_install_now, (d, w) -> {
+                    android.widget.Toast.makeText(this, R.string.update_downloading, android.widget.Toast.LENGTH_LONG).show();
+                    io.execute(() -> {
+                        try {
+                            Updater.install(this, Updater.downloadFromServer(this, server, sha256, userAgent()));
+                        } catch (Exception e) {
+                            ui.post(() -> updateFailed(String.valueOf(e.getMessage())));
+                        }
+                    });
+                })
                 .setNegativeButton(R.string.update_later, (d, w) -> p.edit().putString("update_dismissed", theirs).apply())
                 .show();
     }

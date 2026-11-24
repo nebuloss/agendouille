@@ -241,7 +241,7 @@ func init() {
 			EN: "This sign-in link has expired. Create a new one.",
 		},
 		"error.admin.ownsCalendars": {
-			FR: "Pour chaque calendrier de cet utilisateur, choisissez à qui le donner ou s’il doit être supprimé.",
+			FR: "Pour chaque calendrier de cet utilisateur, choisissez à qui le transférer ou s’il doit être supprimé.",
 			EN: "For each of this user’s calendars, choose who receives it or whether it is deleted.",
 		},
 		"error.admin.groupHasShares": {

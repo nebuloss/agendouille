@@ -95,7 +95,7 @@ export class CalendarsPage extends AppPage {
     ];
   }
 
-  private nameOf(people: People, target: string): string {
+  protected nameOf(people: People, target: string): string {
     const [kind, name] = [target.slice(0, 1), target.slice(2)];
     const list = kind === 'g' ? people.groups : people.users;
     const p = list.find((x) => x.name === name);
@@ -169,7 +169,7 @@ export class CalendarsPage extends AppPage {
     await this.act(() => this.api.post('/calendars', { name: name.value.trim(), color: color.value }), t('calendarCreated'));
   }
 
-  private async editProps(c: Calendar): Promise<void> {
+  protected async editProps(c: Calendar): Promise<void> {
     const owner = c.access === 'owner';
     const name = h('input', { value: c.name, required: true });
     const color = this.colorPicker(c.color);
@@ -192,7 +192,7 @@ export class CalendarsPage extends AppPage {
     ];
   }
 
-  private mark(name: 'group' | 'person'): HTMLElement {
+  protected mark(name: 'group' | 'person'): HTMLElement {
     return h('span', { class: 'grid size-9 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container' }, icon(name));
   }
 
@@ -201,14 +201,14 @@ export class CalendarsPage extends AppPage {
    * with already ticked. Ticking adds (with the access chosen under the
    * list), unticking takes off, after a confirmation.
    */
-  private async share(c: Calendar, people: People): Promise<void> {
+  protected async share(c: Calendar, people: People): Promise<void> {
     const items = this.shareItems(people);
     if (items.length === 0) {
       this.toasts.show(t('nobodyToShare'), 'error');
       return;
     }
     const current = new Map((c.shares ?? []).map((s) => [s.target, s.access]));
-    const access = segmented(this.doc, t('access'), [{ value: 'read', label: t('accessRead') }, { value: 'readwrite', label: t('accessReadwrite') }], 'read');
+    const access = segmented(this.doc, t('access'), [{ value: 'read', label: t('accessReadShort') }, { value: 'readwrite', label: t('accessReadwriteShort') }], 'read');
     const picked = await pick(this.doc, {
       title: t('shareTitle', { name: c.name }), items, multiple: true, allowNone: true,
       selected: [...current.keys()], confirm: t('shareSave'),
@@ -230,7 +230,7 @@ export class CalendarsPage extends AppPage {
   }
 
   /** Giving it away: one person, chosen in the picker. */
-  private async transfer(c: Calendar, people: People): Promise<void> {
+  protected async transfer(c: Calendar, people: People): Promise<void> {
     if (people.users.length === 0) return;
     const picked = await pick(this.doc, {
       title: t('giveTitle', { name: c.name }),
@@ -263,7 +263,7 @@ export class CalendarsPage extends AppPage {
     }
   }
 
-  private async remove(c: Calendar): Promise<void> {
+  protected async remove(c: Calendar): Promise<void> {
     await this.confirmed(t('deleteCalendarTitle', { name: c.name }), t('deleteCalendarText'), t('deleteCalendarButton'),
       () => this.api.delete(`/calendars/${seg(c.ref)}`), t('calendarDeleted'));
   }

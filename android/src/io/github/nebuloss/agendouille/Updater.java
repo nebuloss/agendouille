@@ -78,6 +78,23 @@ final class Updater {
         byte[] apk = get(r.apkUrl, userAgent, MAX_APK);
         String got = Checksums.sha256(apk);
         if (!got.equals(want)) throw new IOException("the APK's SHA-256 is " + got + ", the release says " + want);
+        return save(ctx, apk);
+    }
+
+    /**
+     * The APK of the account's server (a dev build: scripts/devdeploy.sh
+     * embeds it), checked against the SHA-256 the server announces
+     * (/api/app/config); the file, or an IOException.
+     */
+    static File downloadFromServer(Context ctx, String server, String sha256, String userAgent) throws IOException {
+        if (sha256 == null || !sha256.matches("[0-9a-f]{64}")) throw new IOException("the server announces no SHA-256 for its app");
+        byte[] apk = get(server + "/app/agendouille.apk", userAgent, MAX_APK);
+        String got = Checksums.sha256(apk);
+        if (!got.equals(sha256)) throw new IOException("the APK's SHA-256 is " + got + ", the server says " + sha256);
+        return save(ctx, apk);
+    }
+
+    private static File save(Context ctx, byte[] apk) throws IOException {
         File f = new File(ctx.getCacheDir(), "update.apk");
         try (OutputStream out = new FileOutputStream(f)) {
             out.write(apk);
@@ -122,7 +139,7 @@ final class Updater {
                     String next = c.getHeaderField("Location");
                     if (next == null) throw new IOException("a redirect without Location");
                     URL to = new URL(new URL(address), next);
-                    if (!"https".equals(to.getProtocol())) throw new IOException("a redirect off https: " + to);
+                    if ("https".equals(new URL(address).getProtocol()) && !"https".equals(to.getProtocol())) throw new IOException("a redirect off https: " + to);
                     address = to.toString();
                     continue;
                 }

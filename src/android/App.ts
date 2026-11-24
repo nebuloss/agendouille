@@ -83,54 +83,112 @@ class PhoneCalendars extends CalendarsPage {
       const sub = c.owner === me
         ? (shares.length > 0 ? t('sharedWith', { count: shares.length }) : t('notShared'))
         : t('ownedBy', { name: c.owner });
-      const b = h('button', { type: 'button', class: 'state-layer flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left' },
+      const b = h('button', { type: 'button', class: ROW },
         swatch(c.color, 'md'),
         h('span', { class: 'flex min-w-0 flex-1 flex-col' },
-          h('span', { class: 'truncate font-medium' }, c.name),
-          h('span', { class: 'truncate text-xs text-on-surface-variant' }, sub)),
+          h('span', { class: 'truncate text-base' }, c.name),
+          h('span', { class: 'truncate text-sm text-on-surface-variant' }, sub)),
         c.hidden ? h('span', { class: ui.pill.muted }, t('hiddenPill')) : null,
         icon('right'));
       b.addEventListener('click', () => this.open(c.ref));
       return b;
     };
-    const group = (title: string, cs: Calendar[]): Child[] => cs.length === 0 ? [] : [
-      h('h2', { class: 'px-1 pt-2 text-sm font-semibold text-on-surface-variant' }, title),
-      h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...cs.map(row)),
-    ];
-    const create = h('button', { type: 'button', class: ui.btn('filled') }, icon('plus'), t('newCalendar'));
+    const create = h('button', { type: 'button', class: ui.btn('filled', 'sm') }, icon('plus'), t('newCalendar'));
     create.addEventListener('click', () => void this.create());
     const mine = all.filter((c) => c.owner === me);
     const others = all.filter((c) => c.owner !== me);
     return [
-      h('div', { class: 'flex items-end justify-between gap-3' }, heading(t('tabCalendars')), create),
+      h('div', { class: 'flex items-center justify-between gap-3 pt-4' }, h('h1', { class: 'text-[22px] leading-7 font-normal' }, t('tabCalendars')), create),
       ...(all.length === 0 ? [h('p', { class: ui.empty }, t('noCalendar'))] : []),
-      ...group(t('mine'), mine),
-      ...group(t('sharedWithMe'), others),
+      ...group(t('mine'), mine.map(row)),
+      ...group(t('sharedWithMe'), others.map(row)),
     ];
   }
 
+  /** One calendar: its name and colour, then grouped rows, Android's settings fashion. */
   private detail(c: Calendar, me: string, people: People): Child[] {
-    const back = h('button', { type: 'button', class: ui.btn('text', 'sm') }, icon('left'), t('tabCalendars'));
+    const back = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} -ml-3 self-start` }, icon('left'), t('tabCalendars'));
     back.addEventListener('click', () => this.open(null));
+    const owned = c.owner === me;
+    const shares = c.shares ?? [];
+    const head = h('div', { class: 'flex items-center gap-3' }, swatch(c.color, 'md'),
+      h('div', { class: 'flex min-w-0 flex-col' },
+        h('h1', { class: 'truncate text-[22px] leading-7 font-normal' }, c.name),
+        h('span', { class: 'truncate text-sm text-on-surface-variant' },
+          owned ? (shares.length > 0 ? t('sharedWith', { count: shares.length }) : t('notShared'))
+            : `${t('ownedBy', { name: c.owner })} · ${c.access === 'read' ? t('readOnly') : t('canWrite')}`)));
+
+    // Sur ce téléphone: whether it syncs here.
     const phone = this.phone()?.calendars.find((x) => x.ref === c.ref);
-    let sync: Child;
+    let sync: HTMLElement;
     if (phone === undefined) {
-      sync = h('p', { class: 'text-sm text-on-surface-variant' }, t('notOnPhoneYet'));
+      sync = h('p', { class: 'px-4 py-3 text-sm text-on-surface-variant' }, t('notOnPhoneYet'));
     } else {
       const box = h('input', { type: 'checkbox', checked: phone.sync, 'aria-label': t('syncThis', { name: c.name }) });
       box.addEventListener('change', () => this.toggle(phone, box.checked));
-      sync = h('label', { class: 'flex min-h-12 items-center gap-3' },
+      sync = h('label', { class: ROW },
         h('span', { class: 'flex min-w-0 flex-1 flex-col' },
-          h('span', { class: 'font-medium' }, t('syncOnPhone')),
-          h('span', { class: 'text-xs text-on-surface-variant' }, phone.read_only ? t('readOnly') : t('syncOnPhoneHelp'))),
+          h('span', { class: 'text-base' }, t('syncOnPhone')),
+          h('span', { class: 'text-sm text-on-surface-variant' }, phone.read_only ? t('readOnlyHere') : t('syncOnPhoneHelp'))),
         box);
     }
+
+    // Partagé avec: each share, its access in place; then « Partager ».
+    const shareRows = shares.map((sh) => {
+      const who = this.nameOf(people, sh.target);
+      const path = `/calendars/${seg(c.ref)}/shares/${seg(sh.target)}`;
+      const access = segmented(this.doc, t('access'), [{ value: 'read', label: t('accessRead') }, { value: 'readwrite', label: t('accessReadwrite') }],
+        sh.access === 'readwrite' ? 'readwrite' : 'read',
+        (v) => void this.act(() => this.api.put(path, { access: v }), t('accessChanged', { name: who })), 'sm');
+      const off = h('button', { type: 'button', class: 'state-layer grid size-10 shrink-0 place-items-center rounded-full text-on-surface-variant',
+        title: t('unshare'), 'aria-label': `${t('unshare')} ${who}` }, icon('close'));
+      off.addEventListener('click', () => void this.confirmed(t('unshareOneTitle', { name: who }), t('unshareOneText', { calendar: c.name, name: who }),
+        t('unshare'), () => this.api.delete(path), t('unshared', { name: who })));
+      return h('div', { class: 'flex items-center gap-3 py-2 pr-2 pl-4' }, this.mark(sh.target.startsWith('g:') ? 'group' : 'person'),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1.5' }, h('span', { class: 'truncate text-base' }, who), access.el), off);
+    });
+    const action = (ic: Parameters<typeof icon>[0], label: string, run: () => void, danger = false): HTMLElement => {
+      const b = h('button', { type: 'button', class: `${ROW} ${danger ? 'text-error' : ''}` }, icon(ic), h('span', { class: 'flex-1 text-base' }, label));
+      b.addEventListener('click', run);
+      return b;
+    };
+
+    if (!owned) {
+      return [
+        h('div', { class: 'flex flex-col gap-2 pt-2' }, back, head),
+        ...group(t('onThisPhone'), [sync]),
+        ...group(t('actions'), [
+          action('palette', t('customise'), () => void this.editProps(c)),
+          c.hidden
+            ? action('show', t('showAgain'), () => void this.act(() => this.api.patch(`/calendars/${seg(c.ref)}`, { hidden: false }), t('shownAgain')))
+            : action('hide', t('hide'), () => void this.act(() => this.api.patch(`/calendars/${seg(c.ref)}`, { hidden: true }), t('hiddenDone'))),
+        ]),
+      ];
+    }
     return [
-      h('div', { class: 'pt-2' }, back),
-      c.owner === me ? this.ownedCard(c, people) : this.sharedCard(c),
-      card(t('onThisPhone'), [], sync),
+      h('div', { class: 'flex flex-col gap-2 pt-2' }, back, head,
+        c.description !== '' ? h('p', { class: 'text-sm text-on-surface-variant' }, c.description) : null),
+      ...group(t('onThisPhone'), [sync]),
+      ...group(t('sharing'), [...shareRows, action('share', shares.length > 0 ? t('shareMore') : t('shareIt'), () => void this.share(c, people))]),
+      ...group(t('actions'), [
+        action('edit', t('edit'), () => void this.editProps(c)),
+        action('give', t('transfer'), () => void this.transfer(c, people)),
+        action('trash', t('delete'), () => void this.remove(c), true),
+      ]),
     ];
   }
+}
+
+/** A row of a grouped list: full width, 56 px at least, Material's list item. */
+const ROW = 'state-layer flex min-h-14 w-full items-center gap-4 px-4 py-2 text-left';
+
+/** A grouped list under a small heading, Android's settings fashion. */
+function group(title: string, rows: readonly HTMLElement[]): Child[] {
+  if (rows.length === 0) return [];
+  return [
+    h('h2', { class: 'px-4 pt-3 text-sm font-medium text-primary' }, title),
+    h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...rows),
+  ];
 }
 
 /** Appareils: approving a browser, then the devices and browsers signed in, to disconnect them. */

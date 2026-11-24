@@ -40,7 +40,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warn') errors.push(`${name} console: ${m.text()}`); });
   page.on('requestfailed', (r) => errors.push(`${name} failed: ${r.url()}`));
-  await page.setViewport({ width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 });
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
   await page.evaluateOnNewDocument((lang, signedIn, crashed, data) => {
     Object.defineProperty(navigator, 'language', { get: () => lang });
@@ -74,14 +74,16 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       await page.screenshot({ path: `${out}/android-${lang}-${shot}.png` });
       if (shot === 'calendars') {
         // One calendar's page.
-        await (await page.$$('#app-content button.min-h-16'))[0].click();
+        await (await page.$$('#app-content button.min-h-14'))[0].click();
         await new Promise((r) => setTimeout(r, 500));
         await page.screenshot({ path: `${out}/android-${lang}-calendar.png` });
         // Sharing it: the groups and the people, in one picker.
         await (await page.$('xpath/.//button[contains(., "Partager")]')).click();
         await new Promise((r) => setTimeout(r, 400));
         await page.screenshot({ path: `${out}/android-${lang}-share.png` });
-        await page.keyboard.press('Escape');
+        // On a touchscreen the search waits for a tap: no keyboard up front.
+        const focused = await page.evaluate(() => `${document.activeElement?.tagName} coarse=${matchMedia('(pointer: coarse)').matches}`);
+        if (focused.startsWith('INPUT') && focused.endsWith('coarse=true')) errors.push(`share: the search is focused on a touchscreen (${focused})`);        await page.keyboard.press('Escape');
         await new Promise((r) => setTimeout(r, 300));
       }
     }

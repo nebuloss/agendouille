@@ -3,6 +3,26 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: « Transférer »; the app's calendar pages; updates inside the app
+
+The user: "rename donner to transférer; the search should not be focused
+by default, it opens the keyboard; rework the calendar view's font sizes,
+the screen space is not used well; make the app's updates download inside
+the app instead of the browser".
+
+- « Transférer » wherever a calendar changes hands (web app, app, admin).
+- The picker focuses its search only with a pointer; on a touchscreen the
+  dialog holds the focus (Chromium ignores `autofocus` on a dialog), and
+  the app's screenshots fail if the search has it.
+- The app's Calendriers no longer reuses the website's card: grouped
+  full-width lists, Android's settings fashion (title 22 px, rows 16 px,
+  secondary 14 px, 56 px rows), with « Sur ce téléphone », « Partage »
+  (each share's access in place, « Partager avec d'autres ») and
+  « Actions » (Modifier, Transférer, Supprimer).
+- A dev build's update comes from the server inside the app too: the APK
+  of `/app/agendouille.apk`, checked against the `apk_sha256` of
+  `/api/app/config`, then PackageInstaller, as a release's from GitHub.
+
 ## 2026-11-24: sharing in one picker; no native dropdowns in the app
 
 The user: "the dropdown in the app uses the legacy Android style; rework

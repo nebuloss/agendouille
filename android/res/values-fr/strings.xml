@@ -10,7 +10,6 @@
   <string name="revoked">Ce téléphone a été retiré d’agendouille. Demandez un nouveau lien de connexion à votre administrateur pour l’utiliser à nouveau.</string>
   <string name="update_title">Une mise à jour est disponible</string>
   <string name="update_body">La version %1$s d’agendouille est disponible sur votre serveur (ce téléphone a la %2$s).</string>
-  <string name="update_install">Télécharger</string>
   <string name="update_later">Plus tard</string>
   <string name="camera_needed">L’appareil photo est nécessaire pour scanner un QR code.</string>
   <string name="calendar_needed">L’accès au calendrier est nécessaire pour synchroniser vos calendriers sur ce téléphone.</string>

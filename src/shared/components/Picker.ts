@@ -142,8 +142,14 @@ export function pick(doc: Document, o: PickOptions): Promise<string[] | null> {
       el.remove();
       resolve(result);
     }, { once: true });
+    // showModal focuses the first field, the search: on a touchscreen that
+    // brings the keyboard up over half the list before anyone asked for
+    // it, so the dialog itself holds the focus there (Chromium ignores
+    // autofocus on the dialog); with a pointer, the search keeps it.
+    el.tabIndex = -1;
     if (typeof el.showModal === 'function') el.showModal();
     else el.setAttribute('open', '');
-    search.focus();
+    if (doc.defaultView?.matchMedia?.('(pointer: coarse)').matches ?? false) el.focus();
+    else search.focus();
   });
 }

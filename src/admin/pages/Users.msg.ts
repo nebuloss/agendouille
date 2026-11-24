@@ -157,7 +157,7 @@ export const t = messages({
 
     // Deleting a user.
     deleteCalendar: 'Supprimer ce calendrier',
-    giveTo: 'Donner à {name}',
+    giveTo: 'Transférer à {name}',
     deleteBody: '{name} ne pourra plus se connecter. Les événements que cette personne a ajoutés aux calendriers partagés sont conservés. Cette action est irréversible.',
     theirCalendars: 'Ses calendriers sont conservés et transférés au nouveau propriétaire que vous choisissez. Vous pouvez aussi en supprimer.',
     deleteTitle: 'Supprimer « {name} » ?',

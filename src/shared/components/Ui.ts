@@ -292,14 +292,14 @@ export interface Segmented<T extends string> {
  * in the system's old style, and two or three choices read better shown.
  */
 export function segmented<T extends string>(doc: Document, label: string, options: readonly Segment<T>[], value: T,
-  onChange?: (v: T) => void): Segmented<T> {
+  onChange?: (v: T) => void, size: 'sm' | 'md' = 'md'): Segmented<T> {
   const el = h('div', { role: 'radiogroup', 'aria-label': label, class: 'inline-flex max-w-full shrink-0 overflow-hidden rounded-md3-full border border-outline' });
   const state = { value };
   const draw = (): void => {
     el.replaceChildren(...options.map((o, i) => {
       const on = state.value === o.value;
       const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), ...(o.lang !== undefined ? { lang: o.lang } : {}),
-        class: `state-layer inline-flex h-10 min-w-0 items-center justify-center gap-1.5 px-4 text-sm font-medium whitespace-nowrap ${i > 0 ? 'border-l border-outline' : ''} ${on ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface'} [&_.ic]:size-4` },
+        class: `state-layer inline-flex ${size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-10 px-4 text-sm'} min-w-0 items-center justify-center gap-1.5 font-medium whitespace-nowrap ${i > 0 ? 'border-l border-outline' : ''} ${on ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface'} [&_.ic]:size-4` },
       on ? icon('check', doc) : (o.lead?.cloneNode(true) ?? null), o.label);
       b.addEventListener('click', () => {
         if (state.value === o.value) return;
