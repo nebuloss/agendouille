@@ -156,8 +156,13 @@ func (h *handlers) signin(w http.ResponseWriter, r *http.Request) {
 	}
 	// What is left, not when: the page counts it down on its own clock, so
 	// a phone whose clock is wrong still refreshes the code on time.
-	h.render(w, r, http.StatusOK, "app/signin.html", "app.title.signin", map[string]any{"Approval": a, "QR": qr,
-		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()})
+	data := map[string]any{"Approval": a, "QR": qr,
+		"RemainingMs": a.ExpiresAt.Sub(h.d.Clock()).Milliseconds(), "TTLMs": auth.ApprovalTTL.Milliseconds()}
+	// The Android app, when this server has it: syncing a phone starts there.
+	if apk := assets.AndroidApp(); apk != nil {
+		data["APKSHA256"] = apk.SHA256
+	}
+	h.render(w, r, http.StatusOK, "app/signin.html", "app.title.signin", data)
 }
 
 // wait long-polls an approval. Approved, it sets the session cookie; the

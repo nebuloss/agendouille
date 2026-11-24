@@ -26,5 +26,12 @@
     <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-5 text-sm font-medium text-on-primary">{{t "app.signin.continue"}}</button>
   </form>
   {{end}}
+  {{if .APKSHA256}}
+  <div class="flex flex-col gap-2 border-t border-outline-variant pt-4">
+    <p class="text-sm text-on-surface-variant">{{t "app.signin.getAppHelp"}}</p>
+    <div><a href="/app/agendouille.apk" download class="state-layer inline-flex h-10 items-center gap-2 rounded-md3-full bg-secondary-container px-5 text-sm font-medium text-on-secondary-container no-underline"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11 M7 10l5 5 5-5 M4 20h16"/></svg>{{t "app.enroll.getApp"}}</a></div>
+    <p class="font-mono text-[11px] break-all text-on-surface-variant">SHA-256 {{.APKSHA256}}</p>
+  </div>
+  {{end}}
 </div>
 </div>
