@@ -203,7 +203,7 @@ func TestM1(t *testing.T) {
 
 	// --- admin sign-in
 	if a := x.do("GET", x.admin+"/", nil, nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/signin" {
-		t.Errorf("/ signed out: %d %s", a.status, a.header.Get("Location"))
+		t.Errorf("a page signed out: %d %s", a.status, a.header.Get("Location"))
 	}
 	body, edit := form(url.Values{"password": {"wrong password!"}})
 	if a := x.do("POST", x.admin+"/signin", body, edit); a.status != http.StatusUnauthorized {
@@ -242,8 +242,11 @@ func TestM1(t *testing.T) {
 			t.Errorf("public listener %s: %d, want 404", p, a.status)
 		}
 	}
-	if a := x.do("GET", x.public+"/", nil, nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/signin" {
-		t.Errorf("/ signed out: %d %s", a.status, a.header.Get("Location"))
+	if a := x.do("GET", x.public+"/signin", nil, nil); a.status != http.StatusMovedPermanently || a.header.Get("Location") != "/" {
+		t.Errorf("the old sign-in address: %d %q", a.status, a.header.Get("Location"))
+	}
+	if a := x.do("GET", x.public+"/calendars", nil, nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/" {
+		t.Errorf("a page signed out: %d %s", a.status, a.header.Get("Location"))
 	}
 	if !strings.Contains(x.do("GET", x.public+"/", nil, nil).header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
 		t.Error("no CSP on the public listener")
@@ -413,10 +416,10 @@ var (
 	waitRe      = regexp.MustCompile(`action="(/signin/wait/[0-9a-f]+)"`)
 )
 
-// startSignin opens /signin as a new browser would and reads its codes.
+// startSignin opens the root as a new browser would (the sign-in page) and reads its codes.
 func (x *e2e) startSignin() (shortCode string, number int, waitURL string) {
 	x.t.Helper()
-	a := x.do("GET", x.public+"/signin", nil, nil)
+	a := x.do("GET", x.public+"/", nil, nil)
 	sc, n, w := shortCodeRe.FindStringSubmatch(a.body), numberRe.FindStringSubmatch(a.body), waitRe.FindStringSubmatch(a.body)
 	if a.status != 200 || sc == nil || n == nil || w == nil {
 		x.t.Fatalf("/signin: %d\n%s", a.status, a.body)

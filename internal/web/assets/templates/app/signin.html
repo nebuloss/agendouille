@@ -1,5 +1,6 @@
-<div class="flex min-h-screen items-start justify-center px-4 py-10 sm:items-center">
-<div class="flex w-full max-w-[440px] flex-col gap-5 rounded-md3-xl bg-surface-container p-6 sm:p-8">
+<!-- On a phone the page is the card: no frame, the whole width. -->
+<div class="flex min-h-screen items-start justify-center px-4 pt-6 pb-10 sm:items-center sm:py-10">
+<div class="flex w-full max-w-[440px] flex-col gap-5 sm:rounded-md3-xl sm:bg-surface-container sm:p-8">
   <div class="flex items-center gap-3">
     <img src="/static/shared/icon.svg" alt="" width="44" height="44" class="rounded-md3-m">
     <div><p class="text-xs font-semibold tracking-wider text-on-surface-variant uppercase">agendouille</p>
@@ -9,9 +10,9 @@
   {{if .Error}}<p role="alert" class="rounded-md3-m bg-error-container px-4 py-2.5 text-on-error-container">{{.Error}}</p>{{end}}
   {{if .Approval}}
   <p class="text-on-surface-variant">{{t "app.signin.how"}}</p>
-  <div class="flex justify-center"><img id="signin-qr" class="qr rounded-md3-l p-2" src="{{.QR}}" alt="{{t "app.signin.qrAlt"}}" width="240" height="240"></div>
+  <div class="flex justify-center"><img id="signin-qr" class="qr size-[200px] rounded-md3-l p-2 sm:size-[240px]" src="{{.QR}}" alt="{{t "app.signin.qrAlt"}}" width="240" height="240"></div>
   <div class="grid grid-cols-2 gap-3">
-    <div class="rounded-md3-l bg-surface-lowest p-3 text-center"><p class="text-xs font-semibold text-on-surface-variant">{{t "app.signin.code"}}</p>
+    <div class="rounded-md3-l bg-surface-container p-3 text-center sm:bg-surface-lowest"><p class="text-xs font-semibold text-on-surface-variant">{{t "app.signin.code"}}</p>
       <p id="signin-short-code" class="font-mono text-2xl font-semibold tracking-widest">{{.Approval.ShortCode}}</p></div>
     <div class="rounded-md3-l bg-primary-container p-3 text-center text-on-primary-container"><p class="text-xs font-semibold">{{t "app.signin.number"}}</p>
       <p id="signin-number" class="text-2xl font-semibold">{{.Approval.Number}}</p></div>
@@ -20,17 +21,18 @@
     <p class="text-center text-xs text-on-surface-variant">{{t "app.signin.valid"}}</p>
   </div>
   <p class="text-center text-xs text-on-surface-variant">{{t "app.signin.auto"}}</p>
-  <form method="get" action="/signin/wait/{{.Approval.ID}}" id="signin-wait" class="flex flex-wrap justify-end gap-2">
-    <a href="/signin" class="state-layer inline-flex h-10 items-center rounded-md3-full px-5 text-sm font-medium text-primary">{{t "app.signin.newCode"}}</a>
+  <form method="get" action="/signin/wait/{{.Approval.ID}}" id="signin-wait" class="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+    <a href="/" class="state-layer inline-flex h-12 items-center justify-center rounded-md3-full px-5 text-sm font-medium text-primary no-underline sm:h-10">{{t "app.signin.newCode"}}</a>
     <input type="hidden" name="then" value="redirect">
-    <button type="submit" class="state-layer inline-flex h-10 items-center rounded-md3-full bg-primary px-5 text-sm font-medium text-on-primary">{{t "app.signin.continue"}}</button>
+    <button type="submit" class="state-layer inline-flex h-12 items-center justify-center rounded-md3-full bg-primary px-5 text-sm font-medium text-on-primary sm:h-10">{{t "app.signin.continue"}}</button>
   </form>
   {{end}}
   {{if .APKSHA256}}
-  <div class="flex flex-col gap-2 border-t border-outline-variant pt-4">
+  <div class="flex flex-col gap-3 border-t border-outline-variant pt-4">
     <p class="text-sm text-on-surface-variant">{{t "app.signin.getAppHelp"}}</p>
-    <div><a href="/app/agendouille.apk" download class="state-layer inline-flex h-10 items-center gap-2 rounded-md3-full bg-secondary-container px-5 text-sm font-medium text-on-secondary-container no-underline"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11 M7 10l5 5 5-5 M4 20h16"/></svg>{{t "app.enroll.getApp"}}</a></div>
-    <p class="font-mono text-[11px] break-all text-on-surface-variant">SHA-256 {{.APKSHA256}}</p>
+    <a href="/app/agendouille.apk" download class="state-layer inline-flex h-12 items-center justify-center gap-2 rounded-md3-full bg-secondary-container px-5 text-sm font-medium text-on-secondary-container no-underline sm:h-10 sm:self-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11 M7 10l5 5 5-5 M4 20h16"/></svg>{{t "app.enroll.getApp"}}</a>
+    <details class="text-[11px] text-on-surface-variant"><summary class="cursor-pointer">{{t "app.signin.checksum"}}</summary>
+      <p class="mt-1 font-mono break-all">SHA-256 {{.APKSHA256}}</p></details>
   </div>
   {{end}}
 </div>

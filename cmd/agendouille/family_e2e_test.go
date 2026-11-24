@@ -279,7 +279,7 @@ func TestM4FamilyAPI(t *testing.T) {
 
 	// Signing out ends this browser's session, and only it.
 	out := L.call("POST", "/signout", nil)
-	if out.status != http.StatusSeeOther || out.header.Get("Location") != "/signin" {
+	if out.status != http.StatusSeeOther || out.header.Get("Location") != "/" {
 		t.Errorf("sign out: %d %s", out.status, out.header.Get("Location"))
 	}
 	if a := L.call("GET", "/api/me", nil); a.status != http.StatusUnauthorized {

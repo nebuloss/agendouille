@@ -76,7 +76,7 @@ password printed), Thunderbird (New calendar, On the network, the same).
 A calendar made in DAVx5 or on an iPhone belongs to its user.
 
 Users have no password and no email. The enrollment QR signs in their first
-device; after that, any browser shows a QR code at `/signin` that a
+device; after that, any browser shows a QR code at `/` that a
 signed-in phone approves (`/approve`, or the agendouille app's scanner),
 picking the number the browser shows. `agendouille config` prints every
 setting and where it came from.

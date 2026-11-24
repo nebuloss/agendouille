@@ -46,7 +46,8 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 		mux.Handle(path, h.page(h.shell(page[0], page[1])))
 	}
 	h.registerFamily(mux, guard)
-	mux.HandleFunc("GET /signin", h.signin)
+	// The sign-in page is the root's, without a session; the old address leads there.
+	mux.HandleFunc("GET /signin", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusMovedPermanently) })
 	mux.HandleFunc("GET /signin/wait/{id}", h.wait)
 	mux.HandleFunc("GET /enroll/{token}", h.enrollPage)
 	// The links made before the spelling changed (DECISIONS: enroll): a QR
@@ -89,12 +90,18 @@ func (h *handlers) render(w http.ResponseWriter, r *http.Request, status int, na
 
 type withPrincipal func(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 
-// page needs an agd_app session and sends to /signin without one.
+// page needs an agd_app session. Without one, the root is the sign-in
+// page itself and every other page leads there.
 func (h *handlers) page(next withPrincipal) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, err := h.d.Auth.Session(r, auth.SurfaceApp)
 		if err != nil {
-			http.Redirect(w, r, "/signin", http.StatusSeeOther)
+			if r.URL.Path == "/" {
+				w.Header().Set("Cache-Control", "no-store")
+				h.signin(w, r)
+				return
+			}
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 		next(w, r.WithContext(auth.WithPrincipal(r.Context(), p)), p)
@@ -204,7 +211,7 @@ func (h *handlers) wait(w http.ResponseWriter, r *http.Request) {
 		status, state = http.StatusInternalServerError, "error"
 	}
 	if redirect {
-		http.Redirect(w, r, "/signin", http.StatusSeeOther)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	webx.JSON(w, status, map[string]string{"status": state})
@@ -328,7 +335,7 @@ func (h *handlers) enroll(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) signout(w http.ResponseWriter, r *http.Request) {
 	h.d.Auth.SignOut(r, auth.SurfaceApp)
 	auth.ClearCookie(w, auth.SurfaceApp, h.secure())
-	http.Redirect(w, r, "/signin", http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func approvalError(err error) (int, string, string) {

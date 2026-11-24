@@ -13,7 +13,7 @@ func TestThemeAndDarkReader(t *testing.T) {
 	x.publicOn()
 	page := func(cookie string) string {
 		t.Helper()
-		a := x.do("GET", x.public+"/signin", nil, func(r *http.Request) {
+		a := x.do("GET", x.public+"/", nil, func(r *http.Request) {
 			if cookie != "" {
 				r.AddCookie(&http.Cookie{Name: "agd_theme", Value: cookie})
 			}

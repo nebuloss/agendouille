@@ -44,7 +44,7 @@ export class SigninPage implements Page {
     const ttl = timer === null ? null : Dom.number(timer, 'data-ttl-ms');
     if (timer !== null && left !== null && ttl !== null) {
       this.countdown = new Countdown(timer, left, ttl, () => {
-        if (!this.stopped) this.doc.location.assign('/signin');
+        if (!this.stopped) this.doc.location.assign('/');
       });
     }
     void this.loop(action);
@@ -73,7 +73,7 @@ export class SigninPage implements Page {
         return;
       }
       if (step === 'restart') {
-        this.doc.location.assign('/signin');
+        this.doc.location.assign('/');
         return;
       }
     }

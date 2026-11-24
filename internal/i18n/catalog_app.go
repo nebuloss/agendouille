@@ -47,6 +47,7 @@ func init() {
 			FR: "Ouvrir dans l’application",
 			EN: "Open in the app",
 		},
+		"app.signin.checksum": {FR: "Empreinte du fichier", EN: "File checksum"},
 		"app.signin.getAppHelp": {
 			FR: "Sur un téléphone Android, l’application agendouille synchronise vos calendriers avec ceux du téléphone.",
 			EN: "On an Android phone, the agendouille app syncs your calendars with the phone’s.",

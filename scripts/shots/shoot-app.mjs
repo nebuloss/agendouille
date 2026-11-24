@@ -37,7 +37,7 @@ if (pass === 'certs') {
 
 // Signed out first: the sign-in page, its QR and its countdown.
 await page.setViewport({ width: 390, height: 844, isMobile: true });
-await page.goto(base + '/signin', { waitUntil: 'networkidle2' });
+await page.goto(base + '/', { waitUntil: 'networkidle2' });
 await new Promise((r) => setTimeout(r, 1200));
 await page.screenshot({ path: `${out}/app-signin.png` });
 await page.setViewport({ width: 1280, height: 860 });
