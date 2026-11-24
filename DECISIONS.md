@@ -1148,3 +1148,13 @@ setting). It also follows the server's `app_sync_interval_minutes` instead of
 a fixed 30 minutes, and syncs when opened if the last sync is over five
 minutes old. No foreground service and no push: UnifiedPush stays the plan
 for real-time changes.
+
+## 2026-11-24: a phone's sign-in page has no QR code; updates follow a switch
+
+A phone cannot scan its own screen, and on Android the app is how a phone
+signs in: an Android browser gets only the app's download (when the server
+has it), another phone the short code without the QR code, and only a
+computer the QR code. The app's update source is a switch in Réglages,
+« Versions de développement » (the server's build, or GitHub's releases),
+defaulting to what the app is, and the version code decides before Android
+would refuse an older APK.

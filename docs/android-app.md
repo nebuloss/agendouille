@@ -8,8 +8,11 @@ no AndroidX.
 
 ## Install
 
-- From the server: the sign-in page (`/`) offers « Télécharger
-  l'application » on an Android phone only (`/app/agendouille.apk`).
+- From the server: on an Android phone, the sign-in page (`/`) offers
+  only « Télécharger l'application » (`/app/agendouille.apk`), no sign-in
+  code: a phone signs in with the app. Another phone (an iPhone) gets the
+  short code to type in the app of a signed-in phone; only a computer
+  shows the QR code.
 - From GitHub: `agendouille-<version>.apk` on each
   [release](https://github.com/nebuloss/agendouille/releases), with its
   line in `SHA256SUMS`.
@@ -50,7 +53,8 @@ which opens a session for the person.
 - **Réglages**: « Autorisations » (each permission, granted or not, with
   its button: calendar, notifications, camera, battery and, on a Xiaomi
   phone, autostart), language, appearance (light, dark, as the phone),
-  version, and « Rechercher une mise à jour ».
+  version, « Versions de développement », and « Rechercher une mise à
+  jour ».
 
 ## Background sync
 
@@ -70,12 +74,17 @@ setting.
 ## Updates
 
 The app checks when it opens, and when « Rechercher une mise à jour »
-(Réglages) is tapped, which also ignores an earlier « Plus tard »:
+(Réglages) is tapped, which also ignores an earlier « Plus tard ». Where it
+looks is the switch « Versions de développement » (Réglages):
 
-- **A release** (from GitHub) checks GitHub's latest release, at most every
-  six hours.
-- **A dev build** (from `scripts/devdeploy.sh`) checks the server it is
-  signed in to.
+- **Off** (a release's default): GitHub's latest release, at most every six
+  hours.
+- **On** (a dev build's default): the server it is signed in to, which
+  offers the build it embeds (`scripts/devdeploy.sh`), whatever its version.
+
+Android never installs a lower version code: the app checks the APK's
+before handing it over and says so, and a dev build switched off is offered
+a release only once one is later than it.
 
 Either way it downloads the APK itself, checks its SHA-256 (the release's
 `SHA256SUMS`, or the server's announced sum), and hands it to Android's
