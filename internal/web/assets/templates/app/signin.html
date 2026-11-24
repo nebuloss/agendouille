@@ -27,13 +27,25 @@
     <button type="submit" class="state-layer inline-flex h-12 items-center justify-center rounded-md3-full bg-primary px-5 text-sm font-medium text-on-primary sm:h-10">{{t "app.signin.continue"}}</button>
   </form>
   {{end}}
-  {{if .APKSHA256}}
+  {{if .APKSHA256}}{{if ne .Platform "ios"}}
   <div class="flex flex-col gap-3 border-t border-outline-variant pt-4">
+    {{if eq .Platform "android"}}
     <p class="text-sm text-on-surface-variant">{{t "app.signin.getAppHelp"}}</p>
     <a href="/app/agendouille.apk" download class="state-layer inline-flex h-12 items-center justify-center gap-2 rounded-md3-full bg-secondary-container px-5 text-sm font-medium text-on-secondary-container no-underline sm:h-10 sm:self-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11 M7 10l5 5 5-5 M4 20h16"/></svg>{{t "app.enroll.getApp"}}</a>
+    {{else}}
+    <!-- A computer: the app is for the phone, so a QR code to scan with its camera. -->
+    <div class="flex items-center gap-4">
+      {{if .APKQR}}<img class="qr size-28 shrink-0 rounded-md3-m p-1.5" src="{{.APKQR}}" alt="{{t "app.signin.apkQrAlt"}}" width="112" height="112">{{end}}
+      <div class="flex flex-col gap-1">
+        <p class="text-sm font-medium">{{t "app.signin.getAppTitle"}}</p>
+        <p class="text-sm text-on-surface-variant">{{t "app.signin.getAppDesktop"}}</p>
+        <a href="/app/agendouille.apk" download class="self-start text-sm text-primary underline-offset-4 hover:underline">{{t "app.signin.getAppHere"}}</a>
+      </div>
+    </div>
+    {{end}}
     <details class="text-[11px] text-on-surface-variant"><summary class="cursor-pointer">{{t "app.signin.checksum"}}</summary>
       <p class="mt-1 font-mono break-all">SHA-256 {{.APKSHA256}}</p></details>
   </div>
-  {{end}}
+  {{end}}{{end}}
 </div>
 </div>
