@@ -55,6 +55,36 @@ public class PureTest {
     }
 
     @Test
+    public void apiPaths() {
+        // Managing calendars and approving a browser.
+        assertTrue(ApiPath.allowed("GET", "/api/calendars"));
+        assertTrue(ApiPath.allowed("POST", "/api/calendars"));
+        assertTrue(ApiPath.allowed("GET", "/api/people"));
+        assertTrue(ApiPath.allowed("GET", "/api/me"));
+        assertTrue(ApiPath.allowed("PATCH", "/api/calendars/lea%2Fecole"));
+        assertTrue(ApiPath.allowed("DELETE", "/api/calendars/lea%2Fecole"));
+        assertTrue(ApiPath.allowed("PUT", "/api/calendars/x/shares/g%3Afamille"));
+        assertTrue(ApiPath.allowed("DELETE", "/api/calendars/x/shares/u%3Atom"));
+        assertTrue(ApiPath.allowed("POST", "/api/calendars/x/transfer"));
+        assertTrue(ApiPath.allowed("GET", "/api/approvals/PKW-6VY"));
+        assertTrue(ApiPath.allowed("POST", "/api/approvals/PKW-6VY"));
+        // Never events, exports, devices, the admin, or a way out of /api.
+        assertFalse(ApiPath.allowed("GET", "/api/calendars/x/events/a.ics"));
+        assertFalse(ApiPath.allowed("POST", "/api/calendars/x/events"));
+        assertFalse(ApiPath.allowed("GET", "/api/calendars/x/export"));
+        assertFalse(ApiPath.allowed("GET", "/api/calendars/x"));
+        assertFalse(ApiPath.allowed("GET", "/api/events"));
+        assertFalse(ApiPath.allowed("DELETE", "/api/devices/3"));
+        assertFalse(ApiPath.allowed("GET", "/api/admin/users"));
+        assertFalse(ApiPath.allowed("GET", "/api/calendars/../admin"));
+        assertFalse(ApiPath.allowed("GET", "//evil.example/api/me"));
+        assertFalse(ApiPath.allowed("GET", "https://evil.example/api/me"));
+        assertFalse(ApiPath.allowed("TRACE", "/api/me"));
+        assertFalse(ApiPath.allowed("GET", "/dav/"));
+        assertFalse(ApiPath.allowed(null, null));
+    }
+
+    @Test
     public void notEnrollLinks() {
         assertNull(EnrollLink.parse(null));
         assertNull(EnrollLink.parse(""));

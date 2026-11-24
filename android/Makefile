@@ -32,6 +32,7 @@ SRC    := $(shell find src -name '*.java')
 RES    := $(shell find res -type f)
 # The parts with no Android types, tested on the JVM.
 PURE   := src/io/github/nebuloss/agendouille/EnrollLink.java \
+          src/io/github/nebuloss/agendouille/ApiPath.java \
           src/io/github/nebuloss/agendouille/ServerAddress.java \
           src/io/github/nebuloss/agendouille/ICal.java \
           src/io/github/nebuloss/agendouille/EventMapper.java \

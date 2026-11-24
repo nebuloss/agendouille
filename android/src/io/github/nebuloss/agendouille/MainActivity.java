@@ -287,6 +287,9 @@ public final class MainActivity extends Activity {
             case "account.remove":
                 removeAccount(r.id);
                 break;
+            case "api":
+                api(r.id, r.args.optString("method"), r.args.optString("path"), r.args.isNull("body") ? null : r.args.optString("body", null));
+                break;
             case "crash.clear":
                 CrashLog.clear(this);
                 io.execute(() -> send(BridgeCodec.ok(r.id, state())));
@@ -501,22 +504,87 @@ public final class MainActivity extends Activity {
             Credentials c = Credentials.load(this);
             if (c != null && "enrolled".equals(c.mode)) {
                 try {
-                    Http.Answer s = Http.call("POST", c.server + "/api/app/session", c.username, c.secret, null, null, userAgent());
-                    StringBuilder cookie = new StringBuilder();
-                    for (String sc : s.cookies) {
-                        if (cookie.length() > 0) cookie.append("; ");
-                        cookie.append(sc.split(";", 2)[0]);
-                    }
-                    if (s.status == 204 || s.status == 200) {
-                        Http.call("DELETE", c.server + "/api/devices/" + c.deviceId, null, null, cookie.toString(), null, userAgent());
-                    }
+                    String cookie = openSession(c);
+                    if (cookie != null) Http.call("DELETE", c.server + "/api/devices/" + c.deviceId, null, null, cookie, null, userAgent());
                 } catch (IOException ignored) {
                     // Offline: the device stays listed in agendouille, where it can be removed.
                 }
             }
             Credentials.remove(this);
+            session = null;
             SyncStatus.clear(this);
             send(BridgeCodec.ok(id, state()));
+        });
+    }
+
+    /** The family API's session, opened with the device's key ("enrolled" only). */
+    private volatile String session;
+    private volatile String sessionFor;
+
+    /** A session from the device's key, as a Cookie header; null when refused. */
+    private String openSession(Credentials c) throws IOException {
+        Http.Answer s = Http.call("POST", c.server + "/api/app/session", c.username, c.secret, null, null, userAgent());
+        if (s.status != 204 && s.status != 200) return null;
+        StringBuilder cookie = new StringBuilder();
+        for (String sc : s.cookies) {
+            if (cookie.length() > 0) cookie.append("; ");
+            cookie.append(sc.split(";", 2)[0]);
+        }
+        return cookie.toString();
+    }
+
+    /**
+     * The screens' family API calls (Calendriers, approving a browser), on
+     * the account's session: what ApiPath allows, and only that. The answer
+     * is the server's own, status and JSON, for the page's Api to read.
+     */
+    private void api(long id, String method, String path, String body) {
+        io.execute(() -> {
+            Credentials c = Credentials.load(this);
+            if (c == null) {
+                send(BridgeCodec.error(id, "signed_out", getString(R.string.manage_signed_out)));
+                return;
+            }
+            if (!ApiPath.allowed(method, path)) {
+                send(BridgeCodec.error(id, "forbidden", "not allowed: " + method + " " + path));
+                return;
+            }
+            try {
+                RawHttp.Answer a = null;
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    String key = c.server + " " + c.username;
+                    if (session == null || !key.equals(sessionFor)) {
+                        Http.Answer s = Http.call("POST", c.server + "/api/app/session", c.username, c.secret, null, null, userAgent());
+                        if (s.status != 204 && s.status != 200) {
+                            // A device's password opens CalDAV only: the server says so, in its words.
+                            send(BridgeCodec.ok(id, new JSONObject().put("status", s.status).put("body", s.body)));
+                            return;
+                        }
+                        StringBuilder cookie = new StringBuilder();
+                        for (String sc : s.cookies) {
+                            if (cookie.length() > 0) cookie.append("; ");
+                            cookie.append(sc.split(";", 2)[0]);
+                        }
+                        session = cookie.toString();
+                        sessionFor = key;
+                    }
+                    java.util.Map<String, String> h = new java.util.LinkedHashMap<>();
+                    h.put("User-Agent", userAgent());
+                    h.put("Accept", "application/json");
+                    h.put("Accept-Language", java.util.Locale.getDefault().toLanguageTag());
+                    h.put("Cookie", session);
+                    if (body != null) h.put("Content-Type", "application/json");
+                    a = RawHttp.request(null, method, c.server + path, h,
+                            body == null ? null : body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    if (a.status != 401) break;
+                    session = null; // expired: one more try with a new one
+                }
+                send(BridgeCodec.ok(id, new JSONObject().put("status", a.status).put("body", a.text())));
+            } catch (IOException e) {
+                send(BridgeCodec.error(id, "offline", getString(R.string.offline)));
+            } catch (Exception e) {
+                send(BridgeCodec.error(id, "error", String.valueOf(e.getMessage())));
+            }
         });
     }
 

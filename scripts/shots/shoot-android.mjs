@@ -48,7 +48,20 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       const ch = new MessageChannel();
       ch.port2.onmessage = (e) => {
         const r = JSON.parse(e.data);
-        const result = r.call === 'hello' ? { app_bridge: 2, app_version: 'dev', android: 34 } : state;
+        // The family API the tabs call (MainActivity "api"), as the server answers.
+        const api = {
+          'GET /api/calendars': { calendars: [
+            { ref: 'lea/famille', name: 'Famille', color: '#3b6ea5', owner: 'lea', access: 'owner', hidden: false, description: 'Les rendez-vous de toute la maison',
+              shares: [{ target: 'g:famille', access: 'readwrite' }] },
+            { ref: 'lea/perso', name: 'Perso de Léa', color: '#7b1fa2', owner: 'lea', access: 'owner', hidden: false, description: '', shares: [] },
+            { ref: 'maman/ecole', name: 'École', color: '#e8710a', owner: 'maman', access: 'read', hidden: false, description: '' },
+          ] },
+          'GET /api/people': { users: [{ name: 'maman', display_name: 'Maman', color: '#e53935' }], groups: [{ name: 'famille', display_name: 'Famille', color: '' }] },
+          'GET /api/approvals/PKW-6VY': { user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36', ip: '192.168.1.24', numbers: [30, 72, 15], expires_at: new Date(Date.now() + 120000).toISOString() },
+        };
+        const result = r.call === 'hello' ? { app_bridge: 2, app_version: 'dev', android: 34 }
+          : r.call === 'api' ? { status: 200, body: JSON.stringify(api[`${r.args.method} ${r.args.path}`] ?? {}) }
+            : state;
         ch.port2.postMessage(JSON.stringify({ id: r.id, ok: true, result }));
       };
       window.postMessage('agendouille-bridge', '*', [ch.port1]);
@@ -57,6 +70,18 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   await page.goto(base + '/index.html', { waitUntil: 'networkidle0' });
   await new Promise((r) => setTimeout(r, 500));
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });
+  if (name === 'account') {
+    // The other tabs: Calendriers (the web app's page), Navigateur, and approving one.
+    for (const [i, shot] of [[1, 'calendars'], [2, 'browser']]) {
+      await (await page.$$('nav button'))[i].click();
+      await new Promise((r) => setTimeout(r, 500));
+      await page.screenshot({ path: `${out}/android-${lang}-${shot}.png`, fullPage: true });
+    }
+    await page.type('input[aria-label]', 'PKW-6VY');
+    await (await page.$('form button[type="submit"]')).click();
+    await new Promise((r) => setTimeout(r, 500));
+    await page.screenshot({ path: `${out}/android-${lang}-approve.png` });
+  }
   if (name === 'welcome') {
     const manual = await page.$('[data-action="manual"]');
     if (manual === null) {

@@ -75,6 +75,9 @@ interface People {
 
 /** Calendriers (PLAN.md 9.3): mine, shared with me; create, share, hide. */
 export class CalendarsPage extends AppPage {
+  /** Export and import (.ics files): the Android app has no use for them. */
+  protected readonly files: boolean = true;
+
   protected async render(): Promise<Child[]> {
     const [cals, people] = await Promise.all([this.api.get<Calendars>('/calendars'), this.api.get<People>('/people')]);
     const me = this.doc.querySelector<HTMLElement>('.app')?.dataset['user'] ?? '';
@@ -121,8 +124,8 @@ export class CalendarsPage extends AppPage {
       h('div', { class: 'flex flex-wrap items-center gap-1' },
         action(t('share'), () => this.share(c, people), 'tonal', 'share', 'sm'),
         action(t('edit'), () => this.editProps(c), 'text', 'edit', 'sm'),
-        h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`${path}/export`), download: `${c.ref}.ics` }, icon('download'), t('export')),
-        action(t('import'), () => this.importInto(c), 'text', 'upload', 'sm'),
+        this.files ? h('a', { class: ui.btn('text', 'sm'), href: this.api.url(`${path}/export`), download: `${c.ref}.ics` }, icon('download'), t('export')) : null,
+        this.files ? action(t('import'), () => this.importInto(c), 'text', 'upload', 'sm') : null,
         action(t('give'), () => this.transfer(c, people), 'text', 'give', 'sm'),
         h('span', { class: 'ml-auto' }),
         action(t('delete'), () => this.remove(c), 'danger-text', 'trash', 'sm')));

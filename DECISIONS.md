@@ -3,6 +3,21 @@
 Deviations from `PLAN.md` and answers to its open questions, newest first.
 Each entry gives the date, the decision and the reason.
 
+## 2026-11-24: the Android app manages calendars and approves browsers
+
+The user: "a navigation panel with scan qr code (to connect a browser),
+also we should be able to manage our calendar (add/remove/share them)".
+Still a sync app: no event is shown or read. Three tabs at the bottom:
+Synchro (as before), Calendriers (the web app's `CalendarsPage`, without
+export and import), Navigateur (approving a browser's sign-in: its QR code
+or the code typed, then the number). The page's `Api` runs over the bridge
+(`api`): Java sends the request with a session the device's key opens
+(`/api/app/session`), so only devices enrolled with the app's code (kind
+`app`) can; a device's password (by hand, or a DAVx5 QR code) opens CalDAV
+only, and the tabs say how to sign in with the app's code. Java allows
+only the paths of those two pages (`ApiPath`, tested): never events,
+exports, devices or the admin.
+
 ## 2026-11-24: the Android app is « Guémené » under its icon
 
 "agendouille" (11 letters) is cut in a launcher's grid (a Xiaomi's drawer

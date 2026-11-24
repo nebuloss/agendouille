@@ -25,4 +25,5 @@
   <string name="manual_refused">The server refused this user name or password. Check them, then try again.</string>
   <string name="manual_not_caldav">This server does not answer as an agendouille server (HTTP %1$d). Check the address.</string>
   <string name="crash_no_server">The report can be sent once this phone is signed in to a server. Copy it meanwhile.</string>
+  <string name="manage_signed_out">This phone is not signed in.</string>
 </resources>

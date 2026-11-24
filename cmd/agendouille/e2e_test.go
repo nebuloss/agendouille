@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -374,6 +375,21 @@ func TestM1(t *testing.T) {
 	}
 	if a := x.do("GET", x.public+"/api/me", nil, cookie(auth.AppCookie, webview)); a.status != 200 {
 		t.Errorf("the WebView's /api/me: %d", a.status)
+	}
+	// The app's screens, as its Java sends them: no Origin, no Sec-Fetch-*.
+	appJSON := func(r *http.Request) {
+		r.Header.Set("Cookie", auth.AppCookie+"="+webview)
+		r.Header.Set("Content-Type", "application/json")
+	}
+	if a := x.do("POST", x.public+"/api/calendars", strings.NewReader(`{"name":"Depuis le téléphone","color":"#43a047"}`), appJSON); a.status != http.StatusCreated {
+		t.Errorf("the app creates a calendar: %d %s", a.status, a.body)
+	}
+	code, number, _ := x.startSignin()
+	if a := x.do("GET", x.public+"/api/approvals/"+url.PathEscape(code), nil, appJSON); a.status != 200 || !strings.Contains(a.body, `"numbers"`) {
+		t.Errorf("the app looks an approval up: %d %s", a.status, a.body)
+	}
+	if a := x.do("POST", x.public+"/api/approvals/"+url.PathEscape(code), strings.NewReader(fmt.Sprintf(`{"number":%d}`, number)), appJSON); a.status != http.StatusNoContent {
+		t.Errorf("the app approves a browser: %d %s", a.status, a.body)
 	}
 
 	// --- moving the public listener, then turning it off, live

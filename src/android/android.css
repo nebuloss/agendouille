@@ -4,6 +4,7 @@
 @import "../shared/design/base.css";
 @source ".";
 @source "../shared";
+@source "../app/pages/Manage.ts";
 @source "../../android/assets/web/index.html";
 
 /* The app draws under the status and navigation bars (edge to edge). */
