@@ -913,10 +913,12 @@ export class App {
    * other pages grow and scroll as usual.
    */
   private fit(home: boolean): void {
-    const on = ['h-dvh', 'overflow-y-auto', 'pb-2', 'gap-[clamp(8px,1.6vh,20px)]', 'landscape:max-w-5xl'];
+    const on = ['h-dvh', 'overflow-y-auto', 'pb-2', 'gap-[clamp(8px,1.6vh,20px)]'];
     const off = ['min-h-screen', 'pb-10', 'gap-5'];
     this.root.classList.remove(...(home ? off : on));
     this.root.classList.add(...(home ? on : off));
+    // Landscape: every page takes the width, not the portrait column.
+    this.root.classList.add('landscape:max-w-5xl');
   }
 
   /** Home's top: who and where, opening the account's page. */

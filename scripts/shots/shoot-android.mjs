@@ -100,6 +100,13 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       const inner = await page.evaluate(() => { const r = document.getElementById('app'); return r.scrollHeight - r.clientHeight; });
       if (over > 1 || inner > 1) errors.push(`home ${w}x${hgt}: scrolls (${over}px page, ${inner}px inside)`);
     }
+    // A page in landscape: the whole width.
+    await go(page, 'settings');
+    await page.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    await new Promise((r) => setTimeout(r, 300));
+    await page.screenshot({ path: `${out}/android-${lang}-settings-landscape.png` });
+    await page.click('[data-back]');
+    await new Promise((r) => setTimeout(r, 300));
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     await new Promise((r) => setTimeout(r, 300));
     // Home's pages: Calendriers (the web app's page), Réglages, Autorisations, Appareils.
