@@ -44,9 +44,8 @@ scanning.
 
 ## Moving around
 
-Home is the server, the account at the top right (a squircle with the
-person icon and the name, opening its page: the server, the user,
-« Se déconnecter »), the sync's state (« Synchroniser » in the standard
+Home is the account first, large (the person icon and the name, opening
+its page: the server, the user, « Se déconnecter »), the sync's state (« Synchroniser » in the standard
 mode; none in the instant mode, which needs no hand), and four rows,
 each opening its page: **Calendriers**, **Appareils**, **Autorisations**
 (in orange when one is missing) and **Réglages**. Every page has a top bar
@@ -68,7 +67,7 @@ leaves the app in the background.
   button.
 - **Réglages**: the sync mode, language,
   appearance, version, « Versions de développement » and « Rechercher une
-  mise à jour ».
+  mise à jour », and « Code source sur GitHub ».
 
 ## Background sync
 

@@ -2,6 +2,8 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    sourceCode: 'Code source sur GitHub',
+    accountSub: 'Compte · se déconnecter',
     thisPhoneCard: 'Ce téléphone',
     homeCalendars: { zero: 'Aucun sur ce téléphone', one: '{count} sur ce téléphone', other: '{count} sur ce téléphone' },
     homeDevices: 'Connecter un navigateur, appareils et navigateurs connectés',
@@ -202,6 +204,8 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    sourceCode: 'Source code on GitHub',
+    accountSub: 'Account · sign out',
     thisPhoneCard: 'This phone',
     homeCalendars: { zero: 'None on this phone', one: '{count} on this phone', other: '{count} on this phone' },
     homeDevices: 'Connect a browser, devices and browsers signed in',

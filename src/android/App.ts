@@ -35,6 +35,10 @@ function reason(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+/** Where the code is, and GitHub's mark (as in the web app's header). */
+const SOURCE_URL = 'https://github.com/nebuloss/agendouille';
+const GITHUB_MARK = 'M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12';
+
 /** The views: home, and the pages its rows open (the permissions from anywhere). */
 type View = 'home' | 'account' | 'calendars' | 'devices' | 'settings' | 'permissions';
 
@@ -645,6 +649,21 @@ export class App {
     el.focus();
   }
 
+  /** À propos: the code, on GitHub, in the browser. */
+  private sourceLink(): HTMLElement {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = this.doc.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('class', 'size-5 fill-current');
+    const path = this.doc.createElementNS(ns, 'path');
+    path.setAttribute('d', GITHUB_MARK);
+    svg.append(path);
+    const b = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} -ml-3 self-start` }, svg, t('sourceCode'));
+    b.addEventListener('click', () => void this.bridge.call('open', { url: SOURCE_URL }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
+    return b;
+  }
+
   /** « Versions de développement »: where updates come from. */
   private devUpdatesRow(s: AppState): HTMLElement {
     const sw = switchButton(this.doc, t('devUpdates'), s.devUpdates, (on) => {
@@ -678,7 +697,8 @@ export class App {
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
           h('dt', {}, t('android')), h('dd', {}, String(this.bridge.hello?.android ?? '?'))),
         this.devUpdatesRow(s),
-        this.updateButton()),
+        this.updateButton(),
+        this.sourceLink()),
     ];
   }
 
@@ -881,19 +901,17 @@ export class App {
 
   /** Home's top: who and where, opening the account's page. */
   private accountHeader(user: string, host: string): HTMLElement {
-    // The account: a squircle with the person icon and the name, as the
-    // profile button of other apps: it says what it opens.
-    const account = h('button', { type: 'button', 'data-view': 'account', 'aria-label': `${t('account')} ${user}`,
-      class: 'state-layer flex max-w-[45%] shrink-0 items-center gap-2 rounded-[18px] bg-secondary-container py-1.5 pr-3 pl-1.5 text-on-secondary-container' },
-    h('span', { class: 'grid size-9 shrink-0 place-items-center rounded-[14px] bg-primary text-on-primary [&_.ic]:size-5' }, icon('person')),
-    h('span', { class: 'truncate text-sm font-medium' }, user));
-    account.addEventListener('click', () => this.go('account'));
-    return h('header', { class: 'flex items-center gap-3 pt-4' },
-      h('img', { src: '/icon.svg', alt: '', width: 44, height: 44, class: 'rounded-md3-m' }),
-      h('div', { class: 'flex min-w-0 flex-1 flex-col' },
-        h('h1', { class: 'truncate text-[22px] leading-7 font-normal' }, 'agendouille'),
-        h('span', { class: 'truncate text-sm text-on-surface-variant' }, host)),
-      account);
+    // The account first, large: who is signed in on this phone, and the
+    // way to the account's page (the server is there, not here).
+    const b = h('button', { type: 'button', 'data-view': 'account', 'aria-label': `${t('account')} ${user}`, title: host,
+      class: 'state-layer mt-4 flex w-full items-center gap-4 rounded-md3-xl bg-secondary-container p-4 text-left text-on-secondary-container' },
+    h('span', { class: 'grid size-14 shrink-0 place-items-center rounded-[20px] bg-primary text-on-primary' }, bigIcon(this.doc, 'person', 30)),
+    h('span', { class: 'flex min-w-0 flex-1 flex-col gap-0.5' },
+      h('span', { class: 'truncate text-[22px] leading-7 font-normal' }, user),
+      h('span', { class: 'truncate text-sm opacity-80' }, t('accountSub'))),
+    icon('right'));
+    b.addEventListener('click', () => this.go('account'));
+    return b;
   }
 
   /** Home's rows, Android's settings fashion: each opens its page. */
@@ -960,4 +978,12 @@ function topBar(doc: Document, title: string, back: () => void, action?: Child):
   const b = h('button', { type: 'button', 'data-back': '', class: 'state-layer -ml-2 grid size-12 shrink-0 place-items-center rounded-full text-on-surface', 'aria-label': t('back') }, icon('left', doc));
   b.addEventListener('click', back);
   return h('div', { class: 'flex min-h-14 items-center gap-1 pt-1' }, b, h('span', { class: 'min-w-0 flex-1 truncate text-lg font-medium' }, title), action ?? null);
+}
+
+/** An icon larger than .ic's 20 px (base.css wins over the size utilities). */
+function bigIcon(doc: Document, name: Parameters<typeof icon>[0], px: number): SVGSVGElement {
+  const ic = icon(name, doc);
+  ic.style.width = `${px}px`;
+  ic.style.height = `${px}px`;
+  return ic;
 }
