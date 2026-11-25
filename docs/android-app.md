@@ -42,6 +42,15 @@ change made elsewhere within seconds: see [instant sync](push.md)). Réglages,
 needs: the battery exemption only for instant sync; the camera when
 scanning.
 
+## Moving around
+
+Four tabs at the bottom; tapping the current one goes back to its first
+page. A page under a tab (a calendar, the permissions) has a top bar with
+back. Android's back gesture works as in any app: it closes a dialog, goes
+back from a page to where it was opened from (the permissions opened from
+Synchro go back to Synchro), from another tab to Synchro, and from Synchro
+leaves the app in the background.
+
 ## The tabs
 
 - **Synchro**: the last sync, « Synchroniser » now, how many events and

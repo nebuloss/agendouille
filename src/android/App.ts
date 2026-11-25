@@ -73,6 +73,13 @@ class PhoneCalendars extends CalendarsPage {
     return this.detail(c, me, people);
   }
 
+  /** The back gesture: a calendar's page goes back to the list; false on the list. */
+  back(): boolean {
+    if (this.selected === null) return false;
+    this.open(null);
+    return true;
+  }
+
   private open(ref: string | null): void {
     this.selected = ref;
     void this.refresh();
@@ -111,8 +118,7 @@ class PhoneCalendars extends CalendarsPage {
 
   /** One calendar: its name and colour, then grouped rows, Android's settings fashion. */
   private detail(c: Calendar, me: string, people: People): Child[] {
-    const back = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} -ml-3 self-start` }, icon('left'), t('tabCalendars'));
-    back.addEventListener('click', () => this.open(null));
+    const back = topBar(this.doc, t('tabCalendars'), () => this.open(null));
     const owned = c.owner === me;
     const shares = c.shares ?? [];
     const head = h('div', { class: 'flex items-center gap-3' }, swatch(c.color, 'md'),
@@ -279,6 +285,8 @@ export class App {
   private tab: Tab = 'sync';
   /** Réglages, or its permissions' view. */
   private settingsView: 'main' | 'permissions' = 'main';
+  /** The tab the permissions were opened from, to go back to it. */
+  private permissionsFrom: Tab | null = null;
   /** The update offer the dialog showed last (its time), not to show it twice. */
   private updateShown = 0;
   /** The open update dialog's status line, which the "update" events fill. */
@@ -289,6 +297,7 @@ export class App {
     this.toasts = new Toasts(doc.getElementById('toasts') ?? doc.body);
     this.api = bridgeApi(bridge);
     bridge.on('state', (s) => this.show(parseState(s)));
+    bridge.on('back', () => this.back());
     // A tapped alert: its view.
     bridge.on('navigate', (d) => {
       if ((d as Record<string, unknown> | null)?.['view'] === 'permissions' && this.state?.account) this.showPermissions();
@@ -353,13 +362,7 @@ export class App {
         class: on ? 'flex flex-1 flex-col items-center gap-1 pt-3 pb-3 text-xs font-semibold text-on-surface' : 'flex flex-1 flex-col items-center gap-1 pt-3 pb-3 text-xs font-medium text-on-surface-variant',
         ...(on ? { 'aria-current': 'page' } : {}),
       }, h('span', { class: on ? 'grid h-8 w-16 place-items-center rounded-md3-full bg-secondary-container text-on-secondary-container' : 'grid h-8 w-16 place-items-center rounded-md3-full' }, icon(ic)), label);
-      b.addEventListener('click', () => {
-        if (this.tab === tab) return;
-        this.tab = tab;
-        this.settingsView = 'main';
-        this.draw();
-        this.doc.defaultView?.scrollTo(0, 0);
-      });
+      b.addEventListener('click', () => this.goTab(tab));
       return b;
     };
     return h('nav', { class: 'fixed inset-x-0 bottom-0 z-40 flex border-t border-outline-variant bg-surface-container pb-[env(safe-area-inset-bottom)]', 'aria-label': t('tabs') },
@@ -429,12 +432,53 @@ export class App {
     return [p.calendar, p.notifications, ...(s.push.instant ? [p.battery, s.push.hidden] : [])].filter((x) => !x).length;
   }
 
-  /** The permissions' view, from anywhere: Réglages' tab, the view on top. */
+  /** The permissions' view, from anywhere: Réglages' tab, the view on top; back returns where it was opened. */
   private showPermissions(): void {
+    if (this.tab !== 'settings' || this.settingsView !== 'permissions') this.permissionsFrom = this.tab;
     this.tab = 'settings';
     this.settingsView = 'permissions';
     this.draw();
     this.doc.defaultView?.scrollTo(0, 0);
+  }
+
+  private closePermissions(): void {
+    this.settingsView = 'main';
+    this.tab = this.permissionsFrom ?? 'settings';
+    this.permissionsFrom = null;
+    this.draw();
+    this.doc.defaultView?.scrollTo(0, 0);
+  }
+
+  /** A tab: its first page, also when it is the current one (a calendar's page goes back to the list). */
+  private goTab(tab: Tab): void {
+    this.tab = tab;
+    this.settingsView = 'main';
+    this.permissionsFrom = null;
+    this.draw();
+    this.doc.defaultView?.scrollTo(0, 0);
+  }
+
+  /**
+   * Android's back gesture, as in any app: an open dialog closes; a page
+   * goes back to where it came from; another tab goes back to Synchro;
+   * Synchro leaves the app (it stays in the background).
+   */
+  private back(): void {
+    const open = this.doc.querySelector<HTMLDialogElement>('dialog[open]');
+    if (open !== null) {
+      open.close('');
+      return;
+    }
+    if (this.tab === 'settings' && this.settingsView === 'permissions') {
+      this.closePermissions();
+      return;
+    }
+    if (this.page instanceof PhoneCalendars && this.page.back()) return;
+    if (this.state?.account != null && this.tab !== 'sync') {
+      this.goTab('sync');
+      return;
+    }
+    void this.bridge.call('app.leave').catch(() => undefined);
   }
 
   /** Synchro, while a permission is missing: a small link to them all. */
@@ -487,11 +531,7 @@ export class App {
   /** Each permission: what it is for, granted or not, and the way to grant it. */
   private permissionsView(s: AppState): Child[] {
     const p = s.permissions;
-    const back = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} -ml-3 self-start` }, icon('left'), t('tabSettings'));
-    back.addEventListener('click', () => {
-      this.settingsView = 'main';
-      this.draw();
-    });
+    const back = topBar(this.doc, t('permissions'), () => this.closePermissions());
     const row = (ic: Parameters<typeof icon>[0], title: string, why: string, ok: boolean | null, call: string, label: string, actionCall?: (b: HTMLElement) => void): HTMLElement => {
       const b = h('button', { type: 'button', class: ui.btn(ok === false ? 'filled' : 'text', 'sm') }, label);
       if (actionCall) actionCall(b);
@@ -519,7 +559,7 @@ export class App {
     const settings = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} self-start` }, icon('gear'), t('appSettings'));
     settings.addEventListener('click', () => this.open('settings.open'));
     return [
-      h('div', { class: 'flex flex-col gap-2 pt-2' }, back, h('h1', { class: 'text-[22px] leading-7 font-normal' }, t('permissions'))),
+      back,
       this.permissionsMode(s),
       h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...rows),
       h('p', { class: 'px-1 text-sm text-on-surface-variant' }, t('deniedTwice')),
@@ -925,4 +965,14 @@ export class App {
           : chip(`${a.mode === 'manual' ? t('byHand') : t('byDavx5')} · ${t('syncOnly')}`, 'warn', 'lock'))),
       h('div', {}, remove));
   }
+}
+
+/**
+ * A page's top bar (Material's small top app bar): back, and where back
+ * goes or the page's title. The same on every page under a tab.
+ */
+function topBar(doc: Document, title: string, back: () => void): HTMLElement {
+  const b = h('button', { type: 'button', class: 'state-layer -ml-2 grid size-12 shrink-0 place-items-center rounded-full text-on-surface', 'aria-label': t('back') }, icon('left', doc));
+  b.addEventListener('click', back);
+  return h('div', { class: 'flex min-h-14 items-center gap-1 pt-1' }, b, h('span', { class: 'truncate text-lg font-medium' }, title));
 }

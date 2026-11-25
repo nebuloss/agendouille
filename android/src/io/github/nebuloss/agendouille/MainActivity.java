@@ -133,6 +133,10 @@ public final class MainActivity extends Activity {
         web.loadUrl(ORIGIN + "/index.html");
         pendingLink = linkOf(getIntent());
         pendingOpen = getIntent().getStringExtra("open");
+        // Back is the screens' (a page, a tab, then leave): Android 13 on, its callback.
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::backToScreens);
+        }
     }
 
     @Override
@@ -160,6 +164,25 @@ public final class MainActivity extends Activity {
         checkConfig();
         syncOnOpen();
         io.execute(() -> Alerts.permissions(this));
+    }
+
+    /** Before Android 13: the back key, to the screens too. */
+    @Override
+    public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && Build.VERSION.SDK_INT < 33) {
+            backToScreens();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    /** The screens decide what back does; without them (not loaded yet), the app leaves. */
+    private void backToScreens() {
+        if (port == null) {
+            moveTaskToBack(true);
+            return;
+        }
+        send(BridgeCodec.event("back", new JSONObject()));
     }
 
     /** Shows one of the screens' views (a tapped alert). */
@@ -390,6 +413,11 @@ public final class MainActivity extends Activity {
                 io.execute(() -> send(BridgeCodec.ok(r.id, state())));
                 break;
             }
+            case "app.leave":
+                // As Android does at a task's root: to the background, not closed.
+                moveTaskToBack(true);
+                send(BridgeCodec.ok(r.id, null));
+                break;
             case "update.check":
                 updateCheck(r.id);
                 break;

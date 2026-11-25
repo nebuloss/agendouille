@@ -2,6 +2,7 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    back: 'Retour',
     permNotifications: 'Notifications',
     permNotificationsWhy: 'Pour vous prévenir d’une connexion à refaire, d’une synchronisation en échec ou d’une autorisation manquante.',
     pushVisibleRibbon: 'Sa notification est visible : masquez-la dans Autorisations.',
@@ -197,6 +198,7 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    back: 'Back',
     permNotifications: 'Notifications',
     permNotificationsWhy: 'To tell you when to sign in again, when sync fails, or when a permission is missing.',
     pushVisibleRibbon: 'Its notification is visible: hide it in Permissions.',
