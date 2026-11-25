@@ -59,7 +59,7 @@ export const EMPTY: AppState = {
   permissions: { calendar: false, camera: false, notifications: false, battery: false },
   xiaomi: false,
   devUpdates: false,
-  push: { instant: false, service: false, connected: false, users: [] },
+  push: { instant: false, service: false, connected: false, hidden: false, users: [] },
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
   crash: null,
@@ -109,6 +109,8 @@ export interface PushState {
   service: boolean;
   /** The stream is open now. */
   connected: boolean;
+  /** Its notification's category is turned off in Android's settings. */
+  hidden: boolean;
   /** The apps that use this one as their UnifiedPush distributor (DAVx5). */
   users: string[];
 }
@@ -119,6 +121,7 @@ function parsePush(v: unknown): PushState {
     instant: o['instant'] === true,
     service: o['service'] === true,
     connected: o['connected'] === true,
+    hidden: o['hidden'] === true,
     users: Array.isArray(o['users']) ? (o['users'] as unknown[]).map(String) : [],
   };
 }

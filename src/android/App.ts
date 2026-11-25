@@ -516,8 +516,8 @@ export class App {
         p.service ? switchButton(this.doc, t('pushSwitch'), p.instant, (on) => set({ instant: on })) : null),
     ];
     if (p.instant) {
-      body.push(h('p', { class: 'text-sm' }, t('pushNotification')));
-      const hide = h('button', { type: 'button', class: `${ui.btn('tonal', 'sm')} self-start` }, icon('bell'), t('pushHide'));
+      body.push(h('p', { class: 'text-sm' }, p.hidden ? t('pushHidden') : t('pushNotification')));
+      const hide = h('button', { type: 'button', class: `${ui.btn(p.hidden ? 'text' : 'tonal', 'sm')} self-start` }, icon('bell'), p.hidden ? t('pushNotificationSetting') : t('pushHide'));
       hide.addEventListener('click', () => set({ notification: true }));
       body.push(hide);
       body.push(h('p', { class: 'text-sm text-on-surface-variant' },

@@ -2,6 +2,8 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    pushHidden: 'Sa notification est masquée : la connexion continue sans rien afficher.',
+    pushNotificationSetting: 'Réglage de la notification',
     pushTitle: 'Synchronisation instantanée',
     pushHelp: 'Un changement fait ailleurs arrive sur ce téléphone en quelques secondes, au lieu de la prochaine synchronisation. L’application garde pour cela une connexion à votre serveur agendouille, sans passer par Google.',
     pushSwitch: 'Activée',
@@ -174,6 +176,8 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    pushHidden: 'Its notification is hidden: the connection goes on without showing anything.',
+    pushNotificationSetting: 'Notification setting',
     pushTitle: 'Instant sync',
     pushHelp: 'A change made elsewhere reaches this phone within seconds instead of at the next sync. The app keeps a connection to your agendouille server for it, never through Google.',
     pushSwitch: 'On',

@@ -917,17 +917,27 @@ public final class MainActivity extends Activity {
         return new JSONObject().put("instant", p.getBoolean("instant", false))
                 .put("service", p.getBoolean("service", false))
                 .put("connected", p.getBoolean("connected", false))
+                .put("hidden", notificationHidden())
                 .put("users", users);
+    }
+
+    /** Whether the person turned instant sync's notification category off. */
+    private boolean notificationHidden() {
+        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+        android.app.NotificationChannel ch = nm == null ? null : nm.getNotificationChannel(PushService.CHANNEL);
+        return ch != null && ch.getImportance() == android.app.NotificationManager.IMPORTANCE_NONE;
     }
 
     /** Réglages: instant sync on or off; or Android's settings of its notification. */
     private void setPush(JSONObject args) {
         if (args.optBoolean("notification")) {
+            // This notification's own category, not the app's whole notifications.
             PushService.channel(this);
-            startActivity(new Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())
-                    .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, PushService.CHANNEL)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            openFirst(new Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())
+                            .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, PushService.CHANNEL),
+                    new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName()));
             return;
         }
         if (args.has("instant")) {
