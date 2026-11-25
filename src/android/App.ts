@@ -516,11 +516,11 @@ export class App {
         p.service ? switchButton(this.doc, t('pushSwitch'), p.instant, (on) => set({ instant: on })) : null),
     ];
     if (p.instant) {
-      body.push(h('label', { class: 'flex items-center gap-4' },
-        h('span', { class: 'flex min-w-0 flex-1 flex-col gap-0.5' },
-          h('span', { class: 'text-base font-medium' }, t('pushShowNotification')),
-          h('span', { class: 'text-sm text-on-surface-variant' }, p.hidden ? t('pushHidden') : t('pushNotification'))),
-        switchButton(this.doc, t('pushShowNotification'), !p.hidden, (on) => set({ hide: !on }))));
+      body.push(h('p', { class: 'text-sm' }, p.hidden ? t('pushHidden') : t('pushNotification')));
+      const settings = h('button', { type: 'button', class: `${ui.btn(p.hidden ? 'text' : 'tonal', 'sm')} self-start` }, icon('bell'), t('pushNotificationSetting'));
+      settings.addEventListener('click', () => set({ notification: true }));
+      body.push(settings);
+      if (!p.hidden) body.push(h('p', { class: 'text-sm text-on-surface-variant' }, t('pushLongPress')));
       body.push(h('p', { class: 'text-sm text-on-surface-variant' },
         p.users.length > 0 ? t('pushUsers', { apps: p.users.join(', ') }) : t('pushDavx5')));
     }

@@ -35,13 +35,6 @@ import java.util.Base64;
  */
 public final class PushService extends Service {
     static final String CHANNEL = "push";
-    /**
-     * The same notification, hidden: a category made turned off (an app may
-     * create one so, never turn one off later). Hiding it in the app works
-     * on every phone, where Android's settings page for one category is not
-     * always reachable (HyperOS opens the app's page instead).
-     */
-    static final String CHANNEL_HIDDEN = "push_hidden";
     private static final int NOTIFICATION = 7;
 
     private volatile boolean running;
@@ -71,24 +64,15 @@ public final class PushService extends Service {
         }
     }
 
-    /** Makes both categories; the one in use, as the person chose in Réglages. */
+    /** The notification's category, which the person can turn off in Android's settings. */
     static String channel(Context ctx) {
         NotificationManager nm = ctx.getSystemService(NotificationManager.class);
         NotificationChannel ch = new NotificationChannel(CHANNEL, ctx.getString(R.string.push_channel), NotificationManager.IMPORTANCE_MIN);
         ch.setDescription(ctx.getString(R.string.push_channel_help));
         ch.setShowBadge(false);
         nm.createNotificationChannel(ch);
-        NotificationChannel hidden = new NotificationChannel(CHANNEL_HIDDEN, ctx.getString(R.string.push_channel_hidden), NotificationManager.IMPORTANCE_NONE);
-        hidden.setDescription(ctx.getString(R.string.push_channel_help));
-        hidden.setShowBadge(false);
-        nm.createNotificationChannel(hidden);
-        return UnifiedPush.prefs(ctx).getBoolean("hide_notification", false) ? CHANNEL_HIDDEN : CHANNEL;
-    }
-
-    /** Again, with the notification in the category now chosen. */
-    static void restart(Context ctx) {
-        ctx.stopService(new Intent(ctx, PushService.class));
-        update(ctx);
+        nm.deleteNotificationChannel("push_hidden"); // a category of an earlier build
+        return CHANNEL;
     }
 
     @Override

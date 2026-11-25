@@ -15,14 +15,15 @@ The agendouille app: Réglages, « Synchronisation instantanée », « Activée 
 - **The notification.** Android lets an app stay connected only as a
   foreground service, which must have a notification. It is on the lowest
   channel: no icon in the status bar, folded at the bottom of the shade.
-  « Afficher la notification » off hides it, on every phone: the app moves
-  it to a category made turned off (an app cannot turn one off later, and
-  HyperOS opens the app's notifications page rather than one category's).
-  The connection goes on; Android still lists the app among its active
-  apps.
+  « Réglage de la notification » opens Android's page for the app's
+  notifications showing only its category, « Synchronisation instantanée »
+  (Android 11 on): turn it off and it never shows; the connection goes on,
+  and the card says it is hidden. A long press on the notification works
+  too. Only the person can turn it off: Android turns back on a category an
+  app made off for a foreground service.
 - **Battery.** Allow the app in Réglages, Autorisations (and « Démarrage
-  automatique » on a Xiaomi phone), or Android cuts the connection while
-  the phone sleeps.
+  automatique » under MIUI or HyperOS), or Android cuts the connection
+  while the phone sleeps.
 - **DAVx5** (4.4 or later) can use it too: the app is a UnifiedPush
   distributor. In DAVx5's account settings, « Push », choose Guémené.
   Réglages then shows « Utilisée aussi par : DAVx5 ».

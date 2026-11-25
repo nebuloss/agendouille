@@ -54,7 +54,7 @@ which opens a session for the person.
   the signed-in browsers, each with « Déconnecter », and « Déconnecter tous
   les navigateurs » (this phone stays signed in).
 - **Réglages**: « Autorisations » (each permission, granted or not, with
-  its button: calendar, notifications, camera, battery and, on a Xiaomi
+  its button: calendar, notifications, camera, battery and, under MIUI or HyperOS
   phone, autostart), « Synchronisation instantanée » (push, off by
   default: on, the app stays connected, with a discreet notification it
   can hide), language, appearance (light, dark, as the phone),
@@ -73,7 +73,7 @@ instantanée », see [instant sync](push.md)), at the next sync without it.
 
 Android holds back the background work of apps under battery optimisation,
 sometimes for hours on a phone left idle. Allow the app in Réglages,
-Autorisations (Synchro links there while one is missing). On Xiaomi phones (MIUI, Redmi, POCO), also turn on
+Autorisations (Synchro links there while one is missing). Under MIUI or HyperOS (Xiaomi's systems, not crDroid or LineageOS on a Xiaomi phone), also turn on
 « Démarrage automatique » for agendouille, or it only syncs while open:
 Android cannot tell the app whether it is on, so the app only opens the
 setting.
