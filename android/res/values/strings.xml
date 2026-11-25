@@ -45,4 +45,6 @@
     <string name="alert_perm_text">Missing for this sync mode: %1$s. Tap to allow it.</string>
     <string name="alert_perm_calendar">the calendar</string>
     <string name="alert_perm_battery">the battery (instant sync)</string>
+    <string name="alert_update_title">Update available</string>
+    <string name="alert_update_text">Version %1$s of agendouille is ready. Tap to install it.</string>
 </resources>

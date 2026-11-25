@@ -13,6 +13,7 @@ import (
 
 	"github.com/nebuloss/agendouille/internal/auth"
 	"github.com/nebuloss/agendouille/internal/push"
+	"github.com/nebuloss/agendouille/internal/web/assets"
 	"github.com/nebuloss/agendouille/internal/web/webx"
 )
 
@@ -96,6 +97,14 @@ func (h *handlers) pushStream(w http.ResponseWriter, r *http.Request, p *auth.Pr
 	hdr.Set("X-Accel-Buffering", "no") // nginx: do not buffer the stream
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(w, "retry: 5000\n\n")
+	// Which app this server carries, first: a phone hears of an update as
+	// soon as it reconnects after a deploy (no id: nothing to acknowledge).
+	apkSHA, apkVersion := "", ""
+	if a := assets.AndroidApp(); a != nil {
+		apkSHA, apkVersion = a.SHA256, a.Version
+	}
+	server, _ := json.Marshal(map[string]string{"apk_version": apkVersion, "apk_sha256": apkSHA, "server_version": h.d.Version})
+	_, _ = fmt.Fprintf(w, "event: server\ndata: %s\n\n", server)
 	flusher.Flush()
 	ping := time.NewTicker(streamPing)
 	defer ping.Stop()

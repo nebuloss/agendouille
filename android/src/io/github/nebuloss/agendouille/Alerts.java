@@ -26,7 +26,7 @@ final class Alerts {
     private Alerts() {}
 
     static final String CHANNEL = "alerts";
-    private static final int LOGIN = 11, SYNC = 12, PERMISSIONS = 13;
+    private static final int LOGIN = 11, SYNC = 12, PERMISSIONS = 13, UPDATE = 14;
     /** Failures in a row, online, before saying so: one is often a blip. */
     private static final int FAILURES = 2;
 
@@ -117,6 +117,19 @@ final class Alerts {
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    /** An update for this phone: told once per version, never one « Plus tard » was said to. */
+    static void update(Context ctx, String version) {
+        if (version.equals(ctx.getSharedPreferences("agendouille", Context.MODE_PRIVATE).getString("update_dismissed", ""))) return;
+        if (version.equals(prefs(ctx).getString("update", ""))) return;
+        prefs(ctx).edit().putString("update", version).apply();
+        show(ctx, UPDATE, ctx.getString(R.string.alert_update_title), ctx.getString(R.string.alert_update_text, version), "update");
+    }
+
+    /** The app is open: its dialog offers the update, the notification is done. */
+    static void updateSeen(Context ctx) {
+        cancel(ctx, UPDATE);
     }
 
     /** A sign-out: nothing of the account stays on screen. */

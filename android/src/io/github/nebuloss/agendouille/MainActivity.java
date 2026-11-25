@@ -164,6 +164,7 @@ public final class MainActivity extends Activity {
         checkConfig();
         syncOnOpen();
         io.execute(() -> Alerts.permissions(this));
+        Alerts.updateSeen(this);
     }
 
     /** Before Android 13: the back key, to the screens too. */
@@ -187,6 +188,11 @@ public final class MainActivity extends Activity {
 
     /** Shows one of the screens' views (a tapped alert). */
     private void navigate(String view) {
+        if ("update".equals(view)) {
+            Alerts.updateSeen(this);
+            updateCheck(0); // the dialog, whatever « six hours » says
+            return;
+        }
         if (port == null) {
             pendingOpen = view;
             return;

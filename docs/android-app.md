@@ -45,10 +45,11 @@ scanning.
 ## Moving around
 
 Home is the account first, large (the person icon and the name, opening
-its page: the server, the user, « Se déconnecter »), the sync's state (« Synchroniser » in the standard
-mode; none in the instant mode, which needs no hand), and four rows,
-each opening its page: **Calendriers**, **Appareils**, **Autorisations**
-(in orange when one is missing) and **Réglages**. Every page has a top bar
+its page: the server, the user, « Se déconnecter »), the sync's state
+(« Synchroniser » in the standard mode; none in the instant mode), then four
+rows, each opening its page: **Calendriers**, **Appareils**, **Autorisations**
+(in orange when one is missing) and **Réglages**; at the foot, the app's
+name, its version and its code on GitHub. Every page has a top bar
 with back. Android's back gesture works as in any app: it closes a dialog,
 goes back to where the page was opened from, home at last, and from home
 leaves the app in the background.
@@ -67,7 +68,7 @@ leaves the app in the background.
   button.
 - **Réglages**: the sync mode, language,
   appearance, version, « Versions de développement » and « Rechercher une
-  mise à jour », and « Code source sur GitHub ».
+  mise à jour ».
 
 ## Background sync
 
@@ -118,7 +119,10 @@ category: when the server no longer accepts the phone (sign in again), when
 sync fails twice in a row while the phone is online (never when offline),
 and when the sync mode lacks a permission (the calendar; the battery for
 instant sync), once for each new lack; tapping that one opens the
-permissions. Each goes away once things are right again.
+permissions. And « Mise à jour disponible », once per version: within seconds of the
+server's upgrade with instant sync (its stream reconnects and says which app
+it carries), at the next sync otherwise; tapping it opens the update.
+Each goes away once things are right again.
 
 ## When it stops
 

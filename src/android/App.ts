@@ -649,8 +649,8 @@ export class App {
     el.focus();
   }
 
-  /** À propos: the code, on GitHub, in the browser. */
-  private sourceLink(): HTMLElement {
+  /** Home's foot: the app, its version, and its code on GitHub (in the browser). */
+  private footer(): HTMLElement {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = this.doc.createElementNS(ns, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -659,9 +659,14 @@ export class App {
     const path = this.doc.createElementNS(ns, 'path');
     path.setAttribute('d', GITHUB_MARK);
     svg.append(path);
-    const b = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} -ml-3 self-start` }, svg, t('sourceCode'));
-    b.addEventListener('click', () => void this.bridge.call('open', { url: SOURCE_URL }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
-    return b;
+    const gh = h('button', { type: 'button', class: `${ui.btn('text', 'sm')}`, 'aria-label': t('sourceCode') }, svg, 'GitHub');
+    gh.addEventListener('click', () => void this.bridge.call('open', { url: SOURCE_URL }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
+    return h('footer', { class: 'mt-4 flex flex-col items-center gap-1 pb-6 text-center text-on-surface-variant' },
+      h('div', { class: 'flex items-center gap-2' },
+        h('img', { src: '/icon.svg', alt: '', width: 28, height: 28, class: 'rounded-md3-s' }),
+        h('span', { class: 'text-base font-medium text-on-surface' }, 'agendouille')),
+      h('span', { class: 'text-xs' }, `${t('version')} ${this.bridge.hello?.app_version ?? '?'}`),
+      gh);
   }
 
   /** « Versions de développement »: where updates come from. */
@@ -697,8 +702,7 @@ export class App {
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
           h('dt', {}, t('android')), h('dd', {}, String(this.bridge.hello?.android ?? '?'))),
         this.devUpdatesRow(s),
-        this.updateButton(),
-        this.sourceLink()),
+        this.updateButton()),
     ];
   }
 
@@ -896,6 +900,7 @@ export class App {
     }
     out.push(this.syncCard(s));
     out.push(this.menu(s));
+    out.push(this.footer());
     return out;
   }
 

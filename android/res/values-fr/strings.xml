@@ -41,4 +41,6 @@
     <string name="alert_perm_text">Il manque pour ce mode de synchronisation : %1$s. Touchez pour l’accorder.</string>
     <string name="alert_perm_calendar">l’agenda</string>
     <string name="alert_perm_battery">la batterie (synchronisation instantanée)</string>
+    <string name="alert_update_title">Mise à jour disponible</string>
+    <string name="alert_update_text">La version %1$s d’agendouille est prête. Touchez pour l’installer.</string>
 </resources>

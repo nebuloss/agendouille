@@ -190,8 +190,17 @@ public final class PushService extends Service {
             BufferedReader in = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             long id = 0;
             String data = null;
+            String event = null;
             for (String line; running && (line = in.readLine()) != null; ) {
-                if (line.startsWith("id: ")) {
+                if (line.startsWith("event: ")) {
+                    event = line.substring(7).trim();
+                } else if (line.isEmpty() && "server".equals(event) && data != null) {
+                    // The APK the server carries: an update, told at once.
+                    JSONObject o = new JSONObject(data);
+                    UpdateNotice.fromServer(this, o.optString("apk_version"), !o.optString("apk_sha256").isEmpty());
+                    event = null;
+                    data = null;
+                } else if (line.startsWith("id: ")) {
                     id = Long.parseLong(line.substring(4).trim());
                 } else if (line.startsWith("data: ")) {
                     data = line.substring(6);
@@ -202,6 +211,7 @@ public final class PushService extends Service {
                     ack(cred, id);
                     id = 0;
                     data = null;
+                    event = null;
                 }
             }
         } finally {

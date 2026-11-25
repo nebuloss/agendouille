@@ -561,8 +561,9 @@ Bodies `<D:error xmlns:D="DAV:" xmlns:C="…caldav"><C:…/></D:error>`:
     same for the same instance (at most 50 per device). The app's own is its
     package name; a distributed app's is `<package>:<token>`.
   - `DELETE /api/app/push/endpoints/<id>`: `204`, or `404`.
-  - `GET /api/app/push/stream`: Server-Sent Events, `retry: 5000`, a
-    `: ping` every 25 s; each message `id: <seq>`, `event: message`,
+  - `GET /api/app/push/stream`: Server-Sent Events, `retry: 5000`, first
+    `event: server` with `{"apk_version","apk_sha256","server_version"}` (no
+    id), a `: ping` every 25 s; each message `id: <seq>`, `event: message`,
     `data: {"endpoint","urgency","data"}` (`data` base64url, the body as
     received). `Last-Event-ID` acknowledges up to it.
   - `POST /api/app/push/ack {"seq"}`: acknowledges up to `seq`: `204`.

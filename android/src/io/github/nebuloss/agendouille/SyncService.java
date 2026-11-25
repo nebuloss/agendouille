@@ -101,6 +101,7 @@ public final class SyncService extends Service {
                 if (a.status != 200) return null;
                 org.json.JSONObject o = new org.json.JSONObject(a.body);
                 UnifiedPush.prefs(ctx).edit().putBoolean("service", o.optBoolean("push_service")).apply();
+                UpdateNotice.fromServer(ctx, o.optString("apk_version"), !o.optString("apk_sha256").isEmpty());
                 org.json.JSONArray arr = o.optJSONArray("not_shown");
                 if (arr == null) return null;
                 java.util.Set<String> out = new java.util.HashSet<>();
