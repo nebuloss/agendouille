@@ -27,10 +27,16 @@
   <!-- Updates from GitHub, installed through PackageInstaller (DECISIONS). -->
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-feature android:name="android.hardware.camera" android:required="false" />
-  <!-- UnifiedPush: the distributors installed (ntfy, …), seen and talked to. -->
+  <!-- Instant sync: a foreground service holds the push stream (its notification on the lowest channel). -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <!-- As a UnifiedPush distributor: the apps it hands messages to (DAVx5, …). -->
   <queries>
     <intent>
-      <action android:name="org.unifiedpush.android.distributor.REGISTER" />
+      <action android:name="org.unifiedpush.android.connector.MESSAGE" />
+    </intent>
+    <intent>
+      <action android:name="org.unifiedpush.android.connector.RAISE_TO_FOREGROUND" />
     </intent>
   </queries>
 
@@ -75,14 +81,21 @@
           android:resource="@xml/syncadapter" />
     </service>
 
-    <!-- UnifiedPush's connector: the distributor's endpoint and messages. -->
-    <receiver android:name=".UnifiedPush$Receiver" android:exported="true">
+    <!-- Instant sync: the push stream, while the person has it on. -->
+    <service
+        android:name=".PushService"
+        android:exported="false"
+        android:foregroundServiceType="specialUse">
+      <property
+          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+          android:value="Holds the connection to the family's own push server (a UnifiedPush distributor), in place of Google's" />
+    </service>
+    <!-- The app as a UnifiedPush distributor: DAVx5 and others register here. -->
+    <receiver android:name=".Distributor$Receiver" android:exported="true">
       <intent-filter>
-        <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
-        <action android:name="org.unifiedpush.android.connector.MESSAGE" />
-        <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
-        <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
-        <action android:name="org.unifiedpush.android.connector.TEMP_UNAVAILABLE" />
+        <action android:name="org.unifiedpush.android.distributor.REGISTER" />
+        <action android:name="org.unifiedpush.android.distributor.UNREGISTER" />
+        <action android:name="org.unifiedpush.android.distributor.MESSAGE_ACK" />
       </intent-filter>
     </receiver>
 

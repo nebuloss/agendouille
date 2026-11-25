@@ -21,10 +21,9 @@ import java.util.Set;
 
 /**
  * At each sync, the server's side of push (WebDAV-Push, standard CalDAV as
- * DAVx5 does it): the server's VAPID key for the distributor, then one
- * registration per calendar the phone syncs, with UnifiedPush's endpoint;
- * renewed before they expire, removed when a calendar stops syncing or push
- * is off.
+ * DAVx5 does it): one registration per calendar the phone syncs, with the
+ * app's own endpoint on the server's push service; renewed before they
+ * expire, removed when a calendar stops syncing or instant sync is off.
  *
  * The keys given to the server are the app's own; it never decrypts what it
  * gets: any message for its token means "something changed, sync".
@@ -38,27 +37,18 @@ final class PushSync {
     static void run(Context ctx, Credentials cred, String ua, List<CalendarSync.Synced> synced) {
         SharedPreferences p = UnifiedPush.prefs(ctx);
         try {
-            // The server's VAPID key, from a calendar's properties.
-            if (!synced.isEmpty() && p.getString("vapid_checked", "").compareTo(day()) < 0) {
+            // Whether the server offers push (WebDAV-Push), from a calendar's properties, once a day.
+            if (!synced.isEmpty() && p.getString("dav_checked", "").compareTo(day()) < 0) {
                 Http.Answer a = Http.dav("PROPFIND", synced.get(0).url, cred.username, cred.secret, "0", "application/xml; charset=utf-8", PushXml.PROPFIND, null, ua);
-                String key = a.status == 207 ? PushXml.vapidKey(a.body) : null;
-                SharedPreferences.Editor e = p.edit().putString("vapid_checked", day());
-                if (key == null) {
-                    e.remove("vapid").putBoolean("server_push", false);
-                } else {
-                    e.putBoolean("server_push", true);
-                    if (!key.equals(p.getString("vapid", null))) e.putString("vapid", key).remove("endpoint"); // a new key: a new endpoint
-                }
-                e.apply();
+                p.edit().putString("dav_checked", day()).putBoolean("server_push", a.status == 207 && PushXml.vapidKey(a.body) != null).apply();
             }
-            // No endpoint yet (a distributor installed since, a new key, no answer): ask again.
-            if (p.getString("endpoint", null) == null) UnifiedPush.register(ctx);
-            subscriptions(ctx, cred, ua, synced, UnifiedPush.endpoint(ctx));
+            subscriptions(ctx, cred, ua, synced, UnifiedPush.selfEndpoint(ctx, cred, ua));
         } catch (IOException e) {
             Log.i("agendouille", "push: offline", e);
         } catch (Exception e) {
             Log.w("agendouille", "push", e);
         }
+        PushService.update(ctx);
     }
 
     /** Brings the server's registrations in line: one per synced calendar while there is an endpoint. */
@@ -103,7 +93,7 @@ final class PushSync {
         } catch (Exception e) {
             Log.i("agendouille", "push: clearing", e);
         }
-        UnifiedPush.prefs(ctx).edit().remove("regs").remove("vapid").remove("vapid_checked").remove("server_push").apply();
+        UnifiedPush.prefs(ctx).edit().remove("regs").remove("dav_checked").remove("server_push").apply();
     }
 
     private static void delete(Credentials cred, String ua, String location) {

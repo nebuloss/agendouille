@@ -92,6 +92,7 @@ public final class ChangeJob extends JobService {
         @Override
         public void onReceive(Context ctx, Intent intent) {
             schedule(ctx);
+            PushService.update(ctx); // instant sync, when on
         }
     }
 }

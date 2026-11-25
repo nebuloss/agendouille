@@ -55,8 +55,9 @@ which opens a session for the person.
   les navigateurs » (this phone stays signed in).
 - **Réglages**: « Autorisations » (each permission, granted or not, with
   its button: calendar, notifications, camera, battery and, on a Xiaomi
-  phone, autostart), « Synchronisation instantanée » (push: the
-  distributor app, on or off, whether it works), language, appearance (light, dark, as the phone),
+  phone, autostart), « Synchronisation instantanée » (push, off by
+  default: on, the app stays connected, with a discreet notification it
+  can hide), language, appearance (light, dark, as the phone),
   version, « Versions de développement », and « Rechercher une mise à
   jour ».
 
@@ -68,8 +69,7 @@ when the app is opened, and within seconds of an event being created,
 changed or deleted on the phone (in any calendar app, the app closed or
 not: a job Android runs when the phone's calendars change). A change made
 elsewhere arrives within seconds with instant sync (Réglages, « Synchronisation
-instantanée »: UnifiedPush through ntfy, see [instant sync](push.md)), at the
-next sync without it.
+instantanée », see [instant sync](push.md)), at the next sync without it.
 
 Android holds back the background work of apps under battery optimisation,
 sometimes for hours on a phone left idle. Allow the app in Réglages,

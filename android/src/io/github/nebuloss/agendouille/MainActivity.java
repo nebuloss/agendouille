@@ -74,10 +74,7 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         CrashLog.install(this);
-        if (saved == null) {
-            Updater.cleanup(this);
-            UnifiedPush.register(this); // the spec asks it at each start, with the same token
-        }
+        if (saved == null) Updater.cleanup(this);
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
         web = new WebView(this);
         WebSettings s = web.getSettings();
@@ -152,6 +149,8 @@ public final class MainActivity extends Activity {
         syncObserver = ContentResolver.addStatusChangeListener(
                 ContentResolver.SYNC_OBSERVER_TYPE_ACTIVE | ContentResolver.SYNC_OBSERVER_TYPE_PENDING, which -> ui.post(this::pushState));
         SyncStatus.prefs(this).registerOnSharedPreferenceChangeListener(statusListener);
+        UnifiedPush.prefs(this).registerOnSharedPreferenceChangeListener(statusListener);
+        PushService.update(this);
         pushState();
         checkConfig();
         syncOnOpen();
@@ -206,6 +205,7 @@ public final class MainActivity extends Activity {
     protected void onPause() {
         if (syncObserver != null) ContentResolver.removeStatusChangeListener(syncObserver);
         SyncStatus.prefs(this).unregisterOnSharedPreferenceChangeListener(statusListener);
+        UnifiedPush.prefs(this).unregisterOnSharedPreferenceChangeListener(statusListener);
         super.onPause();
     }
 
@@ -350,10 +350,8 @@ public final class MainActivity extends Activity {
                 updateCheck(r.id);
                 break;
             case "push.set":
-                io.execute(() -> {
-                    setPush(r.args);
-                    send(BridgeCodec.ok(r.id, state()));
-                });
+                setPush(r.args);
+                io.execute(() -> send(BridgeCodec.ok(r.id, state())));
                 break;
             case "updates.dev":
                 getSharedPreferences("agendouille", MODE_PRIVATE).edit().putBoolean("dev_updates", r.args.optBoolean("on")).remove("update_dismissed").apply();
@@ -614,7 +612,9 @@ public final class MainActivity extends Activity {
                 }
             }
             if (c != null) PushSync.clear(this, c, userAgent());
-            UnifiedPush.unregister(this);
+            Distributor.unregisterAll(this);
+            UnifiedPush.clear(this);
+            PushService.update(this);
             Credentials.remove(this);
             session = null;
             SyncStatus.clear(this);
@@ -909,43 +909,31 @@ public final class MainActivity extends Activity {
         }
     }
 
-    /** Push as the screens show it: the distributors, the one in use, whether it works. */
+    /** Instant sync as the screens show it. */
     private JSONObject pushInfo() throws org.json.JSONException {
         SharedPreferences p = UnifiedPush.prefs(this);
-        org.json.JSONArray all = new org.json.JSONArray();
-        for (String pkg : UnifiedPush.distributors(this)) {
-            String label = pkg;
-            try {
-                label = String.valueOf(getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(pkg, 0)));
-            } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
-                // gone meanwhile
-            }
-            all.put(new JSONObject().put("package", pkg).put("label", label));
-        }
-        String dist = UnifiedPush.distributor(this);
-        return new JSONObject().put("distributors", all).put("distributor", dist == null ? JSONObject.NULL : dist)
-                .put("enabled", UnifiedPush.enabled(this))
-                .put("server", p.getBoolean("server_push", false))
-                .put("active", UnifiedPush.endpoint(this) != null)
-                .put("error", p.getString("error", null) == null ? JSONObject.NULL : p.getString("error", null));
+        org.json.JSONArray users = new org.json.JSONArray();
+        for (String l : Distributor.users(this)) users.put(l);
+        return new JSONObject().put("instant", p.getBoolean("instant", false))
+                .put("service", p.getBoolean("service", false))
+                .put("connected", p.getBoolean("connected", false))
+                .put("users", users);
     }
 
-    /** Réglages: push on or off, or another distributor. */
+    /** Réglages: instant sync on or off; or Android's settings of its notification. */
     private void setPush(JSONObject args) {
-        SharedPreferences p = UnifiedPush.prefs(this);
-        if (args.has("distributor")) {
-            String d = args.optString("distributor");
-            if (!d.equals(UnifiedPush.distributor(this))) {
-                UnifiedPush.unregister(this);
-                p.edit().putString("distributor", d).remove("error").apply();
-            }
+        if (args.optBoolean("notification")) {
+            PushService.channel(this);
+            startActivity(new Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())
+                    .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, PushService.CHANNEL)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            return;
         }
-        if (args.has("enabled")) {
-            boolean on = args.optBoolean("enabled");
-            p.edit().putBoolean("enabled", on).remove("error").apply();
-            if (!on) UnifiedPush.unregister(this);
+        if (args.has("instant")) {
+            UnifiedPush.prefs(this).edit().putBoolean("instant", args.optBoolean("instant")).apply();
+            PushService.update(this);
+            syncNow(); // the calendars' registrations follow
         }
-        UnifiedPush.register(this);
-        syncNow(); // the server's registrations follow
     }
 }

@@ -59,7 +59,7 @@ export const EMPTY: AppState = {
   permissions: { calendar: false, camera: false, notifications: false, battery: false },
   xiaomi: false,
   devUpdates: false,
-  push: { distributors: [], distributor: null, enabled: true, server: false, active: false, error: null },
+  push: { instant: false, service: false, connected: false, users: [] },
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
   crash: null,
@@ -101,28 +101,24 @@ export function parseState(v: unknown): AppState {
   };
 }
 
-/** UnifiedPush as Java reports it (MainActivity.pushInfo). */
+/** Instant sync as Java reports it (MainActivity.pushInfo). */
 export interface PushState {
-  distributors: { package: string; label: string }[];
-  distributor: string | null;
-  enabled: boolean;
-  /** The server offers push (WebDAV-Push), as the last sync saw. */
-  server: boolean;
-  /** The distributor gave an endpoint: messages arrive. */
-  active: boolean;
-  /** The distributor's last failure (REGISTRATION_FAILED's reason). */
-  error: string | null;
+  /** The person turned it on (Réglages). */
+  instant: boolean;
+  /** The server has its push service (/api/app/config). */
+  service: boolean;
+  /** The stream is open now. */
+  connected: boolean;
+  /** The apps that use this one as their UnifiedPush distributor (DAVx5). */
+  users: string[];
 }
 
 function parsePush(v: unknown): PushState {
   const o = (v ?? {}) as Record<string, unknown>;
-  const list = Array.isArray(o['distributors']) ? (o['distributors'] as Record<string, unknown>[]) : [];
   return {
-    distributors: list.map((d) => ({ package: String(d['package'] ?? ''), label: String(d['label'] ?? d['package'] ?? '') })),
-    distributor: typeof o['distributor'] === 'string' ? o['distributor'] : null,
-    enabled: o['enabled'] !== false,
-    server: o['server'] === true,
-    active: o['active'] === true,
-    error: typeof o['error'] === 'string' ? o['error'] : null,
+    instant: o['instant'] === true,
+    service: o['service'] === true,
+    connected: o['connected'] === true,
+    users: Array.isArray(o['users']) ? (o['users'] as unknown[]).map(String) : [],
   };
 }

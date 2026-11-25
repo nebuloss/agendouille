@@ -49,7 +49,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       permissions: { calendar: signedIn, camera: false, notifications: true, battery: false },
       xiaomi: true,
       dev_updates: true,
-      push: { distributors: [{ package: 'io.heckel.ntfy', label: 'ntfy' }], distributor: 'io.heckel.ntfy', enabled: true, server: true, active: true, error: null },
+      push: { instant: true, service: true, connected: true, users: ['DAVx⁵'] },
       sync: data.sync,
       calendars: signedIn ? data.calendars : [],
       crash: crashed ? data.crash : null,

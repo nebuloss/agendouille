@@ -39,8 +39,9 @@ setting it up by hand (in DAVx5, « Se connecter avec une URL et un nom
 d'utilisateur »). The page works for
 ten minutes. The agendouille app can scan the same QR code too.
 
-DAVx5 4.4 and later sync at once with push: in the account's settings,
-« Push », choose ntfy (see [instant sync](push.md)).
+DAVx5 4.4 and later sync at once with push: turn instant sync on in the
+agendouille app, then in DAVx5's account settings, « Push », choose Guémené
+(see [instant sync](push.md)).
 
 ## iPhone, iPad, Mac
 

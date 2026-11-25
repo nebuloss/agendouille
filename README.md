@@ -45,7 +45,7 @@ proxy: [deployment](docs/deployment.md).
 | [Deployment](docs/deployment.md) | The two listeners, the DMZ proxy, backups, logs. |
 | [Configuration](docs/configuration.md) | `/etc/agendouille.yaml`: every setting, which apply live. |
 | [Clients](docs/clients.md) | Signing in without passwords; the Android app, DAVx5, iPhone, Thunderbird, read-only links; device passwords. |
-| [Instant sync](docs/push.md) | Push without Google: WebDAV-Push, ntfy, UnifiedPush. |
+| [Instant sync](docs/push.md) | Push without Google, built in: WebDAV-Push, the push service, the app. |
 | [The Android app](docs/android-app.md) | Installing it, its tabs, its updates. |
 | [Command line](docs/cli.md) | `agendouille serve` and the operator's commands. |
 | [Development](docs/development.md) | The layout, building and testing, the scripts, releasing. |

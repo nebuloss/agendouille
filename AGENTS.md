@@ -105,10 +105,14 @@ M0 and M1 are done. What exists:
 - **M9, push:** `internal/push` (subscriptions, RFC 8291 encryption,
   VAPID, the sending loop on the hub), WebDAV-Push in `internal/dav/push.go`
   (properties, `POST` register, `DELETE /dav/push/<id>`, `Push-Dont-Notify`),
-  migration 0012; in the app, `UnifiedPush` (the connector, by hand),
+  migration 0012; in the app, `UnifiedPush` (instant sync's state),
   `PushSync` (registrations per synced calendar, at each sync), `PushXml`.
-  Tests: `push_e2e_test.go`, `internal/push/webpush_test.go` (RFC 8291's
-  vector), `PushXmlTest`. The push server is ntfy (`docs/push.md`).
+  Then the push service built in (`internal/push/relay.go`, `/push/<id>`,
+  `/api/app/push/*` in `internal/web/app/push.go`, migration 0013) and, in
+  the app, `PushService` (the stream, a foreground service, off by default)
+  and `Distributor` (UnifiedPush distributor for DAVx5); no ntfy.
+  Tests: `push_e2e_test.go`, `relay_e2e_test.go`,
+  `internal/push/webpush_test.go` (RFC 8291's vector), `PushXmlTest`.
 
 M2's by-hand checks with real DAVx5, iOS and Thunderbird are still to do,
 now with the web app's Appareils page to set them up.

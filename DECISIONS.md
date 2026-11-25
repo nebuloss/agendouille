@@ -1212,3 +1212,25 @@ screens). A change made elsewhere still waits for the periodic sync: push
   preferences (only its public half and the auth secret).
 - **The push server is ntfy, self-hosted**, documented in `docs/push.md`,
   not embedded.
+
+## 2026-11-25: push without ntfy: agendouille is its own push service
+
+The person wanted no other server. agendouille now is the push service
+(RFC 8030's side that takes messages: `/push/<id>`), and the app holds the
+delivery side, a Server-Sent Events stream (a W3C standard; RFC 8030's own
+delivery runs on HTTP/2 server push, which nothing implements). WebDAV-Push
+stays as it was: our own endpoints simply skip the network. The app is a
+UnifiedPush distributor, so DAVx5 uses it too, with no ntfy.
+
+- **The notification.** Android lets an app stay connected only as a
+  foreground service, which must show one (`specialUse`, on the lowest
+  channel, which the person can turn off). The person did not want a
+  permanent notification: instant sync is therefore **off by default**, a
+  switch in Réglages, and the card says why the notification exists and
+  opens the setting that hides it.
+- **FCM was considered** (microG supports it, and it needs no notification):
+  its messages go through Google's servers and the server would need a
+  Firebase project's key. Not done: no outside service (PLAN 1). The server
+  sends standard Web Push, so an FCM gateway could be added later.
+- **The external-distributor connector of the day before is gone**: with
+  the push service built in, the app is the distributor, not its client.

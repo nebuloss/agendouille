@@ -547,8 +547,27 @@ Bodies `<D:error xmlns:D="DAV:" xmlns:C="…caldav"><C:…/></D:error>`:
   `content-update` (with `DAV:sync-token`) and/or `property-update`. Not sent
   to the device that made the change, nor to `Push-Dont-Notify`'s
   registrations (`*`: none). `404`/`410` drop the registration.
-- `/api/app/config` is unchanged; the app reads the VAPID key from
-  `transports`, like any client.
+- `/api/app/config` adds `"push_service": true`.
+
+### 4.6 The push service (RFC 8030, DECISIONS: push without ntfy)
+
+- `POST /push/<id>`: anyone (the URL is the secret, 192 random bits).
+  Body at most 4096 bytes (`413` beyond), `TTL` (seconds; default a day,
+  at most 7; `0`: only to a device connected now), `Topic` (replaces the
+  waiting message of the same topic), `Urgency`. `201` with `Location`;
+  `404` for an unknown endpoint.
+- The device (Basic, a device credential):
+  - `POST /api/app/push/endpoints {"instance"}`: `{"id","endpoint"}`, the
+    same for the same instance (at most 50 per device). The app's own is its
+    package name; a distributed app's is `<package>:<token>`.
+  - `DELETE /api/app/push/endpoints/<id>`: `204`, or `404`.
+  - `GET /api/app/push/stream`: Server-Sent Events, `retry: 5000`, a
+    `: ping` every 25 s; each message `id: <seq>`, `event: message`,
+    `data: {"endpoint","urgency","data"}` (`data` base64url, the body as
+    received). `Last-Event-ID` acknowledges up to it.
+  - `POST /api/app/push/ack {"seq"}`: acknowledges up to `seq`: `204`.
+- A message waits until acknowledged or expired; at most 500 per device,
+  the oldest going first.
 
 ---
 
