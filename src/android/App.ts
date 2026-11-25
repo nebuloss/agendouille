@@ -36,7 +36,7 @@ function reason(e: unknown): string {
 }
 
 /** The views: home, and the pages its rows open (the permissions from anywhere). */
-type View = 'home' | 'calendars' | 'devices' | 'settings' | 'permissions';
+type View = 'home' | 'account' | 'calendars' | 'devices' | 'settings' | 'permissions';
 
 /** Keeps a choice of the screens (language, theme) for the next start; main.ts reads them. */
 export function remember(key: 'agd_lang' | 'agd_theme', value: string): void {
@@ -348,6 +348,7 @@ export class App {
     else if (this.view === 'calendars') this.calendarsTab(s);
     else if (this.view === 'devices') this.devicesTab(s);
     else if (this.view === 'permissions') append(this.root, ...this.permissionsView(s));
+    else if (this.view === 'account') append(this.root, topBar(this.doc, t('account'), () => this.up()), this.accountCard(s));
     else append(this.root, ...this.settingsTab(s));
   }
 
@@ -669,7 +670,6 @@ export class App {
     theme.addEventListener('click', () => remember('agd_theme', currentTheme(this.doc)));
     return [
       topBar(this.doc, t('tabSettings'), () => this.up()),
-      this.accountCard(s),
       this.pushCard(s),
       card(t('language'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('languageHint')), h('div', {}, language)),
       card(t('appearance'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')), h('div', {}, theme)),
@@ -864,11 +864,7 @@ export class App {
   private home(s: AppState): Child[] {
     const a = s.account!;
     const out: Child[] = [
-      h('header', { class: 'flex items-center gap-3 pt-4' },
-        h('img', { src: '/icon.svg', alt: '', width: 44, height: 44, class: 'rounded-md3-m' }),
-        h('div', { class: 'flex min-w-0 flex-col' },
-          h('h1', { class: 'truncate text-[22px] font-normal' }, a.username),
-          h('span', { class: 'truncate text-sm text-on-surface-variant' }, a.host))),
+      this.accountHeader(a.username, a.host),
     ];
     if (!s.permissions.calendar) {
       const allow = h('button', { type: 'button', class: ui.btn('filled') }, icon('calendar'), t('allowCalendar'));
@@ -881,6 +877,19 @@ export class App {
     out.push(this.syncCard(s));
     out.push(this.menu(s));
     return out;
+  }
+
+  /** Home's top: who and where, opening the account's page. */
+  private accountHeader(user: string, host: string): HTMLElement {
+    const b = h('button', { type: 'button', 'data-view': 'account', 'aria-label': t('account'),
+      class: 'state-layer -mx-2 mt-2 flex items-center gap-3 rounded-md3-xl px-2 py-2 text-left' },
+    h('img', { src: '/icon.svg', alt: '', width: 44, height: 44, class: 'rounded-md3-m' }),
+    h('span', { class: 'flex min-w-0 flex-1 flex-col' },
+      h('span', { class: 'truncate text-[22px] leading-7 font-normal' }, user),
+      h('span', { class: 'truncate text-sm text-on-surface-variant' }, host)),
+    h('span', { class: 'text-on-surface-variant' }, icon('right')));
+    b.addEventListener('click', () => this.go('account'));
+    return b;
   }
 
   /** Home's rows, Android's settings fashion: each opens its page. */
@@ -929,7 +938,7 @@ export class App {
       if (!(await confirmDialog(this.doc, t('removeTitle'), a.mode === 'enrolled' ? t('removeBodyEnrolled') : t('removeBodyManual'), t('signOut'), true))) return;
       await this.act('account.remove', undefined, t('removed'));
     })());
-    return card(t('account'), [],
+    return card(t('thisPhoneCard'), [],
       h('dl', { class: ui.kv },
         h('dt', {}, t('server')), h('dd', {}, h('code', {}, a.server)),
         h('dt', {}, t('username')), h('dd', {}, h('code', {}, a.username)),

@@ -91,9 +91,9 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });
   if (name === 'account') {
     // Home's pages: Calendriers (the web app's page), Réglages, Autorisations, Appareils.
-    for (const shot of ['calendars', 'settings', 'permissions', 'devices']) {
+    for (const shot of ['account', 'calendars', 'settings', 'permissions', 'devices']) {
       await go(page, shot);
-      await page.screenshot({ path: `${out}/android-${lang}-${shot}.png`, fullPage: shot === 'permissions' });
+      await page.screenshot({ path: `${out}/android-${lang}-${shot === 'account' ? 'account-page' : shot}.png`, fullPage: shot === 'permissions' });
       if (shot === 'settings') {
         // The bottom: the version, « Versions de développement », the update check.
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
