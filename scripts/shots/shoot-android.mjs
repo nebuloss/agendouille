@@ -48,6 +48,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       account: signedIn ? data.account : null,
       permissions: { calendar: signedIn, camera: false, notifications: true, battery: false },
       xiaomi: true,
+      update: choosing ? null : { version: 'dev-b6e228e', current: 'dev-9adc837', source: 'server', at: 1 },
       dev_updates: true,
       push: choosing ? { instant: false, mode_chosen: false, service: true, connected: false, hidden: false, users: [] } : { instant: true, mode_chosen: true, service: true, connected: true, hidden: false, users: ['DAVx⁵'] },
       sync: data.sync,
@@ -71,6 +72,12 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   }, lang, signedIn, name === 'welcome-dark', fixture, name === 'mode');
   await page.goto(base + '/index.html', { waitUntil: 'networkidle0' });
   await new Promise((r) => setTimeout(r, 500));
+  if (name === 'account') {
+    // The update on offer: its dialog, then closed for the other shots.
+    await page.screenshot({ path: `${out}/android-${lang}-update.png` });
+    await page.evaluate(() => document.querySelector('dialog')?.close());
+    await new Promise((r) => setTimeout(r, 200));
+  }
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });
   if (name === 'account') {
     // The other tabs: Calendriers (the web app's page), Navigateur, and approving one.

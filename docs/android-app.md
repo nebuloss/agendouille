@@ -103,7 +103,7 @@ Android never installs a lower version code: the app checks the APK's
 before handing it over and says so, and a dev build switched off is offered
 a release only once one is later than it.
 
-Either way it downloads the APK itself, checks its SHA-256 (the release's
+It shows a dialog (the version now and the new one, where it comes from); « Mettre à jour » shows the download, then Android's own confirmation, or the error, in the same dialog. Either way it downloads the APK itself, checks its SHA-256 (the release's
 `SHA256SUMS`, or the server's announced sum), and hands it to Android's
 installer, which asks to confirm. Only one APK is ever kept, in the app's
 cache, while it is being installed: it is deleted once Android has its

@@ -352,6 +352,20 @@ public final class MainActivity extends Activity {
             case "api":
                 api(r.id, r.args.optString("method"), r.args.optString("path"), r.args.isNull("body") ? null : r.args.optString("body", null));
                 break;
+            case "update.install": {
+                Runnable go = updateInstall;
+                if (go != null) go.run();
+                send(BridgeCodec.ok(r.id, null));
+                break;
+            }
+            case "update.later": {
+                JSONObject o = updateOffer;
+                if (o != null) getSharedPreferences("agendouille", MODE_PRIVATE).edit().putString("update_dismissed", o.optString("version")).apply();
+                updateOffer = null;
+                updateInstall = null;
+                io.execute(() -> send(BridgeCodec.ok(r.id, state())));
+                break;
+            }
             case "update.check":
                 updateCheck(r.id);
                 break;
@@ -444,6 +458,7 @@ public final class MainActivity extends Activity {
             o.put("xiaomi", xiaomi());
             o.put("dev_updates", devUpdates());
             o.put("push", pushInfo());
+            o.put("update", updateOffer == null ? JSONObject.NULL : updateOffer);
             SharedPreferences p = SyncStatus.prefs(this);
             boolean active = c != null && ContentResolver.isSyncActive(c.account, CalendarContract.AUTHORITY);
             JSONObject sync = new JSONObject().put("state", active ? "syncing" : p.getString("state", "never"))
@@ -792,29 +807,21 @@ public final class MainActivity extends Activity {
         });
     }
 
+    /**
+     * The update on offer, for the screens to show (state's "update"): its
+     * version, this one, and where it comes from; null when none. The
+     * screens draw the dialog; « Mettre à jour » runs updateInstall.
+     */
+    private volatile JSONObject updateOffer;
+    private volatile Runnable updateInstall;
+
     /** A dev build: the server's own APK, downloaded and installed here, as a release's. */
     private void offerUpdate(String server, String theirs, String sha256) {
         offerUpdate(server, theirs, sha256, false);
     }
 
     private void offerUpdate(String server, String theirs, String sha256, boolean asked) {
-        SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
-        if (!asked && theirs.equals(p.getString("update_dismissed", ""))) return;
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.update_title)
-                .setMessage(getString(R.string.update_body, theirs, version()))
-                .setPositiveButton(R.string.update_install_now, (d, w) -> {
-                    android.widget.Toast.makeText(this, R.string.update_downloading, android.widget.Toast.LENGTH_LONG).show();
-                    io.execute(() -> {
-                        try {
-                            Updater.install(this, Updater.downloadFromServer(this, server, sha256, userAgent()));
-                        } catch (Exception e) {
-                            ui.post(() -> updateFailed(String.valueOf(e.getMessage())));
-                        }
-                    });
-                })
-                .setNegativeButton(R.string.update_later, (d, w) -> p.edit().putString("update_dismissed", theirs).apply())
-                .show();
+        offer(theirs, "server", asked, () -> Updater.install(this, Updater.downloadFromServer(this, server, sha256, userAgent())));
     }
 
     /** GitHub's latest release, at most every six hours. */
@@ -833,26 +840,44 @@ public final class MainActivity extends Activity {
     }
 
     private void offerGitHubUpdate(Updater.Release r, boolean asked) {
-        SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
-        if (!asked && r.version.equals(p.getString("update_dismissed", ""))) return;
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.update_title)
-                .setMessage(getString(R.string.update_body_github, r.version, version()))
-                .setPositiveButton(R.string.update_install_now, (d, w) -> installUpdate(r))
-                .setNegativeButton(R.string.update_later, (d, w) -> p.edit().putString("update_dismissed", r.version).apply())
-                .show();
+        offer(r.version, "github", asked, () -> Updater.install(this, Updater.download(this, r, userAgent())));
     }
 
-    /** Downloads, checks against SHA256SUMS, and hands it to Android, which asks. */
-    private void installUpdate(Updater.Release r) {
-        android.widget.Toast.makeText(this, R.string.update_downloading, android.widget.Toast.LENGTH_LONG).show();
-        io.execute(() -> {
+    private interface Install {
+        void run() throws Exception;
+    }
+
+    /** Offers version to the screens, unless « Plus tard » was said to it (and the person did not ask). */
+    private void offer(String version, String source, boolean asked, Install install) {
+        SharedPreferences p = getSharedPreferences("agendouille", MODE_PRIVATE);
+        if (!asked && version.equals(p.getString("update_dismissed", ""))) return;
+        try {
+            updateOffer = new JSONObject().put("version", version).put("current", version()).put("source", source)
+                    .put("asked", asked).put("at", System.currentTimeMillis());
+        } catch (org.json.JSONException e) {
+            return;
+        }
+        updateInstall = () -> io.execute(() -> {
             try {
-                Updater.install(this, Updater.download(this, r, userAgent()));
+                updateEvent("downloading", null);
+                install.run();
+                updateEvent("confirm", null); // Android's own confirmation comes next
             } catch (Exception e) {
-                ui.post(() -> updateFailed(String.valueOf(e.getMessage())));
+                updateFailed(String.valueOf(e.getMessage()));
             }
         });
+        pushState();
+    }
+
+    /** How the update goes, for the dialog: downloading, confirm, cancelled, failed. */
+    private void updateEvent(String state, String message) {
+        try {
+            JSONObject d = new JSONObject().put("state", state);
+            if (message != null) d.put("message", message);
+            send(BridgeCodec.event("update", d));
+        } catch (org.json.JSONException ignored) {
+            // cannot happen with strings
+        }
     }
 
     /** PackageInstaller's answer: its confirmation to show, or how it ended. */
@@ -861,7 +886,9 @@ public final class MainActivity extends Activity {
         if (status == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
             Intent confirm = intentExtra(intent);
             if (confirm != null) startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        } else if (status != android.content.pm.PackageInstaller.STATUS_SUCCESS && status != android.content.pm.PackageInstaller.STATUS_FAILURE_ABORTED) {
+        } else if (status == android.content.pm.PackageInstaller.STATUS_FAILURE_ABORTED) {
+            updateEvent("cancelled", null);
+        } else if (status != android.content.pm.PackageInstaller.STATUS_SUCCESS) {
             String msg = intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE);
             updateFailed(status == android.content.pm.PackageInstaller.STATUS_FAILURE_CONFLICT || status == android.content.pm.PackageInstaller.STATUS_FAILURE_INCOMPATIBLE
                     ? getString(R.string.update_other_key) : String.valueOf(msg));
@@ -876,7 +903,7 @@ public final class MainActivity extends Activity {
     }
 
     private void updateFailed(String why) {
-        new AlertDialog.Builder(this).setMessage(getString(R.string.update_failed, why)).setPositiveButton(android.R.string.ok, null).show();
+        updateEvent("failed", getString(R.string.update_failed, why));
     }
 
     /** The server's sync interval (app_sync_interval_minutes), 15 minutes at least as Android wants. */

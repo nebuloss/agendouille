@@ -46,6 +46,8 @@ export interface AppState {
   xiaomi: boolean;
   /** Updates from the server's dev build (on) or GitHub's releases only (off). */
   devUpdates: boolean;
+  /** An update on offer (Java's check), for the dialog; null when none. */
+  update: UpdateOffer | null;
   /** Instant sync (UnifiedPush): the distributors installed, the one in use, whether it works. */
   push: PushState;
   sync: SyncState;
@@ -59,6 +61,7 @@ export const EMPTY: AppState = {
   permissions: { calendar: false, camera: false, notifications: false, battery: false },
   xiaomi: false,
   devUpdates: false,
+  update: null,
   push: { instant: false, modeChosen: false, service: false, connected: false, hidden: false, users: [] },
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
@@ -83,6 +86,7 @@ export function parseState(v: unknown): AppState {
     xiaomi: o['xiaomi'] === true,
     devUpdates: o['dev_updates'] === true,
     push: parsePush(o['push']),
+    update: parseUpdate(o['update']),
     sync: {
       state: (['never', 'idle', 'syncing', 'error'] as const).find((x) => x === s['state']) ?? 'never',
       last_sync: typeof s['last_sync'] === 'string' ? s['last_sync'] : null,
@@ -127,4 +131,20 @@ function parsePush(v: unknown): PushState {
     hidden: o['hidden'] === true,
     users: Array.isArray(o['users']) ? (o['users'] as unknown[]).map(String) : [],
   };
+}
+
+/** An update on offer: its version, this one, and where it comes from. */
+export interface UpdateOffer {
+  version: string;
+  current: string;
+  source: 'server' | 'github';
+  /** Offered again each time: the dialog shows once per offer. */
+  at: number;
+}
+
+function parseUpdate(v: unknown): UpdateOffer | null {
+  if (v === null || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o['version'] !== 'string') return null;
+  return { version: o['version'], current: String(o['current'] ?? ''), source: o['source'] === 'github' ? 'github' : 'server', at: Number(o['at'] ?? 0) };
 }

@@ -22,7 +22,7 @@ import type { Calendar, Calendars } from '@/app/api.ts';
 import { scanQR } from '@/shared/components/Scanner.ts';
 import { ago } from '@/shared/render/format.ts';
 import { BridgeError, type Bridge } from '@/shared/core/Bridge.ts';
-import { parseState, type AppState, type CalendarState } from '@/android/state.ts';
+import { parseState, type AppState, type CalendarState, type UpdateOffer } from '@/android/state.ts';
 import { bridgeApi } from '@/android/api.ts';
 import { seg, type Api } from '@/shared/core/Api.ts';
 import { CalendarsPage, browserName, kindLabel, type Device, type People, type Session } from '@/app/pages/Manage.ts';
@@ -279,12 +279,20 @@ export class App {
   private tab: Tab = 'sync';
   /** Réglages, or its permissions' view. */
   private settingsView: 'main' | 'permissions' = 'main';
+  /** The update offer the dialog showed last (its time), not to show it twice. */
+  private updateShown = 0;
+  /** The open update dialog's status line, which the "update" events fill. */
+  private updateStatus: ((state: string, message?: string) => void) | null = null;
   private page: ApiPage | null = null;
 
   constructor(private readonly doc: Document, private readonly root: HTMLElement, private readonly bridge: Bridge) {
     this.toasts = new Toasts(doc.getElementById('toasts') ?? doc.body);
     this.api = bridgeApi(bridge);
     bridge.on('state', (s) => this.show(parseState(s)));
+    bridge.on('update', (d) => {
+      const o = (d ?? {}) as Record<string, unknown>;
+      this.updateStatus?.(String(o['state'] ?? ''), typeof o['message'] === 'string' ? o['message'] : undefined);
+    });
     // A calendar made, shared or removed: the phone syncs it now.
     doc.addEventListener('agd:changed', () => void bridge.call('sync.now').catch(() => undefined));
   }
@@ -296,6 +304,10 @@ export class App {
   private show(s: AppState): void {
     const before = this.state;
     this.state = s;
+    if (s.update !== null && s.update.at !== this.updateShown) {
+      this.updateShown = s.update.at;
+      this.updateDialog(s.update);
+    }
     // Only Synchro draws from the state: the other tabs keep their page
     // while the sync reports, unless the account itself changed.
     const same = before?.account != null && s.account != null && before.account.server === s.account.server
@@ -445,7 +457,7 @@ export class App {
    * permission, but the person's to show or hide in its own category.
    */
   private pushNotificationRow(s: AppState): HTMLElement {
-    const b = h('button', { type: 'button', class: ui.btn('filled', 'sm') }, t('hideIt'));
+    const b = h('button', { type: 'button', class: ui.btn(s.push.hidden ? 'text' : 'filled', 'sm') }, s.push.hidden ? t('pushNotificationSetting') : t('hideIt'));
     b.addEventListener('click', () => void this.bridge.call('push.set', { notification: true }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
     return h('div', { class: 'flex items-start gap-4 px-4 py-3' },
       h('span', { class: 'pt-0.5 text-primary' }, icon('repeat')),
@@ -453,7 +465,7 @@ export class App {
         h('span', { class: 'text-base font-medium' }, t('permPushNotification')),
         h('span', { class: 'text-sm text-on-surface-variant' }, t('permPushNotificationWhy')),
         h('span', { class: 'flex flex-wrap items-center gap-2' },
-          s.push.hidden ? chip(t('permHidden'), 'ok', 'check') : chip(t('permVisible'), 'warn', 'warn'), s.push.hidden ? null : b)));
+          s.push.hidden ? chip(t('permHidden'), 'ok', 'check') : chip(t('permVisible'), 'warn', 'warn'), b)));
   }
 
   /** Which mode the list is for, and the way to change it (Réglages' card). */
@@ -569,16 +581,72 @@ export class App {
     const body: Child[] = [this.modeChoices(p.instant)];
     if (p.instant) {
       body.push(h('div', {}, p.connected ? chip(t('pushActive'), 'ok', 'check') : chip(t('pushConnecting'), 'warn', 'clock')));
-      body.push(h('p', { class: 'text-sm' }, p.hidden ? t('pushHidden') : t('pushNotification')));
-      const settings = h('button', { type: 'button', class: `${ui.btn(p.hidden ? 'text' : 'tonal', 'sm')} self-start` }, icon('bell'), t('pushNotificationSetting'));
-      settings.addEventListener('click', () => void this.bridge.call('push.set', { notification: true })
-        .catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
-      body.push(settings);
-      if (!p.hidden) body.push(h('p', { class: 'text-sm text-on-surface-variant' }, t('pushLongPress')));
+      if (!p.hidden) {
+        const ribbon = h('button', { type: 'button', class: 'state-layer flex w-full items-center gap-3 rounded-md3-l bg-warning-container px-4 py-3 text-left text-on-warning-container' },
+          icon('warn'), h('span', { class: 'flex-1 text-sm' }, t('pushVisibleRibbon')), icon('right'));
+        ribbon.addEventListener('click', () => this.showPermissions());
+        body.push(ribbon);
+      }
       body.push(h('p', { class: 'text-sm text-on-surface-variant' },
         p.users.length > 0 ? t('pushUsers', { apps: p.users.join(', ') }) : t('pushDavx5')));
     }
     return card(t('modeTitle'), [], ...body);
+  }
+
+  /**
+   * An update on offer: Material's dialog, with the change of version and
+   * where it comes from; then, in place, the download and Android's
+   * confirmation, or what went wrong.
+   */
+  private updateDialog(u: UpdateOffer): void {
+    const el = this.doc.createElement('dialog');
+    el.className = `${ui.dialog} outline-none`;
+    const status = h('div', { class: 'flex w-full flex-col items-center gap-2', hidden: true });
+    const later = h('button', { type: 'button', class: ui.btn('text') }, t('updateLater'));
+    const install = h('button', { type: 'button', class: ui.btn('filled') }, icon('download'), t('updateInstall'));
+    const bar = (): HTMLElement => h('div', { class: 'h-1 w-full overflow-hidden rounded-full bg-surface-highest' },
+      h('div', { class: 'h-full w-1/3 animate-pulse rounded-full bg-primary' }));
+    const setStatus = (state: string, message?: string): void => {
+      status.hidden = false;
+      if (state === 'downloading') {
+        status.replaceChildren(bar(), h('p', { class: 'text-sm text-on-surface-variant' }, t('updateDownloading')));
+        install.disabled = true;
+      } else if (state === 'confirm') {
+        status.replaceChildren(h('p', { class: 'text-sm text-on-surface-variant' }, t('updateConfirm')));
+      } else if (state === 'cancelled') {
+        status.replaceChildren(h('p', { class: 'text-sm text-on-surface-variant' }, t('updateCancelled')));
+        install.disabled = false;
+        install.replaceChildren(icon('download'), t('updateRetry'));
+      } else if (state === 'failed') {
+        status.replaceChildren(h('p', { class: 'flex items-start gap-2 rounded-md3-m bg-error-container px-3 py-2 text-left text-sm text-on-error-container' },
+          icon('warn'), message ?? t('updateFailed')));
+        install.disabled = false;
+        install.replaceChildren(icon('download'), t('updateRetry'));
+      }
+    };
+    this.updateStatus = setStatus;
+    install.addEventListener('click', () => void this.bridge.call('update.install').catch((e: unknown) => setStatus('failed', reason(e))));
+    later.addEventListener('click', () => {
+      el.close();
+      void this.bridge.call('update.later').then((st) => { if (st) this.show(parseState(st)); }, () => undefined);
+    });
+    el.append(h('div', { class: 'flex flex-col items-center gap-4 px-6 pt-6 pb-2 text-center' },
+      h('span', { class: 'grid size-14 place-items-center rounded-full bg-primary-container text-on-primary-container [&_.ic]:size-7' }, icon('download')),
+      h('h2', { class: 'text-2xl leading-8 font-normal' }, t('updateTitle')),
+      h('div', { class: 'flex flex-wrap items-center justify-center gap-2' },
+        chip(u.current, 'neutral'), h('span', { class: 'text-on-surface-variant' }, icon('right')), chip(u.version, 'ok')),
+      h('p', { class: 'text-sm text-on-surface-variant' }, u.source === 'github' ? t('updateFromGitHub') : t('updateFromServer')),
+      status),
+    h('div', { class: 'flex justify-end gap-2 px-6 pt-2 pb-5' }, later, install));
+    el.addEventListener('close', () => {
+      if (this.updateStatus === setStatus) this.updateStatus = null;
+      el.remove();
+    });
+    this.doc.body.append(el);
+    el.showModal();
+    // The dialog itself, not « Plus tard »: no focus ring on a touchscreen.
+    el.tabIndex = -1;
+    el.focus();
   }
 
   /** « Versions de développement »: where updates come from. */
