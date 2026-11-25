@@ -921,8 +921,9 @@ public final class MainActivity extends Activity {
                 .put("users", users);
     }
 
-    /** Whether the person turned instant sync's notification category off. */
+    /** Whether instant sync's notification is hidden: chosen in Réglages, or its category turned off in Android's. */
     private boolean notificationHidden() {
+        if (UnifiedPush.prefs(this).getBoolean("hide_notification", false)) return true;
         android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
         android.app.NotificationChannel ch = nm == null ? null : nm.getNotificationChannel(PushService.CHANNEL);
         return ch != null && ch.getImportance() == android.app.NotificationManager.IMPORTANCE_NONE;
@@ -930,14 +931,9 @@ public final class MainActivity extends Activity {
 
     /** Réglages: instant sync on or off; or Android's settings of its notification. */
     private void setPush(JSONObject args) {
-        if (args.optBoolean("notification")) {
-            // This notification's own category, not the app's whole notifications.
-            PushService.channel(this);
-            openFirst(new Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())
-                            .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, PushService.CHANNEL),
-                    new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        if (args.has("hide")) {
+            UnifiedPush.prefs(this).edit().putBoolean("hide_notification", args.optBoolean("hide")).apply();
+            PushService.restart(this);
             return;
         }
         if (args.has("instant")) {

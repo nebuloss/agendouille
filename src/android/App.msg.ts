@@ -2,8 +2,9 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
-    pushHidden: 'Sa notification est masquée : la connexion continue sans rien afficher.',
-    pushNotificationSetting: 'Réglage de la notification',
+    pushShowNotification: 'Afficher la notification',
+    pushNotification: 'Android l’exige pour une application qui reste connectée ; elle est discrète, sans icône dans la barre d’état.',
+    pushHidden: 'Masquée : la connexion continue sans rien afficher.',
     pushTitle: 'Synchronisation instantanée',
     pushHelp: 'Un changement fait ailleurs arrive sur ce téléphone en quelques secondes, au lieu de la prochaine synchronisation. L’application garde pour cela une connexion à votre serveur agendouille, sans passer par Google.',
     pushSwitch: 'Activée',
@@ -11,8 +12,6 @@ export const t = messages({
     pushNoService: 'Le serveur ne la propose pas',
     pushActive: 'Connectée',
     pushConnecting: 'Connexion en cours',
-    pushNotification: 'Android exige une notification pour une application qui reste connectée. Elle est la plus discrète possible, sans icône dans la barre d’état, et vous pouvez la masquer complètement : la connexion continue.',
-    pushHide: 'Masquer la notification',
     pushUsers: 'Utilisée aussi par : {apps}.',
     pushDavx5: 'DAVx5 peut s’en servir aussi : dans ses réglages de compte, « Push », choisissez Guémené.',
     devUpdates: 'Versions de développement',
@@ -176,8 +175,9 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
-    pushHidden: 'Its notification is hidden: the connection goes on without showing anything.',
-    pushNotificationSetting: 'Notification setting',
+    pushShowNotification: 'Show the notification',
+    pushNotification: 'Android requires it for an app that stays connected; it is discreet, with no icon in the status bar.',
+    pushHidden: 'Hidden: the connection goes on without showing anything.',
     pushTitle: 'Instant sync',
     pushHelp: 'A change made elsewhere reaches this phone within seconds instead of at the next sync. The app keeps a connection to your agendouille server for it, never through Google.',
     pushSwitch: 'On',
@@ -185,8 +185,6 @@ export const t = messages({
     pushNoService: 'The server does not offer it',
     pushActive: 'Connected',
     pushConnecting: 'Connecting',
-    pushNotification: 'Android requires a notification for an app that stays connected. It is as discreet as can be, with no icon in the status bar, and you can hide it entirely: the connection goes on.',
-    pushHide: 'Hide the notification',
     pushUsers: 'Also used by: {apps}.',
     pushDavx5: 'DAVx5 can use it too: in its account settings, “Push”, choose Guémené.',
     devUpdates: 'Development builds',

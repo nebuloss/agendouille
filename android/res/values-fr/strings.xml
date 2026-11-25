@@ -30,4 +30,5 @@
     <string name="push_channel">Synchronisation instantanée</string>
     <string name="push_channel_help">Garde la connexion qui apporte aussitôt les changements faits ailleurs. Désactivez-la pour masquer cette notification : la synchronisation instantanée continue.</string>
     <string name="push_notification">Synchronisation instantanée active</string>
+    <string name="push_channel_hidden">Synchronisation instantanée (masquée)</string>
 </resources>

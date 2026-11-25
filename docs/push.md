@@ -13,12 +13,13 @@ The agendouille app: Réglages, « Synchronisation instantanée », « Activée 
 (off by default). The app then keeps one connection to the server open.
 
 - **The notification.** Android lets an app stay connected only as a
-  foreground service, which must show a notification. It is on the lowest
+  foreground service, which must have a notification. It is on the lowest
   channel: no icon in the status bar, folded at the bottom of the shade.
-  « Masquer la notification » opens Android's setting for it: turn it off
-  and it never shows; the connection goes on. The card then says it is
-  hidden. Only this notification's category is turned off, not the app's
-  others.
+  « Afficher la notification » off hides it, on every phone: the app moves
+  it to a category made turned off (an app cannot turn one off later, and
+  HyperOS opens the app's notifications page rather than one category's).
+  The connection goes on; Android still lists the app among its active
+  apps.
 - **Battery.** Allow the app in Réglages, Autorisations (and « Démarrage
   automatique » on a Xiaomi phone), or Android cuts the connection while
   the phone sleeps.

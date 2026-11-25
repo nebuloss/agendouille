@@ -35,6 +35,13 @@ import java.util.Base64;
  */
 public final class PushService extends Service {
     static final String CHANNEL = "push";
+    /**
+     * The same notification, hidden: a category made turned off (an app may
+     * create one so, never turn one off later). Hiding it in the app works
+     * on every phone, where Android's settings page for one category is not
+     * always reachable (HyperOS opens the app's page instead).
+     */
+    static final String CHANNEL_HIDDEN = "push_hidden";
     private static final int NOTIFICATION = 7;
 
     private volatile boolean running;
@@ -64,20 +71,32 @@ public final class PushService extends Service {
         }
     }
 
-    static void channel(Context ctx) {
+    /** Makes both categories; the one in use, as the person chose in Réglages. */
+    static String channel(Context ctx) {
         NotificationManager nm = ctx.getSystemService(NotificationManager.class);
         NotificationChannel ch = new NotificationChannel(CHANNEL, ctx.getString(R.string.push_channel), NotificationManager.IMPORTANCE_MIN);
         ch.setDescription(ctx.getString(R.string.push_channel_help));
         ch.setShowBadge(false);
         nm.createNotificationChannel(ch);
+        NotificationChannel hidden = new NotificationChannel(CHANNEL_HIDDEN, ctx.getString(R.string.push_channel_hidden), NotificationManager.IMPORTANCE_NONE);
+        hidden.setDescription(ctx.getString(R.string.push_channel_help));
+        hidden.setShowBadge(false);
+        nm.createNotificationChannel(hidden);
+        return UnifiedPush.prefs(ctx).getBoolean("hide_notification", false) ? CHANNEL_HIDDEN : CHANNEL;
+    }
+
+    /** Again, with the notification in the category now chosen. */
+    static void restart(Context ctx) {
+        ctx.stopService(new Intent(ctx, PushService.class));
+        update(ctx);
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
-        channel(this);
+        String channel = channel(this);
         Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        Notification n = new Notification.Builder(this, CHANNEL)
+        Notification n = new Notification.Builder(this, channel)
                 .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
                 .setContentTitle(getString(R.string.push_notification))
                 .setContentIntent(PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE))
