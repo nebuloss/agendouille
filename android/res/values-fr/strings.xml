@@ -30,4 +30,15 @@
     <string name="push_channel">Synchronisation instantanée</string>
     <string name="push_channel_help">Garde la connexion qui apporte aussitôt les changements faits ailleurs. Désactivez-la pour masquer cette notification : la synchronisation instantanée continue.</string>
     <string name="push_notification">Synchronisation instantanée active</string>
+    <string name="alerts_channel">Alertes</string>
+    <string name="alerts_channel_help">Connexion à refaire, synchronisation en échec, autorisation manquante.</string>
+    <string name="alert_login_title">Reconnectez ce téléphone</string>
+    <string name="alert_login_text">Votre serveur agendouille n’accepte plus ce téléphone. Ouvrez l’application pour le reconnecter.</string>
+    <string name="alert_sync_title">La synchronisation échoue</string>
+    <string name="alert_sync_text">Le téléphone est en ligne, mais les calendriers ne se synchronisent pas : %1$s</string>
+    <string name="alert_unreachable">le serveur ne répond pas.</string>
+    <string name="alert_perm_title">Autorisation nécessaire</string>
+    <string name="alert_perm_text">Il manque pour ce mode de synchronisation : %1$s. Touchez pour l’accorder.</string>
+    <string name="alert_perm_calendar">l’agenda</string>
+    <string name="alert_perm_battery">la batterie (synchronisation instantanée)</string>
 </resources>

@@ -67,6 +67,8 @@ public final class MainActivity extends Activity {
     private Object syncObserver;
     private final SharedPreferences.OnSharedPreferenceChangeListener statusListener = (p, k) -> pushState();
     private String pendingLink;
+    /** A view a tapped alert asked for ("permissions"), once the screens are there. */
+    private String pendingOpen;
 
     // --- lifecycle
 
@@ -130,6 +132,7 @@ public final class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl(ORIGIN + "/index.html");
         pendingLink = linkOf(getIntent());
+        pendingOpen = getIntent().getStringExtra("open");
     }
 
     @Override
@@ -139,6 +142,8 @@ public final class MainActivity extends Activity {
             installStatus(intent);
             return;
         }
+        String open = intent.getStringExtra("open");
+        if (open != null) navigate(open);
         String link = linkOf(intent);
         if (link != null) enrollFromIntent(link);
     }
@@ -154,6 +159,20 @@ public final class MainActivity extends Activity {
         pushState();
         checkConfig();
         syncOnOpen();
+        io.execute(() -> Alerts.permissions(this));
+    }
+
+    /** Shows one of the screens' views (a tapped alert). */
+    private void navigate(String view) {
+        if (port == null) {
+            pendingOpen = view;
+            return;
+        }
+        try {
+            send(BridgeCodec.event("navigate", new JSONObject().put("view", view)));
+        } catch (org.json.JSONException ignored) {
+            // a string cannot fail
+        }
     }
 
     private long openedSync;
@@ -291,6 +310,11 @@ public final class MainActivity extends Activity {
             String l = pendingLink;
             pendingLink = null;
             ui.postDelayed(() -> enrollFromIntent(l), 300);
+        }
+        if (pendingOpen != null) {
+            String o = pendingOpen;
+            pendingOpen = null;
+            ui.postDelayed(() -> navigate(o), 500);
         }
     }
 
@@ -634,6 +658,7 @@ public final class MainActivity extends Activity {
             }
             if (c != null) PushSync.clear(this, c, userAgent());
             Distributor.unregisterAll(this);
+            Alerts.clear(this);
             UnifiedPush.clear(this);
             PushService.update(this);
             Credentials.remove(this);
@@ -753,6 +778,7 @@ public final class MainActivity extends Activity {
                 Http.Answer a = Http.call("GET", c.server + "/api/app/config", c.username, c.secret, null, null, userAgent());
                 if (a.status == 401) {
                     SyncStatus.failed(this, getString(R.string.revoked));
+                    Alerts.login(this);
                     return;
                 }
                 if (a.status != 200) return;
@@ -961,6 +987,7 @@ public final class MainActivity extends Activity {
      * or no permission to show notifications at all (Android 13 on).
      */
     private boolean notificationHidden() {
+        // Without the notifications permission nothing shows (but neither do the alerts).
         if (Build.VERSION.SDK_INT >= 33 && !granted("android.permission.POST_NOTIFICATIONS")) return true;
         android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
         android.app.NotificationChannel ch = nm == null ? null : nm.getNotificationChannel(PushService.CHANNEL);

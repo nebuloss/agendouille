@@ -289,6 +289,10 @@ export class App {
     this.toasts = new Toasts(doc.getElementById('toasts') ?? doc.body);
     this.api = bridgeApi(bridge);
     bridge.on('state', (s) => this.show(parseState(s)));
+    // A tapped alert: its view.
+    bridge.on('navigate', (d) => {
+      if ((d as Record<string, unknown> | null)?.['view'] === 'permissions' && this.state?.account) this.showPermissions();
+    });
     bridge.on('update', (d) => {
       const o = (d ?? {}) as Record<string, unknown>;
       this.updateStatus?.(String(o['state'] ?? ''), typeof o['message'] === 'string' ? o['message'] : undefined);
@@ -422,7 +426,7 @@ export class App {
     const p = s.permissions;
     // The camera is asked when scanning; the battery only matters to instant sync.
     // Instant sync: the battery exemption, and its notification hidden.
-    return [p.calendar, ...(s.push.instant ? [p.battery, s.push.hidden] : [])].filter((x) => !x).length;
+    return [p.calendar, p.notifications, ...(s.push.instant ? [p.battery, s.push.hidden] : [])].filter((x) => !x).length;
   }
 
   /** The permissions' view, from anywhere: Réglages' tab, the view on top. */
@@ -504,6 +508,7 @@ export class App {
     const opener = (call: string) => (b: HTMLElement): void => b.addEventListener('click', () => this.open(call));
     const rows = [
       row('calendar', t('permCalendar'), t('permCalendarWhy'), p.calendar, 'calendar.request', t('allow')),
+      row('bell', t('permNotifications'), t('permNotificationsWhy'), p.notifications, 'notifications.request', t('allow')),
       ...(s.push.instant ? [
         row('clock', t('permBattery'), t('permBatteryWhyInstant'), p.battery, 'battery.request', t('allow'), opener('battery.request')),
         this.pushNotificationRow(s),

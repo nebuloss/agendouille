@@ -2,6 +2,8 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    permNotifications: 'Notifications',
+    permNotificationsWhy: 'Pour vous prévenir d’une connexion à refaire, d’une synchronisation en échec ou d’une autorisation manquante.',
     pushVisibleRibbon: 'Sa notification est visible : masquez-la dans Autorisations.',
     updateTitle: 'Mise à jour disponible',
     updateFromServer: 'Depuis votre serveur agendouille. Elle est vérifiée avant d’être installée.',
@@ -14,8 +16,8 @@ export const t = messages({
     updateCancelled: 'Installation annulée.',
     updateFailed: 'La mise à jour a échoué.',
     hideIt: 'Masquer',
-    permsForStandard: 'Pour le mode Standard : seul l’accès à l’agenda est indispensable.',
-    permsForInstant: 'Pour le mode Instantanée : l’agenda, la batterie, et sa notification masquée.',
+    permsForStandard: 'Pour le mode Standard : l’agenda, et les notifications pour vous alerter.',
+    permsForInstant: 'Pour le mode Instantanée : l’agenda, les notifications, la batterie, et la notification de connexion masquée.',
     changeMode: 'Changer de mode',
     modeTitle: 'Mode de synchronisation',
     modeIntro: 'Comment ce téléphone reçoit-il les changements faits ailleurs ? Vous pourrez le changer dans Réglages.',
@@ -195,6 +197,8 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    permNotifications: 'Notifications',
+    permNotificationsWhy: 'To tell you when to sign in again, when sync fails, or when a permission is missing.',
     pushVisibleRibbon: 'Its notification is visible: hide it in Permissions.',
     updateTitle: 'Update available',
     updateFromServer: 'From your agendouille server. It is checked before it is installed.',
@@ -207,8 +211,8 @@ export const t = messages({
     updateCancelled: 'Installation cancelled.',
     updateFailed: 'The update failed.',
     hideIt: 'Hide',
-    permsForStandard: 'For the Standard mode: only the calendar access is needed.',
-    permsForInstant: 'For the Instant mode: the calendar, the battery, and its notification hidden.',
+    permsForStandard: 'For the Standard mode: the calendar, and notifications to alert you.',
+    permsForInstant: 'For the Instant mode: the calendar, notifications, the battery, and the connection’s notification hidden.',
     changeMode: 'Change the mode',
     modeTitle: 'Sync mode',
     modeIntro: 'How does this phone get changes made elsewhere? You can change it in Settings.',

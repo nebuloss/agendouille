@@ -47,6 +47,7 @@ public final class SyncService extends Service {
             Credentials cred = Credentials.load(ctx);
             if (cred == null || !cred.account.equals(account)) return;
             SyncStatus.syncing(ctx);
+            Alerts.permissions(ctx);
             String ua = "agendouille-android/" + version(ctx) + " (Android " + android.os.Build.VERSION.RELEASE + ")";
             Dav dav = new Dav((method, url, depth, type, body) -> {
                 Http.Answer a = Http.dav(method, url, cred.username, cred.secret, depth, type, body, null, ua);
@@ -74,18 +75,22 @@ public final class SyncService extends Service {
                 // Push: the server's registrations, one per calendar synced here.
                 PushSync.run(ctx, cred, ua, cals.synced());
                 SyncStatus.done(ctx, cals.events());
+                Alerts.synced(ctx);
                 ChangeJob.schedule(ctx); // watching the phone's changes, after a reboot too
             } catch (Dav.Unauthorized e) {
                 result.stats.numAuthExceptions++;
                 SyncStatus.failed(ctx, ctx.getString(R.string.sync_refused));
+                Alerts.login(ctx);
             } catch (java.io.IOException e) {
                 Log.w("agendouille", "sync", e);
                 result.stats.numIoExceptions++;
                 SyncStatus.failed(ctx, ctx.getString(R.string.sync_offline));
+                Alerts.failed(ctx, ctx.getString(R.string.alert_unreachable)); // only said when online
             } catch (Exception e) {
                 Log.e("agendouille", "sync", e);
                 result.databaseError = true;
                 SyncStatus.failed(ctx, String.valueOf(e.getMessage()));
+                Alerts.failed(ctx, String.valueOf(e.getMessage()));
             }
         }
 

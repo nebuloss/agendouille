@@ -34,4 +34,15 @@
     <string name="push_channel">Instant sync</string>
     <string name="push_channel_help">Keeps the connection that brings changes made elsewhere at once. Turn it off to hide this notification: instant sync goes on.</string>
     <string name="push_notification">Instant sync is on</string>
+    <string name="alerts_channel">Alerts</string>
+    <string name="alerts_channel_help">Sign in again, sync failing, a permission missing.</string>
+    <string name="alert_login_title">Sign in again</string>
+    <string name="alert_login_text">Your agendouille server no longer accepts this phone. Open the app to sign it in again.</string>
+    <string name="alert_sync_title">Sync is failing</string>
+    <string name="alert_sync_text">The phone is online, but the calendars cannot sync: %1$s</string>
+    <string name="alert_unreachable">the server does not answer.</string>
+    <string name="alert_perm_title">Permission needed</string>
+    <string name="alert_perm_text">Missing for this sync mode: %1$s. Tap to allow it.</string>
+    <string name="alert_perm_calendar">the calendar</string>
+    <string name="alert_perm_battery">the battery (instant sync)</string>
 </resources>

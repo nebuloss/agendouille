@@ -113,6 +113,15 @@ another key: every build is signed with the release key when the build
 machine has it, so releases and dev builds install over each other, the
 higher version code (the commit count) winning.
 
+## Alerts
+
+With the notifications permission, the app tells, in its « Alertes »
+category: when the server no longer accepts the phone (sign in again), when
+sync fails twice in a row while the phone is online (never when offline),
+and when the sync mode lacks a permission (the calendar; the battery for
+instant sync), once for each new lack; tapping that one opens the
+permissions. Each goes away once things are right again.
+
 ## When it stops
 
 If the app crashes, it keeps a report; the next start shows it with
