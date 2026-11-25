@@ -881,15 +881,19 @@ export class App {
 
   /** Home's top: who and where, opening the account's page. */
   private accountHeader(user: string, host: string): HTMLElement {
-    const b = h('button', { type: 'button', 'data-view': 'account', 'aria-label': t('account'),
-      class: 'state-layer -mx-2 mt-2 flex items-center gap-3 rounded-md3-xl px-2 py-2 text-left' },
-    h('img', { src: '/icon.svg', alt: '', width: 44, height: 44, class: 'rounded-md3-m' }),
-    h('span', { class: 'flex min-w-0 flex-1 flex-col' },
-      h('span', { class: 'truncate text-[22px] leading-7 font-normal' }, user),
-      h('span', { class: 'truncate text-sm text-on-surface-variant' }, host)),
-    h('span', { class: 'text-on-surface-variant' }, icon('right')));
-    b.addEventListener('click', () => this.go('account'));
-    return b;
+    // The account: a squircle with the person icon and the name, as the
+    // profile button of other apps: it says what it opens.
+    const account = h('button', { type: 'button', 'data-view': 'account', 'aria-label': `${t('account')} ${user}`,
+      class: 'state-layer flex max-w-[45%] shrink-0 items-center gap-2 rounded-[18px] bg-secondary-container py-1.5 pr-3 pl-1.5 text-on-secondary-container' },
+    h('span', { class: 'grid size-9 shrink-0 place-items-center rounded-[14px] bg-primary text-on-primary [&_.ic]:size-5' }, icon('person')),
+    h('span', { class: 'truncate text-sm font-medium' }, user));
+    account.addEventListener('click', () => this.go('account'));
+    return h('header', { class: 'flex items-center gap-3 pt-4' },
+      h('img', { src: '/icon.svg', alt: '', width: 44, height: 44, class: 'rounded-md3-m' }),
+      h('div', { class: 'flex min-w-0 flex-1 flex-col' },
+        h('h1', { class: 'truncate text-[22px] leading-7 font-normal' }, 'agendouille'),
+        h('span', { class: 'truncate text-sm text-on-surface-variant' }, host)),
+      account);
   }
 
   /** Home's rows, Android's settings fashion: each opens its page. */

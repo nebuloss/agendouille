@@ -44,7 +44,8 @@ scanning.
 
 ## Moving around
 
-Home is the account (tapping it opens its page: the server, the user,
+Home is the server, the account at the top right (a squircle with the
+person icon and the name, opening its page: the server, the user,
 « Se déconnecter »), the sync's state (« Synchroniser » in the standard
 mode; none in the instant mode, which needs no hand), and four rows,
 each opening its page: **Calendriers**, **Appareils**, **Autorisations**
