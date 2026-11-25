@@ -99,7 +99,13 @@ public final class PushService extends Service {
                 }
             }
         };
-        getSystemService(ConnectivityManager.class).registerDefaultNetworkCallback(network);
+        try {
+            getSystemService(ConnectivityManager.class).registerDefaultNetworkCallback(network);
+        } catch (RuntimeException e) {
+            // Without it the stream still reconnects, after its wait.
+            Log.w("agendouille", "push: no network callback", e);
+            network = null;
+        }
         loop = new Thread(this::run, "agendouille-push");
         loop.start();
     }
@@ -122,7 +128,7 @@ public final class PushService extends Service {
             wake.notifyAll();
         }
         try {
-            getSystemService(ConnectivityManager.class).unregisterNetworkCallback(network);
+            if (network != null) getSystemService(ConnectivityManager.class).unregisterNetworkCallback(network);
         } catch (RuntimeException ignored) {
             // not registered
         }
