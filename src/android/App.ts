@@ -655,17 +655,17 @@ export class App {
     const svg = this.doc.createElementNS(ns, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('class', 'size-5 fill-current');
+    svg.setAttribute('class', 'size-6 fill-current');
     const path = this.doc.createElementNS(ns, 'path');
     path.setAttribute('d', GITHUB_MARK);
     svg.append(path);
-    const gh = h('button', { type: 'button', class: `${ui.btn('text', 'sm')}`, 'aria-label': t('sourceCode') }, svg, 'GitHub');
+    const gh = h('button', { type: 'button', class: ui.btn('text'), 'aria-label': t('sourceCode') }, svg, 'GitHub');
     gh.addEventListener('click', () => void this.bridge.call('open', { url: SOURCE_URL }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
-    return h('footer', { class: 'mt-4 flex flex-col items-center gap-1 pb-6 text-center text-on-surface-variant' },
-      h('div', { class: 'flex items-center gap-2' },
-        h('img', { src: '/icon.svg', alt: '', width: 28, height: 28, class: 'rounded-md3-s' }),
-        h('span', { class: 'text-base font-medium text-on-surface' }, 'agendouille')),
-      h('span', { class: 'text-xs' }, `${t('version')} ${this.bridge.hello?.app_version ?? '?'}`),
+    return h('footer', { class: 'mt-6 flex flex-col items-center gap-2 pb-8 text-center text-on-surface-variant' },
+      h('div', { class: 'flex items-center gap-3' },
+        h('img', { src: '/icon.svg', alt: '', width: 48, height: 48, class: 'rounded-md3-m' }),
+        h('span', { class: 'text-2xl font-normal text-on-surface' }, 'agendouille')),
+      h('span', { class: 'text-sm' }, `${t('version')} ${this.bridge.hello?.app_version ?? '?'}`),
       gh);
   }
 
@@ -697,12 +697,11 @@ export class App {
       this.pushCard(s),
       card(t('language'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('languageHint')), h('div', {}, language)),
       card(t('appearance'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')), h('div', {}, theme)),
-      card(t('about'), [],
-        h('dl', { class: ui.kv },
-          h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
-          h('dt', {}, t('android')), h('dd', {}, String(this.bridge.hello?.android ?? '?'))),
+      // Updates: where they come from; checking by hand only in the standard
+      // mode (the instant one hears of them at once).
+      card(t('updates'), [],
         this.devUpdatesRow(s),
-        this.updateButton()),
+        s.push.instant && s.push.service ? null : this.updateButton()),
     ];
   }
 

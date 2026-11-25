@@ -2,6 +2,7 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    updates: 'Mises à jour',
     sourceCode: 'Code source sur GitHub',
     accountSub: 'Compte · se déconnecter',
     thisPhoneCard: 'Ce téléphone',
@@ -204,6 +205,7 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    updates: 'Updates',
     sourceCode: 'Source code on GitHub',
     accountSub: 'Account · sign out',
     thisPhoneCard: 'This phone',

@@ -66,9 +66,9 @@ leaves the app in the background.
   les navigateurs ».
 - **Autorisations**: what the sync mode needs, each with its state and its
   button.
-- **Réglages**: the sync mode, language,
-  appearance, version, « Versions de développement » and « Rechercher une
-  mise à jour ».
+- **Réglages**: the sync mode, language, appearance, and « Mises à jour »:
+  « Versions de développement », and « Rechercher une mise à jour » in the
+  standard mode (the instant one is told of an update at once).
 
 ## Background sync
 
