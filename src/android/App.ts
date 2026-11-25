@@ -662,7 +662,7 @@ export class App {
     svg.append(path);
     const gh = h('button', { type: 'button', class: ui.btn('text'), 'aria-label': t('sourceCode') }, svg, 'GitHub');
     gh.addEventListener('click', () => void this.bridge.call('open', { url: SOURCE_URL }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
-    return h('footer', { class: 'mt-auto flex shrink-0 flex-col items-center gap-[clamp(0px,0.6vh,8px)] text-center text-on-surface-variant' },
+    return h('footer', { class: 'flex shrink-0 flex-col items-center gap-[clamp(0px,0.6vh,8px)] text-center text-on-surface-variant landscape:flex-row landscape:flex-wrap landscape:justify-center landscape:gap-x-4' },
       h('div', { class: 'flex items-center gap-3' },
         h('img', { src: '/icon.svg', alt: '', class: 'size-[clamp(32px,5.5vh,48px)] rounded-md3-m' }),
         h('span', { class: 'text-[clamp(18px,3vh,24px)] font-normal text-on-surface' }, 'agendouille')),
@@ -887,21 +887,23 @@ export class App {
   /** Home: who, the sync, what needs doing, then the pages. */
   private home(s: AppState): Child[] {
     const a = s.account!;
-    const out: Child[] = [
-      this.accountHeader(a.username, a.host),
-    ];
+    // Portrait: one column. Landscape (a short screen): the account, the
+    // sync and the foot on the left, the rows on the right, all the height.
+    const status: Child[] = [];
     if (!s.permissions.calendar) {
       const allow = h('button', { type: 'button', class: ui.btn('filled') }, icon('calendar'), t('allowCalendar'));
       allow.addEventListener('click', () => void this.act('calendar.request', undefined, t('allowed')));
-      out.push(h('section', { class: 'flex flex-col gap-3 rounded-md3-xl bg-tertiary-container p-5 text-on-tertiary-container' },
+      status.push(h('section', { class: 'flex flex-col gap-3 rounded-md3-xl bg-tertiary-container p-5 text-on-tertiary-container' },
         h('h2', { class: 'text-lg font-medium' }, t('permissionTitle')),
         h('p', { class: 'text-sm' }, t('permissionBody')),
         h('div', {}, allow)));
     }
-    out.push(h('div', { class: 'shrink-0' }, this.syncCard(s)));
-    out.push(this.menu(s));
-    out.push(this.footer());
-    return out;
+    status.push(this.syncCard(s));
+    return [h('div', { class: 'flex min-h-0 flex-1 flex-col gap-[clamp(8px,1.6vh,20px)] landscape:grid landscape:grid-cols-2 landscape:grid-rows-[auto_auto_1fr] landscape:gap-x-4' },
+      h('div', { class: 'shrink-0 landscape:col-start-1 landscape:row-start-1' }, this.accountHeader(a.username, a.host)),
+      h('div', { class: 'flex shrink-0 flex-col gap-[clamp(8px,1.6vh,20px)] landscape:col-start-1 landscape:row-start-2' }, ...status),
+      h('div', { class: 'flex min-h-0 flex-1 flex-col landscape:col-start-2 landscape:row-span-3 landscape:row-start-1 landscape:mt-[clamp(8px,2vh,16px)]' }, this.menu(s)),
+      h('div', { class: 'mt-auto shrink-0 landscape:col-start-1 landscape:row-start-3 landscape:self-end' }, this.footer()))];
   }
 
   /**
@@ -911,7 +913,7 @@ export class App {
    * other pages grow and scroll as usual.
    */
   private fit(home: boolean): void {
-    const on = ['h-dvh', 'overflow-y-auto', 'pb-2', 'gap-[clamp(8px,1.6vh,20px)]'];
+    const on = ['h-dvh', 'overflow-y-auto', 'pb-2', 'gap-[clamp(8px,1.6vh,20px)]', 'landscape:max-w-5xl'];
     const off = ['min-h-screen', 'pb-10', 'gap-5'];
     this.root.classList.remove(...(home ? off : on));
     this.root.classList.add(...(home ? on : off));

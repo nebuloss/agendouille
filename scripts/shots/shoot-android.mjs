@@ -92,7 +92,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   if (name === 'account') {
     // Home fits the screen, without scrolling, at every phone's size.
     await page.evaluate(() => document.querySelector('dialog')?.close());
-    for (const [w, hgt] of [[360, 640], [360, 780], [393, 873], [412, 915]]) {
+    for (const [w, hgt] of [[360, 640], [360, 780], [393, 873], [412, 915], [844, 390], [915, 412]]) {
       await page.setViewport({ width: w, height: hgt, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
       await new Promise((r) => setTimeout(r, 300));
       await page.screenshot({ path: `${out}/android-${lang}-home-${w}x${hgt}.png` });

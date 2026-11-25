@@ -51,7 +51,8 @@ rows, each opening its page: **Calendriers**, **Appareils**, **Autorisations**
 (in orange when one is missing) and **Réglages**; at the foot, the app's
 name, its version and its code on GitHub. Home fits the screen without
 scrolling: the rows share the height, sizes follow it, and a short screen
-drops the rows' second lines and the figures. Every page has a top bar
+drops the rows' second lines and the figures. In landscape, two columns: the account, the
+sync and the foot on the left, the rows on the right. Every page has a top bar
 with back. Android's back gesture works as in any app: it closes a dialog,
 goes back to where the page was opened from, home at last, and from home
 leaves the app in the background.
