@@ -908,10 +908,13 @@ export class App {
     const state = st.state === 'syncing' ? chip(t('syncing'), 'accent', 'repeat')
       : st.state === 'error' ? chip(t('syncFailed'), 'error', 'warn')
         : st.last_sync !== null ? chip(t('upToDate'), 'ok', 'check') : chip(t('neverSeen'), 'warn', 'clock');
+    // Instant sync: nothing to start by hand, the server says when.
+    const instant = s.push.instant && s.push.service;
     const now = h('button', { type: 'button', class: ui.btn('tonal', 'sm'), disabled: st.state === 'syncing' || !s.permissions.calendar }, icon('repeat'), t('syncNow'));
     now.addEventListener('click', () => void this.act('sync.now'));
-    return card(t('sync'), [now],
+    return card(t('sync'), instant ? [] : [now],
       h('div', { class: 'flex flex-wrap items-center gap-2', role: 'status' }, state,
+        instant ? chip(t('modeInstant'), 'accent', 'bell') : null,
         st.last_sync !== null ? h('span', { class: 'text-sm text-on-surface-variant' }, ago(st.last_sync)) : null),
       st.state === 'error' && st.error ? h('p', { class: 'text-sm text-error' }, st.error) : null,
       s.calendars.length > 0

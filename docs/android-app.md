@@ -44,7 +44,8 @@ scanning.
 
 ## Moving around
 
-Home is the account, the sync's state (« Synchroniser »), and four rows,
+Home is the account, the sync's state (« Synchroniser » in the standard
+mode; none in the instant mode, which needs no hand), and four rows,
 each opening its page: **Calendriers**, **Appareils**, **Autorisations**
 (in orange when one is missing) and **Réglages**. Every page has a top bar
 with back. Android's back gesture works as in any app: it closes a dialog,
