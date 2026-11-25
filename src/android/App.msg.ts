@@ -2,6 +2,9 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    homeCalendars: { zero: 'Aucun sur ce téléphone', one: '{count} sur ce téléphone', other: '{count} sur ce téléphone' },
+    homeDevices: 'Connecter un navigateur, appareils et navigateurs connectés',
+    homeSettings: 'Compte, mode {mode}, langue, apparence, mises à jour',
     back: 'Retour',
     permNotifications: 'Notifications',
     permNotificationsWhy: 'Pour vous prévenir d’une connexion à refaire, d’une synchronisation en échec ou d’une autorisation manquante.',
@@ -198,6 +201,9 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    homeCalendars: { zero: 'None on this phone', one: '{count} on this phone', other: '{count} on this phone' },
+    homeDevices: 'Connect a browser, devices and browsers signed in',
+    homeSettings: 'Account, {mode} mode, language, appearance, updates',
     back: 'Back',
     permNotifications: 'Notifications',
     permNotificationsWhy: 'To tell you when to sign in again, when sync fails, or when a permission is missing.',

@@ -35,7 +35,8 @@ function reason(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-type Tab = 'sync' | 'calendars' | 'devices' | 'settings';
+/** The views: home, and the pages its rows open (the permissions from anywhere). */
+type View = 'home' | 'calendars' | 'devices' | 'settings' | 'permissions';
 
 /** Keeps a choice of the screens (language, theme) for the next start; main.ts reads them. */
 export function remember(key: 'agd_lang' | 'agd_theme', value: string): void {
@@ -46,8 +47,6 @@ export function remember(key: 'agd_lang' | 'agd_theme', value: string): void {
   }
 }
 
-const heading = (text: string): HTMLElement => h('h1', { class: 'pt-4 text-[22px] font-normal' }, text);
-
 /**
  * Calendriers: the names, then one calendar's page, the web app's own
  * card (share, edit, give, delete; hide for one shared with me) without
@@ -57,7 +56,7 @@ class PhoneCalendars extends CalendarsPage {
   protected override readonly files = false;
   private selected: string | null = null;
 
-  constructor(doc: Document, api: Api, private readonly phone: () => AppState | null, private readonly toggle: (c: CalendarState, on: boolean) => void,
+  constructor(doc: Document, api: Api, private readonly up: () => void, private readonly phone: () => AppState | null, private readonly toggle: (c: CalendarState, on: boolean) => void,
     private readonly align: (c: CalendarState, on: boolean) => void = () => undefined) {
     super(doc, api);
   }
@@ -109,7 +108,7 @@ class PhoneCalendars extends CalendarsPage {
     const mine = all.filter((c) => c.owner === me);
     const others = all.filter((c) => c.owner !== me);
     return [
-      h('div', { class: 'flex items-center justify-between gap-3 pt-4' }, h('h1', { class: 'text-[22px] leading-7 font-normal' }, t('tabCalendars')), create),
+      topBar(this.doc, t('tabCalendars'), this.up, create),
       ...(all.length === 0 ? [h('p', { class: ui.empty }, t('noCalendar'))] : []),
       ...group(t('mine'), mine.map(row)),
       ...group(t('sharedWithMe'), others.map(row)),
@@ -246,7 +245,6 @@ class PhoneDevices extends ApiPage {
         off(name, t('disconnectBrowserTitle', { name }), t('disconnectBrowserText'), () => this.api.delete(`/sessions/${x.id}`), t('browserDisconnected')));
     });
     return [
-      heading(t('tabDevices')),
       this.connect,
       h('h2', { class: 'px-4 pt-3 text-sm font-medium text-primary' }, t('syncedDevices')),
       list(devices, t('noDevices')),
@@ -282,11 +280,9 @@ export class App {
   private readonly toasts: Toasts;
   private readonly api: Api;
   private state: AppState | null = null;
-  private tab: Tab = 'sync';
-  /** Réglages, or its permissions' view. */
-  private settingsView: 'main' | 'permissions' = 'main';
-  /** The tab the permissions were opened from, to go back to it. */
-  private permissionsFrom: Tab | null = null;
+  private view: View = 'home';
+  /** Where back goes: the views before this one. */
+  private history: View[] = [];
   /** The update offer the dialog showed last (its time), not to show it twice. */
   private updateShown = 0;
   /** The open update dialog's status line, which the "update" events fill. */
@@ -325,8 +321,11 @@ export class App {
     // while the sync reports, unless the account itself changed.
     const same = before?.account != null && s.account != null && before.account.server === s.account.server
       && before.account.username === s.account.username && before.crash === s.crash;
-    if (this.tab !== 'sync' && this.tab !== 'settings' && same) return;
-    if (s.account === null) this.tab = 'sync';
+    if ((this.view === 'calendars' || this.view === 'devices') && same) return;
+    if (s.account === null) {
+      this.view = 'home';
+      this.history = [];
+    }
     this.draw();
   }
 
@@ -336,7 +335,6 @@ export class App {
     this.page?.dispose();
     this.page = null;
     this.root.replaceChildren();
-    this.root.classList.toggle('pb-28', s.account !== null);
     if (s.crash !== null) append(this.root, this.crashCard(s));
     if (s.account === null) {
       append(this.root, ...this.welcome());
@@ -346,28 +344,11 @@ export class App {
       append(this.root, ...this.modeView());
       return;
     }
-    if (this.tab === 'sync') append(this.root, ...this.account(s));
-    else if (this.tab === 'calendars') this.calendarsTab(s);
-    else if (this.tab === 'devices') this.devicesTab(s);
-    else append(this.root, ...(this.settingsView === 'permissions' ? this.permissionsView(s) : this.settingsTab(s)));
-    append(this.root, this.nav());
-  }
-
-  /** The tabs, at the bottom, as the web app's on a phone. */
-  private nav(): HTMLElement {
-    const item = (tab: Tab, ic: Parameters<typeof icon>[0], label: string): HTMLElement => {
-      const on = this.tab === tab;
-      const b = h('button', {
-        type: 'button',
-        class: on ? 'flex flex-1 flex-col items-center gap-1 pt-3 pb-3 text-xs font-semibold text-on-surface' : 'flex flex-1 flex-col items-center gap-1 pt-3 pb-3 text-xs font-medium text-on-surface-variant',
-        ...(on ? { 'aria-current': 'page' } : {}),
-      }, h('span', { class: on ? 'grid h-8 w-16 place-items-center rounded-md3-full bg-secondary-container text-on-secondary-container' : 'grid h-8 w-16 place-items-center rounded-md3-full' }, icon(ic)), label);
-      b.addEventListener('click', () => this.goTab(tab));
-      return b;
-    };
-    return h('nav', { class: 'fixed inset-x-0 bottom-0 z-40 flex border-t border-outline-variant bg-surface-container pb-[env(safe-area-inset-bottom)]', 'aria-label': t('tabs') },
-      item('sync', 'repeat', t('tabSync')), item('calendars', 'calendar', t('tabCalendars')),
-      item('devices', 'devices', t('tabDevices')), item('settings', 'gear', t('tabSettings')));
+    if (this.view === 'home') append(this.root, ...this.home(s));
+    else if (this.view === 'calendars') this.calendarsTab(s);
+    else if (this.view === 'devices') this.devicesTab(s);
+    else if (this.view === 'permissions') append(this.root, ...this.permissionsView(s));
+    else append(this.root, ...this.settingsTab(s));
   }
 
   /** The page in a mount of its own: the web app's code finds the person in .app[data-user]. */
@@ -382,7 +363,7 @@ export class App {
       append(this.root, ...this.phoneCalendars(s));
       return;
     }
-    this.mount(s, (doc) => new PhoneCalendars(doc, this.api, () => this.state, (c, on) => void this.setShown(c, on),
+    this.mount(s, (doc) => new PhoneCalendars(doc, this.api, () => this.up(), () => this.state, (c, on) => void this.setShown(c, on),
       (c, on) => void this.bridge.call('calendar.toggle', { id: c.id, enabled: on }).catch(() => undefined)));
   }
 
@@ -398,7 +379,7 @@ export class App {
         box);
     });
     return [
-      heading(t('tabCalendars')),
+      topBar(this.doc, t('tabCalendars'), () => this.up()),
       rows.length === 0
         ? h('p', { class: ui.empty }, s.permissions.calendar ? t('noCalendarsYet') : t('noCalendarsPermission'))
         : h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...rows),
@@ -410,12 +391,13 @@ export class App {
 
   private devicesTab(s: AppState): void {
     if (s.account!.mode !== 'enrolled') {
-      append(this.root, heading(t('tabDevices')),
+      append(this.root, topBar(this.doc, t('tabDevices'), () => this.up()),
         h('section', { class: 'flex flex-col gap-2 rounded-md3-xl bg-surface-container p-5' },
           h('p', {}, t('needsAppBody')),
           h('p', { class: 'text-sm text-on-surface-variant' }, t('needsAppHow'))));
       return;
     }
+    append(this.root, topBar(this.doc, t('tabDevices'), () => this.up()));
     this.mount(s, (doc) => new PhoneDevices(doc, this.api, () => this.state?.account?.device_id ?? 0, this.connectBrowser()));
   }
 
@@ -432,36 +414,30 @@ export class App {
     return [p.calendar, p.notifications, ...(s.push.instant ? [p.battery, s.push.hidden] : [])].filter((x) => !x).length;
   }
 
-  /** The permissions' view, from anywhere: Réglages' tab, the view on top; back returns where it was opened. */
+  /** A page, from where we are: back returns here. */
+  private go(view: View): void {
+    if (view === this.view) return;
+    this.history.push(this.view);
+    this.view = view;
+    this.draw();
+    this.doc.defaultView?.scrollTo(0, 0);
+  }
+
+  /** Back one page: where it was opened from, home at last. */
+  private up(): void {
+    this.view = this.history.pop() ?? 'home';
+    this.draw();
+    this.doc.defaultView?.scrollTo(0, 0);
+  }
+
   private showPermissions(): void {
-    if (this.tab !== 'settings' || this.settingsView !== 'permissions') this.permissionsFrom = this.tab;
-    this.tab = 'settings';
-    this.settingsView = 'permissions';
-    this.draw();
-    this.doc.defaultView?.scrollTo(0, 0);
-  }
-
-  private closePermissions(): void {
-    this.settingsView = 'main';
-    this.tab = this.permissionsFrom ?? 'settings';
-    this.permissionsFrom = null;
-    this.draw();
-    this.doc.defaultView?.scrollTo(0, 0);
-  }
-
-  /** A tab: its first page, also when it is the current one (a calendar's page goes back to the list). */
-  private goTab(tab: Tab): void {
-    this.tab = tab;
-    this.settingsView = 'main';
-    this.permissionsFrom = null;
-    this.draw();
-    this.doc.defaultView?.scrollTo(0, 0);
+    this.go('permissions');
   }
 
   /**
    * Android's back gesture, as in any app: an open dialog closes; a page
-   * goes back to where it came from; another tab goes back to Synchro;
-   * Synchro leaves the app (it stays in the background).
+   * goes back to where it came from, home at last; home leaves the app (it
+   * stays in the background).
    */
   private back(): void {
     const open = this.doc.querySelector<HTMLDialogElement>('dialog[open]');
@@ -469,35 +445,12 @@ export class App {
       open.close('');
       return;
     }
-    if (this.tab === 'settings' && this.settingsView === 'permissions') {
-      this.closePermissions();
-      return;
-    }
     if (this.page instanceof PhoneCalendars && this.page.back()) return;
-    if (this.state?.account != null && this.tab !== 'sync') {
-      this.goTab('sync');
+    if (this.state?.account != null && this.view !== 'home') {
+      this.up();
       return;
     }
     void this.bridge.call('app.leave').catch(() => undefined);
-  }
-
-  /** Synchro, while a permission is missing: a small link to them all. */
-  private permissionsLink(s: AppState): HTMLElement | null {
-    const n = App.missing(s);
-    if (n === 0) return null;
-    const b = h('button', { type: 'button', class: 'state-layer -ml-3 inline-flex h-10 items-center gap-2 self-start rounded-md3-full px-3 text-sm font-medium text-warning [&_.ic]:size-4' }, icon('warn'), t('someMissing', { count: n }), icon('right'));
-    b.addEventListener('click', () => this.showPermissions());
-    return b;
-  }
-
-  /** Réglages' card: how many permissions are missing, and the view of them all. */
-  private permissionsCard(s: AppState): HTMLElement {
-    const missing = App.missing(s);
-    const go = h('button', { type: 'button', class: `${ui.btn('tonal')} self-start` }, icon('lock'), t('checkPermissions'));
-    go.addEventListener('click', () => this.showPermissions());
-    return card(t('permissions'), [],
-      h('div', {}, missing === 0 ? chip(t('allGranted'), 'ok', 'check') : chip(t('someMissing', { count: missing }), 'warn', 'warn')),
-      go);
   }
 
   /**
@@ -520,10 +473,7 @@ export class App {
   private permissionsMode(s: AppState): HTMLElement | null {
     if (!s.push.service) return null;
     const change = h('button', { type: 'button', class: ui.btn('text', 'sm') }, t('changeMode'));
-    change.addEventListener('click', () => {
-      this.settingsView = 'main';
-      this.draw();
-    });
+    change.addEventListener('click', () => this.go('settings'));
     return h('div', { class: 'flex flex-wrap items-center gap-2 rounded-md3-l bg-secondary-container px-4 py-2 text-on-secondary-container' },
       h('span', { class: 'flex-1 text-sm' }, s.push.instant ? t('permsForInstant') : t('permsForStandard')), change);
   }
@@ -531,7 +481,7 @@ export class App {
   /** Each permission: what it is for, granted or not, and the way to grant it. */
   private permissionsView(s: AppState): Child[] {
     const p = s.permissions;
-    const back = topBar(this.doc, t('permissions'), () => this.closePermissions());
+    const back = topBar(this.doc, t('permissions'), () => this.up());
     const row = (ic: Parameters<typeof icon>[0], title: string, why: string, ok: boolean | null, call: string, label: string, actionCall?: (b: HTMLElement) => void): HTMLElement => {
       const b = h('button', { type: 'button', class: ui.btn(ok === false ? 'filled' : 'text', 'sm') }, label);
       if (actionCall) actionCall(b);
@@ -718,11 +668,11 @@ export class App {
     const theme = themeToggle(this.doc);
     theme.addEventListener('click', () => remember('agd_theme', currentTheme(this.doc)));
     return [
-      heading(t('tabSettings')),
+      topBar(this.doc, t('tabSettings'), () => this.up()),
+      this.accountCard(s),
+      this.pushCard(s),
       card(t('language'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('languageHint')), h('div', {}, language)),
       card(t('appearance'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('appearanceHint')), h('div', {}, theme)),
-      this.permissionsCard(s),
-      this.pushCard(s),
       card(t('about'), [],
         h('dl', { class: ui.kv },
           h('dt', {}, t('version')), h('dd', {}, h('code', {}, this.bridge.hello?.app_version ?? '?')),
@@ -910,7 +860,8 @@ export class App {
 
   // --- the account
 
-  private account(s: AppState): Child[] {
+  /** Home: who, the sync, what needs doing, then the pages. */
+  private home(s: AppState): Child[] {
     const a = s.account!;
     const out: Child[] = [
       h('header', { class: 'flex items-center gap-3 pt-4' },
@@ -928,10 +879,28 @@ export class App {
         h('div', {}, allow)));
     }
     out.push(this.syncCard(s));
-    const link = this.permissionsLink(s);
-    if (link) out.push(link);
-    out.push(this.accountCard(s));
+    out.push(this.menu(s));
     return out;
+  }
+
+  /** Home's rows, Android's settings fashion: each opens its page. */
+  private menu(s: AppState): HTMLElement {
+    const missing = App.missing(s);
+    const item = (view: View, ic: Parameters<typeof icon>[0], title: string, sub: Child, warn = false): HTMLElement => {
+      const b = h('button', { type: 'button', 'data-view': view, class: 'state-layer flex min-h-16 w-full items-center gap-4 px-4 py-3 text-left' },
+        h('span', { class: 'grid size-10 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container' }, icon(ic)),
+        h('span', { class: 'flex min-w-0 flex-1 flex-col gap-0.5' },
+          h('span', { class: 'text-base font-medium' }, title),
+          h('span', { class: warn ? 'flex items-center gap-1 text-sm font-medium text-warning [&_.ic]:size-4' : 'text-sm text-on-surface-variant' }, warn ? icon('warn') : null, sub)),
+        h('span', { class: 'text-on-surface-variant' }, icon('right')));
+      b.addEventListener('click', () => this.go(view));
+      return b;
+    };
+    return h('nav', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container', 'aria-label': t('tabs') },
+      item('calendars', 'calendar', t('tabCalendars'), t('homeCalendars', { count: s.calendars.filter((c) => c.sync).length })),
+      item('devices', 'devices', t('tabDevices'), t('homeDevices')),
+      item('permissions', 'lock', t('permissions'), missing === 0 ? t('allGranted') : t('someMissing', { count: missing }), missing > 0),
+      item('settings', 'gear', t('tabSettings'), t('homeSettings', { mode: s.push.instant ? t('modeInstant') : t('modeStandard') })));
   }
 
   private syncCard(s: AppState): HTMLElement {
@@ -971,8 +940,8 @@ export class App {
  * A page's top bar (Material's small top app bar): back, and where back
  * goes or the page's title. The same on every page under a tab.
  */
-function topBar(doc: Document, title: string, back: () => void): HTMLElement {
-  const b = h('button', { type: 'button', class: 'state-layer -ml-2 grid size-12 shrink-0 place-items-center rounded-full text-on-surface', 'aria-label': t('back') }, icon('left', doc));
+function topBar(doc: Document, title: string, back: () => void, action?: Child): HTMLElement {
+  const b = h('button', { type: 'button', 'data-back': '', class: 'state-layer -ml-2 grid size-12 shrink-0 place-items-center rounded-full text-on-surface', 'aria-label': t('back') }, icon('left', doc));
   b.addEventListener('click', back);
-  return h('div', { class: 'flex min-h-14 items-center gap-1 pt-1' }, b, h('span', { class: 'truncate text-lg font-medium' }, title));
+  return h('div', { class: 'flex min-h-14 items-center gap-1 pt-1' }, b, h('span', { class: 'min-w-0 flex-1 truncate text-lg font-medium' }, title), action ?? null);
 }

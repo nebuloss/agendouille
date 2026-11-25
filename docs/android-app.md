@@ -44,41 +44,28 @@ scanning.
 
 ## Moving around
 
-Four tabs at the bottom; tapping the current one goes back to its first
-page. A page under a tab (a calendar, the permissions) has a top bar with
-back. Android's back gesture works as in any app: it closes a dialog, goes
-back from a page to where it was opened from (the permissions opened from
-Synchro go back to Synchro), from another tab to Synchro, and from Synchro
+Home is the account, the sync's state (« Synchroniser »), and four rows,
+each opening its page: **Calendriers**, **Appareils**, **Autorisations**
+(in orange when one is missing) and **Réglages**. Every page has a top bar
+with back. Android's back gesture works as in any app: it closes a dialog,
+goes back to where the page was opened from, home at last, and from home
 leaves the app in the background.
 
-## The tabs
+## The pages
 
-- **Synchro**: the last sync, « Synchroniser » now, how many events and
-  calendars are on the phone, the account, « Se déconnecter » (removes the
-  account and its calendars from the phone; an app sign-in also removes the
-  device on the server). While a permission is missing (battery
-  optimisation included), a small « N autorisations à accorder » link opens
-  Réglages' Autorisations.
 - **Calendriers**: mine and those shared with me, each with its
-  « Affiché » switch. The switch is the person's, kept on the server: the
-  web agenda follows it, and so does every phone with the app at its next
-  sync (a calendar turned off leaves the phone's agenda). A calendar's page:
-  « Synchroniser sur ce téléphone », its shares (each one's access in
-  place; « Partager avec d'autres » picks groups and people), « Modifier »,
-  « Transférer », « Supprimer »; for one shared with me, « Personnaliser »
-  and « Masquer ».
+  « Affiché » switch, and « Nouveau ». A calendar's page: its sharing,
+  « Modifier », « Transférer », « Supprimer »; for one shared with me,
+  « Personnaliser » and « Masquer ».
 - **Appareils**: « Connecter un navigateur » (scan a browser's sign-in QR
   code, or type its code, then « Se connecter »), the synced devices and
   the signed-in browsers, each with « Déconnecter », and « Déconnecter tous
-  les navigateurs » (this phone stays signed in).
-- **Réglages**: « Autorisations » (each permission, granted or not, with
-  its button: calendar, notifications, camera, battery (needed by instant
-  sync), instant sync's notification while it is on, and, under MIUI or HyperOS
-  phone, autostart), « Synchronisation instantanée » (push, off by
-  default: on, the app stays connected, with a discreet notification it
-  can hide), language, appearance (light, dark, as the phone),
-  version, « Versions de développement », and « Rechercher une mise à
-  jour ».
+  les navigateurs ».
+- **Autorisations**: what the sync mode needs, each with its state and its
+  button.
+- **Réglages**: the account (« Se déconnecter »), the sync mode, language,
+  appearance, version, « Versions de développement » and « Rechercher une
+  mise à jour ».
 
 ## Background sync
 

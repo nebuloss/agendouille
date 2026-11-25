@@ -33,6 +33,16 @@ const absolute = (v) => {
 };
 const fixture = absolute(JSON.parse(readFileSync(new URL('./fixtures/android.json', import.meta.url), 'utf8')));
 
+// Home, by the pages' back arrows, then the page of one of its rows.
+async function go(page, view) {
+  for (let i = 0; i < 4 && (await page.$('[data-back]')); i++) {
+    await (await page.$('[data-back]')).click();
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  await (await page.$(`[data-view="${view}"]`)).click();
+  await new Promise((r) => setTimeout(r, 500));
+}
+
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox', `--lang=${lang}`], headless: true });
 const errors = [];
 for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-dark', 'dark', false], ['account', 'light', true], ['account-dark', 'dark', true], ['mode', 'light', true]]) {
@@ -80,21 +90,18 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   }
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });
   if (name === 'account') {
-    // The other tabs: Calendriers (the web app's page), Navigateur, and approving one.
-    for (const [i, shot] of [[1, 'calendars'], [3, 'settings'], [2, 'devices']]) {
-      await (await page.$$('nav button'))[i].click();
-      await new Promise((r) => setTimeout(r, 500));
-      await page.screenshot({ path: `${out}/android-${lang}-${shot}.png` });
+    // Home's pages: Calendriers (the web app's page), Réglages, Autorisations, Appareils.
+    for (const shot of ['calendars', 'settings', 'permissions', 'devices']) {
+      await go(page, shot);
+      await page.screenshot({ path: `${out}/android-${lang}-${shot}.png`, fullPage: shot === 'permissions' });
       if (shot === 'settings') {
         // The bottom: the version, « Versions de développement », the update check.
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await new Promise((r) => setTimeout(r, 300));
         await page.screenshot({ path: `${out}/android-${lang}-settings-bottom.png` });
         await page.evaluate(() => window.scrollTo(0, 0));
-        // The permissions, each with its state and its way.
-        await (await page.$('xpath/.//button[contains(., "Vérifier les autorisations")]')).click();
-        await new Promise((r) => setTimeout(r, 300));
-        await page.screenshot({ path: `${out}/android-${lang}-permissions.png`, fullPage: true });
+      }
+      if (shot === 'permissions') {
         // The rows below the fold: instant sync's notification, autostart.
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await new Promise((r) => setTimeout(r, 300));
@@ -130,10 +137,8 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
     // « Standard » chosen: its permissions are only the calendar (and the camera, optional).
     await (await page.$('xpath/.//button[contains(., "Standard")]')).click();
     await new Promise((r) => setTimeout(r, 400));
-    await (await page.$$('nav button'))[3].click();
-    await new Promise((r) => setTimeout(r, 400));
-    await (await page.$('xpath/.//button[contains(., "Vérifier les autorisations")]')).click();
-    await new Promise((r) => setTimeout(r, 300));
+    await page.screenshot({ path: `${out}/android-${lang}-home-standard.png` });
+    await go(page, 'permissions');
     await page.screenshot({ path: `${out}/android-${lang}-permissions-standard.png`, fullPage: true });
   }
   if (name === 'welcome') {
