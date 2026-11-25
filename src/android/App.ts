@@ -409,7 +409,8 @@ export class App {
   private static missing(s: AppState): number {
     const p = s.permissions;
     // The camera is asked when scanning; the battery only matters to instant sync.
-    return [p.calendar, ...(s.push.instant ? [p.battery] : [])].filter((x) => !x).length;
+    // Instant sync: the battery exemption, and its notification hidden.
+    return [p.calendar, ...(s.push.instant ? [p.battery, s.push.hidden] : [])].filter((x) => !x).length;
   }
 
   /** The permissions' view, from anywhere: Réglages' tab, the view on top. */
@@ -444,7 +445,7 @@ export class App {
    * permission, but the person's to show or hide in its own category.
    */
   private pushNotificationRow(s: AppState): HTMLElement {
-    const b = h('button', { type: 'button', class: ui.btn('text', 'sm') }, t('pushNotificationSetting'));
+    const b = h('button', { type: 'button', class: ui.btn('filled', 'sm') }, t('hideIt'));
     b.addEventListener('click', () => void this.bridge.call('push.set', { notification: true }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
     return h('div', { class: 'flex items-start gap-4 px-4 py-3' },
       h('span', { class: 'pt-0.5 text-primary' }, icon('repeat')),
@@ -452,7 +453,7 @@ export class App {
         h('span', { class: 'text-base font-medium' }, t('permPushNotification')),
         h('span', { class: 'text-sm text-on-surface-variant' }, t('permPushNotificationWhy')),
         h('span', { class: 'flex flex-wrap items-center gap-2' },
-          s.push.hidden ? chip(t('permHidden'), 'neutral', 'close') : chip(t('permVisible'), 'neutral', 'bell'), b)));
+          s.push.hidden ? chip(t('permHidden'), 'ok', 'check') : chip(t('permVisible'), 'warn', 'warn'), s.push.hidden ? null : b)));
   }
 
   /** Which mode the list is for, and the way to change it (Réglages' card). */

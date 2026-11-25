@@ -929,8 +929,12 @@ public final class MainActivity extends Activity {
                 .put("users", users);
     }
 
-    /** Whether instant sync's notification is hidden: chosen in Réglages, or its category turned off in Android's. */
+    /**
+     * Whether instant sync's notification is hidden: its category turned off,
+     * or no permission to show notifications at all (Android 13 on).
+     */
     private boolean notificationHidden() {
+        if (Build.VERSION.SDK_INT >= 33 && !granted("android.permission.POST_NOTIFICATIONS")) return true;
         android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
         android.app.NotificationChannel ch = nm == null ? null : nm.getNotificationChannel(PushService.CHANNEL);
         return ch != null && ch.getImportance() == android.app.NotificationManager.IMPORTANCE_NONE;

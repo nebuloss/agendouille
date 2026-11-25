@@ -2,8 +2,9 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    hideIt: 'Masquer',
     permsForStandard: 'Pour le mode Standard : seul l’accès à l’agenda est indispensable.',
-    permsForInstant: 'Pour le mode Instantanée : l’agenda, la batterie et sa notification.',
+    permsForInstant: 'Pour le mode Instantanée : l’agenda, la batterie, et sa notification masquée.',
     changeMode: 'Changer de mode',
     modeTitle: 'Mode de synchronisation',
     modeIntro: 'Comment ce téléphone reçoit-il les changements faits ailleurs ? Vous pourrez le changer dans Réglages.',
@@ -186,8 +187,9 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    hideIt: 'Hide',
     permsForStandard: 'For the Standard mode: only the calendar access is needed.',
-    permsForInstant: 'For the Instant mode: the calendar, the battery, and its notification.',
+    permsForInstant: 'For the Instant mode: the calendar, the battery, and its notification hidden.',
     changeMode: 'Change the mode',
     modeTitle: 'Sync mode',
     modeIntro: 'How does this phone get changes made elsewhere? You can change it in Settings.',
