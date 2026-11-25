@@ -54,7 +54,8 @@ which opens a session for the person.
   the signed-in browsers, each with « Déconnecter », and « Déconnecter tous
   les navigateurs » (this phone stays signed in).
 - **Réglages**: « Autorisations » (each permission, granted or not, with
-  its button: calendar, notifications, camera, battery and, under MIUI or HyperOS
+  its button: calendar, notifications, camera, battery (needed by instant
+  sync), instant sync's notification while it is on, and, under MIUI or HyperOS
   phone, autostart), « Synchronisation instantanée » (push, off by
   default: on, the app stays connected, with a discreet notification it
   can hide), language, appearance (light, dark, as the phone),

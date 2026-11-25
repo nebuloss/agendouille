@@ -86,6 +86,11 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
         await (await page.$('xpath/.//button[contains(., "Vérifier les autorisations")]')).click();
         await new Promise((r) => setTimeout(r, 300));
         await page.screenshot({ path: `${out}/android-${lang}-permissions.png`, fullPage: true });
+        // The rows below the fold: instant sync's notification, autostart.
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await new Promise((r) => setTimeout(r, 300));
+        await page.screenshot({ path: `${out}/android-${lang}-permissions-bottom.png` });
+        await page.evaluate(() => window.scrollTo(0, 0));
       }
       if (shot === 'calendars') {
         // One calendar's page.

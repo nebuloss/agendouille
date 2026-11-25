@@ -2,6 +2,11 @@ import { messages } from '@/shared/i18n/i18n.ts';
 
 export const t = messages({
   fr: {
+    permBatteryWhyInstant: 'Indispensable à la synchronisation instantanée : sans elle, Android coupe la connexion lorsque le téléphone est en veille.',
+    permPushNotification: 'Notification de synchronisation instantanée',
+    permPushNotificationWhy: 'Android l’exige tant que l’application reste connectée. Vous pouvez désactiver sa catégorie : la connexion continue.',
+    permVisible: 'Visible',
+    permHidden: 'Masquée',
     pushLongPress: 'Ou appuyez longuement sur la notification elle-même, puis désactivez-la.',
     pushNotification: 'Android exige une notification pour une application qui reste connectée. Elle est discrète, sans icône dans la barre d’état, et vous pouvez la masquer : désactivez sa catégorie « Synchronisation instantanée ». La connexion continue.',
     pushHidden: 'Sa notification est masquée : la connexion continue sans rien afficher.',
@@ -176,6 +181,11 @@ export const t = messages({
     removed: 'Vous êtes déconnecté.',
   },
   en: {
+    permBatteryWhyInstant: 'Needed for instant sync: without it, Android cuts the connection while the phone sleeps.',
+    permPushNotification: 'Instant sync notification',
+    permPushNotificationWhy: 'Android requires it while the app stays connected. You can turn its category off: the connection goes on.',
+    permVisible: 'Visible',
+    permHidden: 'Hidden',
     pushLongPress: 'Or long-press the notification itself, then turn it off.',
     pushNotification: 'Android requires a notification for an app that stays connected. It is discreet, with no icon in the status bar, and you can hide it: turn its “Instant sync” category off. The connection goes on.',
     pushHidden: 'Its notification is hidden: the connection goes on without showing anything.',

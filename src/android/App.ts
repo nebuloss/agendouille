@@ -434,6 +434,22 @@ export class App {
       go);
   }
 
+  /**
+   * Instant sync's notification, while instant sync is on: Android's, not a
+   * permission, but the person's to show or hide in its own category.
+   */
+  private pushNotificationRow(s: AppState): HTMLElement {
+    const b = h('button', { type: 'button', class: ui.btn('text', 'sm') }, t('pushNotificationSetting'));
+    b.addEventListener('click', () => void this.bridge.call('push.set', { notification: true }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
+    return h('div', { class: 'flex items-start gap-4 px-4 py-3' },
+      h('span', { class: 'pt-0.5 text-primary' }, icon('repeat')),
+      h('span', { class: 'flex min-w-0 flex-1 flex-col gap-1.5' },
+        h('span', { class: 'text-base font-medium' }, t('permPushNotification')),
+        h('span', { class: 'text-sm text-on-surface-variant' }, t('permPushNotificationWhy')),
+        h('span', { class: 'flex flex-wrap items-center gap-2' },
+          s.push.hidden ? chip(t('permHidden'), 'neutral', 'close') : chip(t('permVisible'), 'neutral', 'bell'), b)));
+  }
+
   /** Each permission: what it is for, granted or not, and the way to grant it. */
   private permissionsView(s: AppState): Child[] {
     const p = s.permissions;
@@ -460,7 +476,8 @@ export class App {
       row('calendar', t('permCalendar'), t('permCalendarWhy'), p.calendar, 'calendar.request', t('allow')),
       row('bell', t('permNotifications'), t('permNotificationsWhy'), p.notifications, 'notifications.request', t('allow')),
       row('qr', t('permCamera'), t('permCameraWhy'), p.camera, 'camera.request', t('allow')),
-      row('clock', t('permBattery'), t('permBatteryWhy'), p.battery, 'battery.request', t('allow'), opener('battery.request')),
+      row('clock', t('permBattery'), s.push.instant ? t('permBatteryWhyInstant') : t('permBatteryWhy'), p.battery, 'battery.request', t('allow'), opener('battery.request')),
+      ...(s.push.instant ? [this.pushNotificationRow(s)] : []),
       ...(s.xiaomi ? [row('repeat', t('permAutostart'), t('permAutostartWhy'), null, 'autostart.open', t('open'), opener('autostart.open'))] : []),
     ];
     const settings = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} self-start` }, icon('gear'), t('appSettings'));
