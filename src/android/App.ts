@@ -455,6 +455,18 @@ export class App {
           s.push.hidden ? chip(t('permHidden'), 'neutral', 'close') : chip(t('permVisible'), 'neutral', 'bell'), b)));
   }
 
+  /** Which mode the list is for, and the way to change it (Réglages' card). */
+  private permissionsMode(s: AppState): HTMLElement | null {
+    if (!s.push.service) return null;
+    const change = h('button', { type: 'button', class: ui.btn('text', 'sm') }, t('changeMode'));
+    change.addEventListener('click', () => {
+      this.settingsView = 'main';
+      this.draw();
+    });
+    return h('div', { class: 'flex flex-wrap items-center gap-2 rounded-md3-l bg-secondary-container px-4 py-2 text-on-secondary-container' },
+      h('span', { class: 'flex-1 text-sm' }, s.push.instant ? t('permsForInstant') : t('permsForStandard')), change);
+  }
+
   /** Each permission: what it is for, granted or not, and the way to grant it. */
   private permissionsView(s: AppState): Child[] {
     const p = s.permissions;
@@ -490,6 +502,7 @@ export class App {
     settings.addEventListener('click', () => this.open('settings.open'));
     return [
       h('div', { class: 'flex flex-col gap-2 pt-2' }, back, h('h1', { class: 'text-[22px] leading-7 font-normal' }, t('permissions'))),
+      this.permissionsMode(s),
       h('div', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container' }, ...rows),
       h('p', { class: 'px-1 text-sm text-on-surface-variant' }, t('deniedTwice')),
       settings,

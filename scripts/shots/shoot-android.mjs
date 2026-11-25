@@ -58,6 +58,8 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       const ch = new MessageChannel();
       ch.port2.onmessage = (e) => {
         const r = JSON.parse(e.data);
+        // The mode chosen, as Java keeps it.
+        if (r.call === 'push.set' && r.args && 'instant' in r.args) Object.assign(state.push, { instant: r.args.instant === true, mode_chosen: true });
         const result = r.call === 'hello' ? data.hello
           : r.call === 'update.check' ? { current: data.hello.app_version, available: null }
           : r.call === 'api' ? { status: 200, body: JSON.stringify(data.api[`${r.args.method} ${r.args.path}`] ?? {}) }
@@ -116,6 +118,16 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
     await (await page.$('form button[type="submit"]')).click();
     await new Promise((r) => setTimeout(r, 500));
     await page.screenshot({ path: `${out}/android-${lang}-approve.png` });
+  }
+  if (name === 'mode') {
+    // « Standard » chosen: its permissions are only the calendar (and the camera, optional).
+    await (await page.$('xpath/.//button[contains(., "Standard")]')).click();
+    await new Promise((r) => setTimeout(r, 400));
+    await (await page.$$('nav button'))[3].click();
+    await new Promise((r) => setTimeout(r, 400));
+    await (await page.$('xpath/.//button[contains(., "Vérifier les autorisations")]')).click();
+    await new Promise((r) => setTimeout(r, 300));
+    await page.screenshot({ path: `${out}/android-${lang}-permissions-standard.png`, fullPage: true });
   }
   if (name === 'welcome') {
     const manual = await page.$('[data-action="manual"]');
