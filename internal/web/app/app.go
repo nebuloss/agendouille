@@ -72,6 +72,9 @@ func Register(mux *http.ServeMux, d *deps.Deps) error {
 	mux.HandleFunc("GET /.well-known/assetlinks.json", h.assetLinks)
 	mux.Handle("POST /api/app/session", h.basic(h.appSession))
 	mux.Handle("GET /api/app/config", h.basic(h.appConfig))
+	if h.d.Push != nil {
+		h.pushRoutes(mux)
+	}
 	return nil
 }
 
@@ -538,7 +541,7 @@ func (h *handlers) appConfig(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	}
 	webx.JSON(w, http.StatusOK, map[string]any{"server_version": h.d.Version, "min_app_version": "0.0.0",
 		"apk_sha256": apkSHA, "apk_version": apkVersion, "bridge": 1, "sync_interval_s": h.d.Settings.Get().AppSyncIntervalMinutes * 60,
-		"not_shown": notShown})
+		"not_shown": notShown, "push_service": h.d.Push != nil})
 }
 
 // initial is the letter on a user's avatar: the first of the display name,

@@ -68,9 +68,14 @@ type Service struct {
 	log     *slog.Logger
 	client  *http.Client
 
+	relay *Relay
+
 	mu  sync.Mutex
 	key *ecdsa.PrivateKey
 }
+
+// Relay is the push service the server is itself (relay.go).
+func (s *Service) Relay() *Relay { return s.relay }
 
 // New makes the service. base is the dav surface's public URL, now.
 func New(db *sql.DB, sh *sharing.Service, now func() time.Time, base func() string, log *slog.Logger) *Service {
@@ -80,7 +85,7 @@ func New(db *sql.DB, sh *sharing.Service, now func() time.Time, base func() stri
 		// A push service answers where it stands: never follow it elsewhere.
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	return &Service{db: db, sharing: sh, now: now, base: base, log: log, client: client}
+	return &Service{db: db, sharing: sh, now: now, base: base, log: log, client: client, relay: NewRelay(db, now, base)}
 }
 
 // vapidKey is the server's VAPID key, made and kept on first use.
@@ -168,7 +173,8 @@ func (s *Service) Register(ctx context.Context, sub Subscription) (string, time.
 		return "", time.Time{}, ErrNoTrigger
 	}
 	u, err := url.Parse(sub.Resource)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || len(sub.Resource) > 1000 {
+	_, local := s.relay.Local(sub.Resource)
+	if err != nil || (u.Scheme != "https" && !local) || u.Host == "" || u.User != nil || len(sub.Resource) > 1000 {
 		return "", time.Time{}, fmt.Errorf("%w: the push resource is an https URL", ErrInvalid)
 	}
 	pub, err := decode64(sub.PublicKey)
@@ -342,6 +348,9 @@ func (s *Service) Run(ctx context.Context, h *hub.Hub) {
 			if _, err := s.db.ExecContext(ctx, `DELETE FROM push_subscriptions WHERE expires_at <= ?`, store.Time(s.now())); err != nil && ctx.Err() == nil {
 				s.log.Warn("push: dropping expired subscriptions", "err", err)
 			}
+			if err := s.relay.Clean(ctx); err != nil && ctx.Err() == nil {
+				s.log.Warn("push: dropping expired messages", "err", err)
+			}
 		}
 	}
 }
@@ -432,6 +441,14 @@ func (s *Service) deliver(ctx context.Context, key *ecdsa.PrivateKey, t target, 
 	}
 	body, err := seal(msg, pub, auth)
 	if err != nil {
+		return err
+	}
+	// One of this server's own endpoints: straight into its queue.
+	if id, ok := s.relay.Local(t.resource); ok {
+		err := s.relay.Accept(ctx, id, body, 24*time.Hour, topic, "high")
+		if errors.Is(err, ErrNoEndpoint) {
+			_, _ = s.db.ExecContext(ctx, `DELETE FROM push_subscriptions WHERE id = ?`, t.id)
+		}
 		return err
 	}
 	subject := s.base()

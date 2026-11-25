@@ -24,6 +24,8 @@ var Tables = map[string][]Topic{
 	"notice_reads":       {Notices},
 	"admin":              {}, // the admin password: no screen shows it
 	"push_subscriptions": {}, // a device's push registrations: no screen shows them
+	"push_endpoints":     {}, // the push service's endpoints and queue: no screen shows them
+	"push_messages":      {},
 	"push_keys":          {}, // the server's VAPID key
 	"schema_migrations":  {},
 }
