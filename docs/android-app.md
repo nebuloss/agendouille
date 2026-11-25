@@ -49,7 +49,9 @@ its page: the server, the user, « Se déconnecter »), the sync's state
 (« Synchroniser » in the standard mode; none in the instant mode), then four
 rows, each opening its page: **Calendriers**, **Appareils**, **Autorisations**
 (in orange when one is missing) and **Réglages**; at the foot, the app's
-name, its version and its code on GitHub. Every page has a top bar
+name, its version and its code on GitHub. Home fits the screen without
+scrolling: the rows share the height, sizes follow it, and a short screen
+drops the rows' second lines and the figures. Every page has a top bar
 with back. Android's back gesture works as in any app: it closes a dialog,
 goes back to where the page was opened from, home at last, and from home
 leaves the app in the background.

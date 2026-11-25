@@ -348,6 +348,7 @@ export class App {
       append(this.root, ...this.modeView());
       return;
     }
+    this.fit(this.view === 'home');
     if (this.view === 'home') append(this.root, ...this.home(s));
     else if (this.view === 'calendars') this.calendarsTab(s);
     else if (this.view === 'devices') this.devicesTab(s);
@@ -661,11 +662,11 @@ export class App {
     svg.append(path);
     const gh = h('button', { type: 'button', class: ui.btn('text'), 'aria-label': t('sourceCode') }, svg, 'GitHub');
     gh.addEventListener('click', () => void this.bridge.call('open', { url: SOURCE_URL }).catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
-    return h('footer', { class: 'mt-6 flex flex-col items-center gap-2 pb-8 text-center text-on-surface-variant' },
+    return h('footer', { class: 'mt-auto flex shrink-0 flex-col items-center gap-[clamp(0px,0.6vh,8px)] text-center text-on-surface-variant' },
       h('div', { class: 'flex items-center gap-3' },
-        h('img', { src: '/icon.svg', alt: '', width: 48, height: 48, class: 'rounded-md3-m' }),
-        h('span', { class: 'text-2xl font-normal text-on-surface' }, 'agendouille')),
-      h('span', { class: 'text-sm' }, `${t('version')} ${this.bridge.hello?.app_version ?? '?'}`),
+        h('img', { src: '/icon.svg', alt: '', class: 'size-[clamp(32px,5.5vh,48px)] rounded-md3-m' }),
+        h('span', { class: 'text-[clamp(18px,3vh,24px)] font-normal text-on-surface' }, 'agendouille')),
+      h('span', { class: 'text-sm [@media(max-height:640px)]:hidden' }, `${t('version')} ${this.bridge.hello?.app_version ?? '?'}`),
       gh);
   }
 
@@ -897,10 +898,23 @@ export class App {
         h('p', { class: 'text-sm' }, t('permissionBody')),
         h('div', {}, allow)));
     }
-    out.push(this.syncCard(s));
+    out.push(h('div', { class: 'shrink-0' }, this.syncCard(s)));
     out.push(this.menu(s));
     out.push(this.footer());
     return out;
+  }
+
+  /**
+   * Home fits the screen, without scrolling: the root takes the screen's
+   * height, the rows share what is left, and sizes follow the height
+   * (clamp on vh); a short screen drops the rows' second lines first. The
+   * other pages grow and scroll as usual.
+   */
+  private fit(home: boolean): void {
+    const on = ['h-dvh', 'overflow-y-auto', 'pb-2', 'gap-[clamp(8px,1.6vh,20px)]'];
+    const off = ['min-h-screen', 'pb-10', 'gap-5'];
+    this.root.classList.remove(...(home ? off : on));
+    this.root.classList.add(...(home ? on : off));
   }
 
   /** Home's top: who and where, opening the account's page. */
@@ -908,8 +922,8 @@ export class App {
     // The account first, large: who is signed in on this phone, and the
     // way to the account's page (the server is there, not here).
     const b = h('button', { type: 'button', 'data-view': 'account', 'aria-label': `${t('account')} ${user}`, title: host,
-      class: 'state-layer mt-4 flex w-full items-center gap-4 rounded-md3-xl bg-secondary-container p-4 text-left text-on-secondary-container' },
-    h('span', { class: 'grid size-14 shrink-0 place-items-center rounded-[20px] bg-primary text-on-primary' }, bigIcon(this.doc, 'person', 30)),
+      class: 'state-layer mt-[clamp(8px,2vh,16px)] flex w-full shrink-0 items-center gap-4 rounded-md3-xl bg-secondary-container p-[clamp(10px,1.8vh,16px)] text-left text-on-secondary-container' },
+    h('span', { class: 'grid size-[clamp(44px,7vh,56px)] shrink-0 place-items-center rounded-[20px] bg-primary text-on-primary' }, bigIcon(this.doc, 'person', 28)),
     h('span', { class: 'flex min-w-0 flex-1 flex-col gap-0.5' },
       h('span', { class: 'truncate text-[22px] leading-7 font-normal' }, user),
       h('span', { class: 'truncate text-sm opacity-80' }, t('accountSub'))),
@@ -922,16 +936,16 @@ export class App {
   private menu(s: AppState): HTMLElement {
     const missing = App.missing(s);
     const item = (view: View, ic: Parameters<typeof icon>[0], title: string, sub: Child, warn = false): HTMLElement => {
-      const b = h('button', { type: 'button', 'data-view': view, class: 'state-layer flex min-h-16 w-full items-center gap-4 px-4 py-3 text-left' },
+      const b = h('button', { type: 'button', 'data-view': view, class: 'state-layer flex min-h-12 w-full flex-1 items-center gap-4 px-4 py-[clamp(4px,1vh,12px)] text-left' },
         h('span', { class: 'grid size-10 shrink-0 place-items-center rounded-full bg-secondary-container text-on-secondary-container' }, icon(ic)),
         h('span', { class: 'flex min-w-0 flex-1 flex-col gap-0.5' },
           h('span', { class: 'text-base font-medium' }, title),
-          h('span', { class: warn ? 'flex items-center gap-1 text-sm font-medium text-warning [&_.ic]:size-4' : 'text-sm text-on-surface-variant' }, warn ? icon('warn') : null, sub)),
+          h('span', { class: warn ? 'flex items-center gap-1 text-sm font-medium text-warning [&_.ic]:size-4' : 'line-clamp-2 text-sm text-on-surface-variant [@media(max-height:760px)]:hidden' }, warn ? icon('warn') : null, sub)),
         h('span', { class: 'text-on-surface-variant' }, icon('right')));
       b.addEventListener('click', () => this.go(view));
       return b;
     };
-    return h('nav', { class: 'flex flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container', 'aria-label': t('tabs') },
+    return h('nav', { class: 'flex min-h-0 flex-1 flex-col divide-y divide-outline-variant overflow-hidden rounded-md3-xl bg-surface-container', 'aria-label': t('tabs') },
       item('calendars', 'calendar', t('tabCalendars'), t('homeCalendars', { count: s.calendars.filter((c) => c.sync).length })),
       item('devices', 'devices', t('tabDevices'), t('homeDevices')),
       item('permissions', 'lock', t('permissions'), missing === 0 ? t('allGranted') : t('someMissing', { count: missing }), missing > 0),
@@ -953,7 +967,7 @@ export class App {
         st.last_sync !== null ? h('span', { class: 'text-sm text-on-surface-variant' }, ago(st.last_sync)) : null),
       st.state === 'error' && st.error ? h('p', { class: 'text-sm text-error' }, st.error) : null,
       s.calendars.length > 0
-        ? h('div', { class: 'grid grid-cols-2 gap-2' }, stat(st.events, t('eventsStat')), stat(s.calendars.filter((c) => c.sync).length, t('calendarsStat')))
+        ? h('div', { class: 'grid grid-cols-2 gap-2 [@media(max-height:700px)]:hidden' }, stat(st.events, t('eventsStat')), stat(s.calendars.filter((c) => c.sync).length, t('calendarsStat')))
         : null);
   }
 

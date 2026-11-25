@@ -90,6 +90,18 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
   }
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });
   if (name === 'account') {
+    // Home fits the screen, without scrolling, at every phone's size.
+    await page.evaluate(() => document.querySelector('dialog')?.close());
+    for (const [w, hgt] of [[360, 640], [360, 780], [393, 873], [412, 915]]) {
+      await page.setViewport({ width: w, height: hgt, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+      await new Promise((r) => setTimeout(r, 300));
+      await page.screenshot({ path: `${out}/android-${lang}-home-${w}x${hgt}.png` });
+      const over = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+      const inner = await page.evaluate(() => { const r = document.getElementById('app'); return r.scrollHeight - r.clientHeight; });
+      if (over > 1 || inner > 1) errors.push(`home ${w}x${hgt}: scrolls (${over}px page, ${inner}px inside)`);
+    }
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    await new Promise((r) => setTimeout(r, 300));
     // Home's pages: Calendriers (the web app's page), Réglages, Autorisations, Appareils.
     for (const shot of ['account', 'calendars', 'settings', 'permissions', 'devices']) {
       await go(page, shot);
