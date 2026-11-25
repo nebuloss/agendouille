@@ -35,21 +35,21 @@ const fixture = absolute(JSON.parse(readFileSync(new URL('./fixtures/android.jso
 
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox', `--lang=${lang}`], headless: true });
 const errors = [];
-for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-dark', 'dark', false], ['account', 'light', true], ['account-dark', 'dark', true]]) {
+for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-dark', 'dark', false], ['account', 'light', true], ['account-dark', 'dark', true], ['mode', 'light', true]]) {
   const page = await browser.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warn') errors.push(`${name} console: ${m.text()}`); });
   page.on('requestfailed', (r) => errors.push(`${name} failed: ${r.url()}`));
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
-  await page.evaluateOnNewDocument((lang, signedIn, crashed, data) => {
+  await page.evaluateOnNewDocument((lang, signedIn, crashed, data, choosing) => {
     Object.defineProperty(navigator, 'language', { get: () => lang });
     const state = {
       account: signedIn ? data.account : null,
       permissions: { calendar: signedIn, camera: false, notifications: true, battery: false },
       xiaomi: true,
       dev_updates: true,
-      push: { instant: true, service: true, connected: true, hidden: false, users: ['DAVx⁵'] },
+      push: choosing ? { instant: false, mode_chosen: false, service: true, connected: false, hidden: false, users: [] } : { instant: true, mode_chosen: true, service: true, connected: true, hidden: false, users: ['DAVx⁵'] },
       sync: data.sync,
       calendars: signedIn ? data.calendars : [],
       crash: crashed ? data.crash : null,
@@ -66,7 +66,7 @@ for (const [name, scheme, signedIn] of [['welcome', 'light', false], ['welcome-d
       };
       window.postMessage('agendouille-bridge', '*', [ch.port1]);
     }, 50));
-  }, lang, signedIn, name === 'welcome-dark', fixture);
+  }, lang, signedIn, name === 'welcome-dark', fixture, name === 'mode');
   await page.goto(base + '/index.html', { waitUntil: 'networkidle0' });
   await new Promise((r) => setTimeout(r, 500));
   await page.screenshot({ path: `${out}/android-${lang}-${name}.png`, fullPage: true });

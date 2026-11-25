@@ -743,6 +743,7 @@ public final class MainActivity extends Activity {
                 if (a.status != 200) return;
                 JSONObject o = new JSONObject(a.body);
                 applyInterval(c, o.optLong("sync_interval_s"));
+                UnifiedPush.prefs(this).edit().putBoolean("service", o.optBoolean("push_service")).apply();
                 String theirs = o.optString("apk_version");
                 String sha = o.optString("apk_sha256");
                 if (dev && Versions.updateAvailable(version(), theirs, !sha.isEmpty())) ui.post(() -> offerUpdate(c.server, theirs, sha));
@@ -921,6 +922,7 @@ public final class MainActivity extends Activity {
         org.json.JSONArray users = new org.json.JSONArray();
         for (String l : Distributor.users(this)) users.put(l);
         return new JSONObject().put("instant", p.getBoolean("instant", false))
+                .put("mode_chosen", p.getBoolean("mode_chosen", false) || p.getBoolean("instant", false))
                 .put("service", p.getBoolean("service", false))
                 .put("connected", p.getBoolean("connected", false))
                 .put("hidden", notificationHidden())
@@ -955,7 +957,13 @@ public final class MainActivity extends Activity {
             return;
         }
         if (args.has("instant")) {
-            UnifiedPush.prefs(this).edit().putBoolean("instant", args.optBoolean("instant")).apply();
+            boolean on = args.optBoolean("instant");
+            UnifiedPush.prefs(this).edit().putBoolean("instant", on).putBoolean("mode_chosen", true).apply();
+            // Instant sync needs the battery exemption: asked now, only for it.
+            if (on && !batteryExempt()) {
+                openFirst(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())),
+                        new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            }
             PushService.update(this);
             syncNow(); // the calendars' registrations follow
         }

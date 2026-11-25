@@ -33,6 +33,15 @@ A phone signed in with a device password (by hand, or a DAVx5 QR code)
 syncs only: managing calendars and devices needs the app's own sign-in,
 which opens a session for the person.
 
+## The sync mode
+
+Once, after signing in, the app asks how it syncs: « Standard » (every 15
+minutes, on opening, after a change on the phone) or « Instantanée » (a
+change made elsewhere within seconds: see [instant sync](push.md)). Réglages,
+« Mode de synchronisation », changes it. Each mode asks only for what it
+needs: the battery exemption only for instant sync; the camera when
+scanning.
+
 ## The tabs
 
 - **Synchro**: the last sync, « Synchroniser » now, how many events and

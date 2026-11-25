@@ -59,7 +59,7 @@ export const EMPTY: AppState = {
   permissions: { calendar: false, camera: false, notifications: false, battery: false },
   xiaomi: false,
   devUpdates: false,
-  push: { instant: false, service: false, connected: false, hidden: false, users: [] },
+  push: { instant: false, modeChosen: false, service: false, connected: false, hidden: false, users: [] },
   sync: { state: 'never', last_sync: null, error: null, events: 0 },
   calendars: [],
   crash: null,
@@ -105,6 +105,8 @@ export function parseState(v: unknown): AppState {
 export interface PushState {
   /** The person turned it on (Réglages). */
   instant: boolean;
+  /** The person chose a mode (the first screen after signing in). */
+  modeChosen: boolean;
   /** The server has its push service (/api/app/config). */
   service: boolean;
   /** The stream is open now. */
@@ -119,6 +121,7 @@ function parsePush(v: unknown): PushState {
   const o = (v ?? {}) as Record<string, unknown>;
   return {
     instant: o['instant'] === true,
+    modeChosen: o['mode_chosen'] === true,
     service: o['service'] === true,
     connected: o['connected'] === true,
     hidden: o['hidden'] === true,

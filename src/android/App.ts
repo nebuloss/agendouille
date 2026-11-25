@@ -317,6 +317,10 @@ export class App {
       append(this.root, ...this.welcome());
       return;
     }
+    if (s.push.service && !s.push.modeChosen) {
+      append(this.root, ...this.modeView());
+      return;
+    }
     if (this.tab === 'sync') append(this.root, ...this.account(s));
     else if (this.tab === 'calendars') this.calendarsTab(s);
     else if (this.tab === 'devices') this.devicesTab(s);
@@ -404,7 +408,8 @@ export class App {
   /** How many permissions are still to grant. */
   private static missing(s: AppState): number {
     const p = s.permissions;
-    return [p.calendar, p.notifications, p.camera, p.battery].filter((x) => !x).length;
+    // The camera is asked when scanning; the battery only matters to instant sync.
+    return [p.calendar, ...(s.push.instant ? [p.battery] : [])].filter((x) => !x).length;
   }
 
   /** The permissions' view, from anywhere: Réglages' tab, the view on top. */
@@ -468,16 +473,17 @@ export class App {
           h('span', { class: 'text-base font-medium' }, title),
           h('span', { class: 'text-sm text-on-surface-variant' }, why),
           h('span', { class: 'flex flex-wrap items-center gap-2' },
-            ok === null ? chip(t('toCheck'), 'neutral', 'info') : ok ? chip(t('granted'), 'ok', 'check') : chip(t('notGranted'), 'warn', 'warn'),
+            ok === null ? chip(call === 'camera.request' ? t('optional') : t('toCheck'), 'neutral', 'info') : ok ? chip(t('granted'), 'ok', 'check') : chip(t('notGranted'), 'warn', 'warn'),
             ok === true ? null : b)));
     };
     const opener = (call: string) => (b: HTMLElement): void => b.addEventListener('click', () => this.open(call));
     const rows = [
       row('calendar', t('permCalendar'), t('permCalendarWhy'), p.calendar, 'calendar.request', t('allow')),
-      row('bell', t('permNotifications'), t('permNotificationsWhy'), p.notifications, 'notifications.request', t('allow')),
-      row('qr', t('permCamera'), t('permCameraWhy'), p.camera, 'camera.request', t('allow')),
-      row('clock', t('permBattery'), s.push.instant ? t('permBatteryWhyInstant') : t('permBatteryWhy'), p.battery, 'battery.request', t('allow'), opener('battery.request')),
-      ...(s.push.instant ? [this.pushNotificationRow(s)] : []),
+      ...(s.push.instant ? [
+        row('clock', t('permBattery'), t('permBatteryWhyInstant'), p.battery, 'battery.request', t('allow'), opener('battery.request')),
+        this.pushNotificationRow(s),
+      ] : []),
+      row('qr', t('permCamera'), t('permCameraWhy'), p.camera ? true : null, 'camera.request', t('allow')),
       ...(s.xiaomi ? [row('repeat', t('permAutostart'), t('permAutostartWhy'), null, 'autostart.open', t('open'), opener('autostart.open'))] : []),
     ];
     const settings = h('button', { type: 'button', class: `${ui.btn('text', 'sm')} self-start` }, icon('gear'), t('appSettings'));
@@ -510,38 +516,55 @@ export class App {
     return b;
   }
 
-  /**
-   * « Synchronisation instantanée »: off by default; on, the app holds the
-   * server's push stream, which Android allows only with a notification
-   * (the lowest one, which the person can hide).
-   */
+  /** Choosing the mode: a card each, what it does and what it asks. */
+  private modeChoices(current: boolean | null): HTMLElement {
+    const choice = (instant: boolean, ic: Parameters<typeof icon>[0], title: string, body: string, asks: string): HTMLElement => {
+      const on = current === instant;
+      const b = h('button', { type: 'button', 'aria-pressed': String(on),
+        class: on ? 'state-layer flex w-full flex-col gap-1.5 rounded-md3-xl border-2 border-primary bg-secondary-container p-4 text-left text-on-secondary-container'
+          : 'state-layer flex w-full flex-col gap-1.5 rounded-md3-xl border-2 border-outline-variant bg-surface-container p-4 text-left' },
+      h('span', { class: 'flex items-center gap-2 text-lg font-medium' }, icon(ic), title, on ? h('span', { class: 'ml-auto' }, icon('check')) : null),
+      h('span', { class: 'text-sm' }, body),
+      h('span', { class: 'text-sm text-on-surface-variant' }, asks));
+      b.addEventListener('click', () => {
+        if (current === instant) return;
+        void this.bridge.call('push.set', { instant }).then((st) => { if (st) this.show(parseState(st)); },
+          (e: unknown) => this.toasts.error(new Error(reason(e))));
+      });
+      return b;
+    };
+    return h('div', { class: 'flex flex-col gap-3' },
+      choice(false, 'repeat', t('modeStandard'), t('modeStandardBody'), t('modeStandardAsks')),
+      choice(true, 'bell', t('modeInstant'), t('modeInstantBody'), t('modeInstantAsks')));
+  }
+
+  /** The first screen after signing in, once: the mode, changeable in Réglages. */
+  private modeView(): Child[] {
+    return [
+      h('div', { class: 'flex flex-col gap-2 pt-4' },
+        h('h1', { class: 'text-[22px] leading-7 font-normal' }, t('modeTitle')),
+        h('p', { class: 'text-sm text-on-surface-variant' }, t('modeIntro'))),
+      this.modeChoices(null),
+    ];
+  }
+
+  /** Réglages: the mode, and instant sync's state while it is chosen. */
   private pushCard(s: AppState): HTMLElement {
     const p = s.push;
-    const set = (args: Record<string, unknown>): void => {
-      void this.bridge.call('push.set', args).then((st) => { if (st) this.show(parseState(st)); },
-        (e: unknown) => this.toasts.error(new Error(reason(e))));
-    };
-    const status = !p.service ? chip(t('pushNoService'), 'neutral', 'info')
-      : !p.instant ? chip(t('pushOff'), 'neutral', 'close')
-        : p.connected ? chip(t('pushActive'), 'ok', 'check')
-          : chip(t('pushConnecting'), 'warn', 'clock');
-    const body: Child[] = [
-      h('p', { class: 'text-sm text-on-surface-variant' }, t('pushHelp')),
-      h('div', {}, status),
-      h('label', { class: 'flex items-center gap-4' },
-        h('span', { class: 'flex-1 text-base font-medium' }, t('pushSwitch')),
-        p.service ? switchButton(this.doc, t('pushSwitch'), p.instant, (on) => set({ instant: on })) : null),
-    ];
+    if (!p.service) return card(t('modeTitle'), [], h('p', { class: 'text-sm text-on-surface-variant' }, t('pushNoServiceBody')));
+    const body: Child[] = [this.modeChoices(p.instant)];
     if (p.instant) {
+      body.push(h('div', {}, p.connected ? chip(t('pushActive'), 'ok', 'check') : chip(t('pushConnecting'), 'warn', 'clock')));
       body.push(h('p', { class: 'text-sm' }, p.hidden ? t('pushHidden') : t('pushNotification')));
       const settings = h('button', { type: 'button', class: `${ui.btn(p.hidden ? 'text' : 'tonal', 'sm')} self-start` }, icon('bell'), t('pushNotificationSetting'));
-      settings.addEventListener('click', () => set({ notification: true }));
+      settings.addEventListener('click', () => void this.bridge.call('push.set', { notification: true })
+        .catch((e: unknown) => this.toasts.error(new Error(reason(e)))));
       body.push(settings);
       if (!p.hidden) body.push(h('p', { class: 'text-sm text-on-surface-variant' }, t('pushLongPress')));
       body.push(h('p', { class: 'text-sm text-on-surface-variant' },
         p.users.length > 0 ? t('pushUsers', { apps: p.users.join(', ') }) : t('pushDavx5')));
     }
-    return card(t('pushTitle'), [], ...body);
+    return card(t('modeTitle'), [], ...body);
   }
 
   /** « Versions de développement »: where updates come from. */

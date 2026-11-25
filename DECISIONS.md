@@ -1234,3 +1234,13 @@ UnifiedPush distributor, so DAVx5 uses it too, with no ntfy.
   sends standard Web Push, so an FCM gateway could be added later.
 - **The external-distributor connector of the day before is gone**: with
   the push service built in, the app is the distributor, not its client.
+
+## 2026-11-25: the sync mode is chosen once, and asks only what it needs
+
+After signing in, the app asks for its mode, « Standard » or
+« Instantanée », changeable in Réglages; the permissions view and its
+counters list only what the mode needs. The notifications permission is no
+longer asked: the app's only notification is instant sync's, and without the
+permission Android simply does not show it. The camera is optional (asked
+when scanning). A Xiaomi phone is MIUI only when MIUI's security centre is
+installed: crDroid on a Xiaomi gets stock Android's rules.

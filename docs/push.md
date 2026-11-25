@@ -9,8 +9,12 @@ its own push service.
 
 ## On the phone
 
-The agendouille app: Réglages, « Synchronisation instantanée », « Activée »
-(off by default). The app then keeps one connection to the server open.
+The agendouille app asks once, after signing in, for its « Mode de
+synchronisation »: « Standard » (every 15 minutes, on opening, and after a
+change on the phone: nothing else to allow) or « Instantanée » (the
+connection below: it asks for the battery exemption, and shows a
+notification). Réglages changes it later. Only instant sync's permissions are
+asked, and only when it is chosen.
 
 - **The notification.** Android lets an app stay connected only as a
   foreground service, which must have a notification. It is on the lowest
