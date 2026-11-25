@@ -42,7 +42,8 @@ final class Alerts {
         Intent tap = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         if (open != null) tap.putExtra("open", open);
         Notification n = new Notification.Builder(ctx, CHANNEL)
-                .setSmallIcon(android.R.drawable.stat_notify_error)
+                // A problem shows a warning; an update, the download arrow.
+                .setSmallIcon(id == UPDATE ? android.R.drawable.stat_sys_download_done : android.R.drawable.stat_notify_error)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
