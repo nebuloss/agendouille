@@ -50,7 +50,8 @@ public final class ChangeJob extends JobService {
     public boolean onStartJob(JobParameters params) {
         new Thread(() -> {
             try {
-                if (waiting(this)) upload(this);
+                String pending = waiting(this);
+                if (pending != null && fresh(this, pending)) upload(this);
             } catch (RuntimeException e) {
                 Log.w("agendouille", "change job", e);
             } finally {
@@ -66,15 +67,48 @@ public final class ChangeJob extends JobService {
         return false; // schedule() in onStartJob's thread puts it back
     }
 
-    /** Whether an event of the account waits to go to the server. */
-    private static boolean waiting(Context ctx) {
+    /**
+     * The events of the account waiting to go to the server, as a signature
+     * (their ids); null when none. Only those the upload handles: in a
+     * calendar the phone syncs and may write to. A change in a read-only or
+     * unsynced calendar stays on the phone, and must not wake a sync: the
+     * sync's own writes wake this job, and it looped, draining the battery.
+     */
+    private static String waiting(Context ctx) {
         Credentials c = Credentials.load(ctx);
-        if (c == null || ctx.checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) return false;
-        try (Cursor q = ctx.getContentResolver().query(CalendarSync.asSyncAdapter(Events.CONTENT_URI, c.account), new String[]{Events._ID},
-                Events.ACCOUNT_NAME + "=? AND " + Events.ACCOUNT_TYPE + "=? AND (" + Events.DIRTY + "=1 OR " + Events.DELETED + "=1)",
+        if (c == null || ctx.checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) return null;
+        StringBuilder calendars = new StringBuilder();
+        try (Cursor q = ctx.getContentResolver().query(CalendarSync.asSyncAdapter(CalendarContract.Calendars.CONTENT_URI, c.account),
+                new String[]{CalendarContract.Calendars._ID},
+                CalendarContract.Calendars.ACCOUNT_NAME + "=? AND " + CalendarContract.Calendars.ACCOUNT_TYPE + "=? AND "
+                        + CalendarContract.Calendars.SYNC_EVENTS + "=1 AND " + CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL + ">="
+                        + CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
                 new String[]{c.account.name, c.account.type}, null)) {
-            return q != null && q.getCount() > 0;
+            while (q != null && q.moveToNext()) calendars.append(calendars.length() == 0 ? "" : ",").append(q.getLong(0));
         }
+        if (calendars.length() == 0) return null;
+        StringBuilder ids = new StringBuilder();
+        try (Cursor q = ctx.getContentResolver().query(CalendarSync.asSyncAdapter(Events.CONTENT_URI, c.account), new String[]{Events._ID},
+                Events.ACCOUNT_NAME + "=? AND " + Events.ACCOUNT_TYPE + "=? AND " + Events.CALENDAR_ID + " IN (" + calendars + ") AND ("
+                        + Events.DIRTY + "=1 OR " + Events.DELETED + "=1)",
+                new String[]{c.account.name, c.account.type}, Events._ID)) {
+            while (q != null && q.moveToNext()) ids.append(q.getLong(0)).append(' ');
+        }
+        return ids.length() == 0 ? null : ids.toString();
+    }
+
+    /**
+     * Whether these waiting events are new since the last sync this job
+     * asked for. The same ones still there after it means the upload cannot
+     * send them (the server refuses one, say): not again before half an
+     * hour, the periodic sync tries meanwhile.
+     */
+    private static boolean fresh(Context ctx, String pending) {
+        android.content.SharedPreferences p = ctx.getSharedPreferences("change_job", Context.MODE_PRIVATE);
+        long now = System.currentTimeMillis();
+        if (pending.equals(p.getString("pending", null)) && now - p.getLong("asked", 0) < 30 * 60_000L) return false;
+        p.edit().putString("pending", pending).putLong("asked", now).apply();
+        return true;
     }
 
     /** Asks Android for a sync now: the phone's changes first, then the server's. */

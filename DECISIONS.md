@@ -1244,3 +1244,15 @@ longer asked: the app's only notification is instant sync's, and without the
 permission Android simply does not show it. The camera is optional (asked
 when scanning). A Xiaomi phone is MIUI only when MIUI's security centre is
 installed: crDroid on a Xiaomi gets stock Android's rules.
+
+## 2026-11-27: battery: the change job no longer loops, the stream pings less
+
+The job that sends a phone's change within seconds woke on every change to
+the calendar provider, the sync's own writes included, and asked for a sync
+whenever an event of the account was waiting: also in read-only or
+unsynced calendars, which the upload never sends, and after an upload the
+server refused. Each sync then woke the job again: a loop. It now counts
+only events the upload handles (synced, writable calendars), and does not
+ask again for the same waiting events within half an hour. The push
+stream's ping went from 25 to 55 s (nginx's default read timeout is 60 s):
+half the radio wake-ups.

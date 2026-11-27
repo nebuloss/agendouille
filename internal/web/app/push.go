@@ -22,8 +22,9 @@ import (
 // secret), and out to the device over one Server-Sent Events stream, which
 // the agendouille app holds open and hands on as a UnifiedPush distributor.
 
-// streamPing keeps proxies from closing a quiet stream (nginx: 60 s).
-var streamPing = 25 * time.Second
+// streamPing keeps proxies from closing a quiet stream (nginx: 60 s by
+// default). Each ping wakes the phone's radio: as rare as the proxy allows.
+var streamPing = 55 * time.Second
 
 func (h *handlers) pushRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /push/{id}", h.pushIn)

@@ -563,7 +563,7 @@ Bodies `<D:error xmlns:D="DAV:" xmlns:C="…caldav"><C:…/></D:error>`:
   - `DELETE /api/app/push/endpoints/<id>`: `204`, or `404`.
   - `GET /api/app/push/stream`: Server-Sent Events, `retry: 5000`, first
     `event: server` with `{"apk_version","apk_sha256","server_version"}` (no
-    id), a `: ping` every 25 s; each message `id: <seq>`, `event: message`,
+    id), a `: ping` every 55 s; each message `id: <seq>`, `event: message`,
     `data: {"endpoint","urgency","data"}` (`data` base64url, the body as
     received). `Last-Event-ID` acknowledges up to it.
   - `POST /api/app/push/ack {"seq"}`: acknowledges up to `seq`: `204`.

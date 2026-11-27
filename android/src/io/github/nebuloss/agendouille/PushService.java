@@ -179,7 +179,7 @@ public final class PushService extends Service {
         current = c;
         try {
             c.setConnectTimeout(15_000);
-            c.setReadTimeout(90_000); // the server pings every 25 s
+            c.setReadTimeout(150_000); // the server pings every 55 s
             c.setRequestProperty("Accept", "text/event-stream");
             String raw = cred.username + ":" + cred.secret;
             c.setRequestProperty("Authorization", "Basic " + android.util.Base64.encodeToString(raw.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
